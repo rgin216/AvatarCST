@@ -1,5 +1,29 @@
 # AvatarCST – Project Context & Repository Plan
 
+---
+
+## 0. Current Status
+
+**Phase:** Phase 1 ✅ → Phase 2 (Next)
+
+### Completed
+- Folder structure (frontend/backend) ✅
+- Dependencies installed ✅
+- Basic backend server running (port 5000) ✅
+- Health endpoint (`/api/health`) ✅
+- Frontend basic health check ✅
+- Git initialized ✅
+
+### Next Priority
+- Phase 2: Backend Foundation
+  - MongoDB local connection setup
+  - Database models (User, Session, Message, Summary)
+  - Controllers and routes scaffolding
+  - Error handling middleware
+  - `.env.example` template
+
+---
+
 ## 1. Project Overview
 
 AvatarCST is an AI-driven conversational system designed to support elderly individuals, particularly those experiencing cognitive decline, through structured, Cognitive Stimulation Therapy (CST)-inspired interactions.
@@ -61,11 +85,9 @@ User → Audio → LLM → Response → Avatar → User
 - Avatar system (e.g. HeyGen)
 
 #### Database (MongoDB)
-- User data
-- Sessions
-- Messages
-- Summaries
-- Memory (future)
+- **Initial:** Local MongoDB for development/testing
+- **Future:** MongoDB Atlas for production
+- Data: User data, Sessions, Messages, Summaries, Memory (future)
 
 ---
 
@@ -87,6 +109,12 @@ User → Audio → LLM → Response → Avatar → User
 ### AI / Integrations
 - OpenAI Realtime API (audio + text)
 - Avatar API (e.g. HeyGen)
+- **OpenAI Realtime API** (audio + text processing)
+  - Integration points stubbed out initially
+  - API keys will be shared via Discord (no repo storage)
+- **Avatar system (HeyGen)**
+  - Integration points stubbed out initially
+  - API keys will be shared via Discord (no repo storage)
 
 ### Note on Python
 Python is NOT included initially.
@@ -99,7 +127,10 @@ Reason:
   - ML pipelines
   - embeddings/vector search
 
----
+### Integration Approach
+- Services will have **placeholder/stub implementations** initially
+- Actual API integration deferred to Phase 5-6
+- This allows Phase 2-4 to focus on backend structure & core conversation flow
 
 ## 5. Repository Structure
 
@@ -220,10 +251,11 @@ backend/
 - summaryText
 - createdAt
 
-### Future (Optional)
-- Memory (long-term user context)
-- Reminders
-- Preferences
+### Future (Optiona ✅ COMPLETE
+- Create repo structure ✅
+- Initialise frontend and backend ✅
+- Add basic configs (health endpoint) ✅
+- Git initialization ✅
 
 ---
 
@@ -233,11 +265,15 @@ backend/
 - Create repo structure
 - Initialise frontend and backend
 - Add basic configs
-
-### Phase 2 – Backend Foundation
-- Express server
-- MongoDB connection
-- Health route
+ 🔄 NEXT
+- Express server setup ✅ (partial)
+- MongoDB connection (local for dev, Atlas later)
+- Database models (User, Session, Message, Summary)
+- Controllers (session, summary, health)
+- Routes (session, summary)
+- Error handling middleware
+- `.env.example` template
+- Stub services (LLM, Avatar, Memory)
 - Basic error handling
 
 ### Phase 3 – Frontend Foundation
@@ -248,23 +284,24 @@ backend/
 
 ### Phase 4 – Core Functionality
 - Create session
-- Store messages
-- Retrieve messages
-- Display conversation
-
-### Phase 5 – AI Integration
-- Connect to LLM
-- Inject session context
-- Generate responses
+- Store meOpenAI Realtime API
+- Inject session context into prompts
+- Generate conversational responses
 
 ### Phase 6 – Avatar Integration
-- Connect avatar API
-- Sync speech + response
+- Connect HeyGen API
+- Sync speech output + avatar animation
+- Real-time audio/video streaming
 
 ### Phase 7 – Summaries
-- Generate session summaries
-- Store summaries
-- Display to caregivers
+- Generate session summaries (backend)
+- Store summaries in DB
+- Display summaries to caregivers (frontend)
+
+### Phase 8 – Caregiver Features (Future)
+- Caregiver dashboard
+- Session history & insights
+- User preferences & management
 
 ---
 
@@ -352,23 +389,51 @@ AvatarCST aims to:
 The project will begin with:
 - Simple 2-folder repo (frontend + backend)
 - Node/Express backend only
-- React frontend
-- MongoDB persistence
-- External AI + avatar integrations
+- React frontends
 
-Focus:
-→ Build a working end-to-end conversational system first  
-→ Then iterate with smarter features
+### Immediate (Phase 2)
+1. Set up local MongoDB connection
+2. Create Mongoose models (User, Session, Message, Summary)
+3. Build controllers & routes
+4. Add error handling middleware
+5. Create `.env.example` file
+6. Stub out LLM & Avatar services (placeholder code)
+
+### Then (Phase 3)
+- Build frontend pages (Landing, Dashboard, Session, Caregiver)
+- Add React Router setup
+- Connect frontend to backend APIs
+
+### Then (Phase 4+)
+- Core conversation flow (store/retrieve messages)
+- AI integration
+- Avatar integration
+- Summaries generation
+- Caregiver features (future)
+## 13. Collaboration & Key Decisions
+
+### API Keys
+- OpenAI Realtime API keys → shared via Discord
+- HeyGen API keys → shared via Discord
+- **No sensitive keys in repo** ✅
+
+### Development Environment
+- **Database:** Local MongoDB for dev/testing
+- **Deployment:** MongoDB Atlas (future production)
+- **Branching:** Feature branches, PR-based reviews
 
 ---
 
-## 13. Next Step
+## 14. Next Steps
 
-Set up the repo with:
-1. frontend (Vite + React)
-2. backend (Express)
-3. MongoDB connection
-4. health endpoint
-5. basic frontend-backend connection
+**Current focus:** Phase 2 – Backend Foundation (planning stage, no code yet)
 
-Once done → move to session creation and message storage.
+Once Phase 2 is implemented:
+1. Set up local MongoDB connection
+2. Create Mongoose models (User, Session, Message, Summary)
+3. Build controllers & routes
+4. Add error handling middleware
+5. Create `.env.example` file
+6. Stub out LLM & Avatar services (placeholder code)
+
+Then move to Phase 3 (Frontend Foundation) and Phase 4+ (Core Functionality)
