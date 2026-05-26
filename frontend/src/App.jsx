@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { createDemoSession, demoUserId, respondToSession } from "./services/sessionApi";
 
 const SCREENS = { LANDING: "landing", SESSION: "session", END: "end", CAREGIVER: "caregiver" };
 
@@ -106,8 +107,17 @@ function SessionScreen({ onEnd }) {
   const [input, setInput] = useState("");
   const [listening, setListening] = useState(false);
   const [typing, setTyping] = useState(false);
+  const [sessionId, setSessionId] = useState(null);
+  const [apiMode, setApiMode] = useState(demoUserId ? "connecting" : "offline");
+  const [activeSlide, setActiveSlide] = useState({
+    title: "Welcome",
+    prompt: "A gentle check-in to begin the session.",
+    visualHint: "Warm living room, tea, calm daylight",
+  });
+  const [memorySuggestions, setMemorySuggestions] = useState([]);
   const scrollRef = useRef(null);
   const replyIndex = useRef(0);
+  const bootStarted = useRef(false);
 
   const avatarReplies = [
     "That's wonderful to hear! Let's start with a little word game. I'll say a word, and you tell me the first thing that comes to mind. Ready? 🌈 Rainbow!",
@@ -120,15 +130,63 @@ function SessionScreen({ onEnd }) {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
   }, [messages, typing]);
 
-  const sendMessage = (text) => {
+  useEffect(() => {
+    let cancelled = false;
+
+    const startBackendSession = async () => {
+      if (!demoUserId) return;
+      if (bootStarted.current) return;
+      bootStarted.current = true;
+      try {
+        const session = await createDemoSession("Reminiscence");
+        const turn = await respondToSession(session._id, "");
+        if (cancelled) return;
+        setSessionId(session._id);
+        setApiMode("connected");
+        setActiveSlide(turn.slide);
+        setMessages([{ from: "avatar", text: turn.assistantText }]);
+      } catch (err) {
+        console.warn("Falling back to local session script:", err);
+        if (!cancelled) setApiMode("offline");
+      }
+    };
+
+    startBackendSession();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const applyBackendTurn = (turn) => {
+    setActiveSlide(turn.slide);
+    setMemorySuggestions(turn.suggestedMemoryUpdates || []);
+    setMessages(m => [...m, { from: "avatar", text: turn.assistantText }]);
+  };
+
+  const sendMessage = async (text) => {
     if (!text.trim()) return;
     setMessages(m => [...m, { from: "user", text }]);
     setInput("");
     setTyping(true);
+
+    if (sessionId && apiMode === "connected") {
+      try {
+        const turn = await respondToSession(sessionId, text);
+        applyBackendTurn(turn);
+      } catch (err) {
+        console.warn("Backend session turn failed, using local reply:", err);
+        setApiMode("offline");
+        setMessages(m => [...m, { from: "avatar", text: avatarReplies[replyIndex.current++ % avatarReplies.length] }]);
+      } finally {
+        setTyping(false);
+      }
+      return;
+    }
+
     setTimeout(() => {
       setTyping(false);
       setMessages(m => [...m, { from: "avatar", text: avatarReplies[replyIndex.current++ % avatarReplies.length] }]);
-    }, 1800);
+    }, 900);
   };
 
   return (
@@ -136,13 +194,26 @@ function SessionScreen({ onEnd }) {
       <div style={{ padding: "16px 24px", display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: `1px solid ${theme.blush}55`, background: theme.white + "CC", backdropFilter: "blur(12px)" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <div className="pulse-dot" />
-          <span style={{ fontSize: 14, fontWeight: 600, color: theme.text }}>Session in progress</span>
+          <span style={{ fontSize: 14, fontWeight: 600, color: theme.text }}>{apiMode === "connected" ? "Guided CST session" : "Local session preview"}</span>
         </div>
         <div style={{ fontSize: 13, color: theme.textLight }}>Reminiscence · 0:04</div>
         <button onClick={onEnd} style={{ background: "#FDE8E8", border: "none", borderRadius: 12, padding: "8px 14px", fontSize: 13, color: "#C0504D", cursor: "pointer", fontWeight: 600, fontFamily: "'Nunito', sans-serif" }}>End</button>
       </div>
 
-      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "28px 24px 12px" }}>
+      <div style={{ padding: "20px 20px 0" }}>
+        <div style={{ background: "linear-gradient(135deg, #FFFAF5, #EAF2ED)", border: `1px solid ${theme.sage}66`, borderRadius: 18, padding: "18px 20px", boxShadow: "0 4px 22px rgba(139,107,90,0.08)" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start" }}>
+            <div>
+              <div style={{ fontFamily: "'Playfair Display', serif", fontSize: 22, fontWeight: 600, color: theme.text }}>{activeSlide.title}</div>
+              <div style={{ fontSize: 15, color: theme.textLight, lineHeight: 1.45, marginTop: 6 }}>{activeSlide.prompt}</div>
+            </div>
+            {activeSlide.total && <div style={{ fontSize: 12, fontWeight: 700, color: theme.sageDark, background: "#FFFFFFAA", borderRadius: 10, padding: "6px 9px", flexShrink: 0 }}>{activeSlide.index + 1}/{activeSlide.total}</div>}
+          </div>
+          <div style={{ marginTop: 12, fontSize: 12, color: theme.textLight }}>{activeSlide.visualHint}</div>
+        </div>
+      </div>
+
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "18px 24px 12px" }}>
         <div style={{ position: "relative", width: 130, height: 130 }}>
           {listening && [0, 0.4, 0.8].map((d, i) => (
             <div key={i} className="ripple-ring" style={{ animationDelay: `${d}s` }} />
@@ -162,6 +233,11 @@ function SessionScreen({ onEnd }) {
         {typing && (
           <div style={{ display: "flex", gap: 6, padding: "12px 16px" }}>
             {[0, 0.2, 0.4].map((d, i) => <div key={i} className="typing-dot" style={{ animationDelay: `${d}s` }} />)}
+          </div>
+        )}
+        {memorySuggestions.length > 0 && (
+          <div style={{ background: "#FFF3E8", borderRadius: 14, padding: "12px 14px", color: theme.warm, fontSize: 13, lineHeight: 1.4 }}>
+            Memory suggestion: {memorySuggestions[0].content}
           </div>
         )}
       </div>

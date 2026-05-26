@@ -1,5 +1,6 @@
 import Session from '../models/Session.js';
 import Message from '../models/Message.js';
+import { respondToSessionTurn } from '../services/sessionOrchestratorService.js';
 
 export const createSession = async (req, res, next) => {
   try {
@@ -66,6 +67,18 @@ export const getMessages = async (req, res, next) => {
   try {
     const messages = await Message.find({ sessionId: req.params.id }).sort({ timestamp: 1 });
     res.json(messages);
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const respondToSession = async (req, res, next) => {
+  try {
+    const turn = await respondToSessionTurn({
+      sessionId: req.params.id,
+      content: req.body?.content,
+    });
+    res.status(201).json(turn);
   } catch (err) {
     next(err);
   }

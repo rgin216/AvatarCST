@@ -7,6 +7,7 @@ import {
   endSession,
   addMessage,
   getMessages,
+  respondToSession,
 } from '../controllers/sessionController.js';
 
 const router = Router();
@@ -15,6 +16,7 @@ router.get('/user/:userId', getUserSessions);
 router.get('/:id', getSession);
 router.patch('/:id', updateSession);
 router.patch('/:id/end', endSession);
+router.post('/:id/respond', respondToSession);
 router.post('/:id/messages', addMessage);
 router.get('/:id/messages', getMessages);
 
