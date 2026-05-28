@@ -204,7 +204,7 @@ function AvatarModel({ lipSyncFrameRef }) {
     }
   });
 
-  return <primitive object={scene} />;
+  return <primitive object={scene} position={[0, -1.38, 0]} scale={1.18} />;
 }
 
 class AvatarErrorBoundary extends Component {
@@ -243,7 +243,7 @@ export default function AvatarViewer({ lipSyncFrameRef }) {
   return (
     <AvatarErrorBoundary>
       <Canvas
-        camera={{ position: [0, 1.58, 1.55], fov: 28 }}
+        camera={{ position: [0, 0.18, 1.02], fov: 25 }}
         gl={{ antialias: true, alpha: true }}
         shadows
       >
