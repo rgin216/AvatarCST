@@ -7,11 +7,13 @@ import {
   endSession,
   addMessage,
   getMessages,
+  clearUserSessions,
 } from '../controllers/sessionController.js';
 
 const router = Router();
 router.post('/', createSession);
 router.get('/user/:userId', getUserSessions);
+router.delete('/user/:userId', clearUserSessions);
 router.get('/:id', getSession);
 router.patch('/:id', updateSession);
 router.patch('/:id/end', endSession);
