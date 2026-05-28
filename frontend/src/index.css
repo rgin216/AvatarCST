@@ -396,26 +396,6 @@ body {
   pointer-events: none;
 }
 
-.avatar-status,
-.avatar-readiness {
-  width: 100%;
-  border: 1px solid rgba(255, 255, 255, 0.24);
-  border-radius: 8px;
-  padding: 8px 10px;
-  background: rgba(13, 18, 42, 0.42);
-  color: #FFFAF5;
-  display: flex;
-  justify-content: space-between;
-  gap: 10px;
-  font-size: 12px;
-}
-
-.avatar-readiness {
-  flex-direction: column;
-  gap: 3px;
-  color: #E8EDF5;
-}
-
 .avatar-figure {
   position: relative;
   width: 260px;
@@ -537,12 +517,6 @@ body {
   cursor: pointer;
   background: linear-gradient(135deg, #A8C5A0, #7AAB72);
   color: #FFFAF5;
-}
-
-.avatar-dock audio {
-  width: 100%;
-  height: 34px;
-  pointer-events: auto;
 }
 
 .session-input-bar {
