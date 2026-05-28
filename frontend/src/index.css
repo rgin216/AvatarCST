@@ -230,17 +230,21 @@ body {
   overflow: hidden;
   border-radius: 8px;
   background:
-    linear-gradient(140deg, #FFFAF5 0%, #FDF6EE 48%, #E8EDF5 100%);
+    linear-gradient(180deg, rgba(13, 18, 70, 0.96), rgba(13, 18, 70, 0.98));
+  background-size: cover;
+  background-position: center;
   box-shadow: 0 24px 70px rgba(0, 0, 0, 0.28);
 }
 
 .ppt-slide::before {
   content: '';
   position: absolute;
-  inset: 0;
+  inset: 18px;
+  border: 5px solid rgba(255, 255, 255, 0.94);
+  border-radius: 4px;
   background:
-    linear-gradient(90deg, var(--slide-accent) 0 14px, transparent 14px),
-    radial-gradient(circle at 82% 20%, color-mix(in srgb, var(--slide-accent) 34%, transparent), transparent 32%);
+    linear-gradient(90deg, var(--slide-accent) 0 10px, transparent 10px),
+    radial-gradient(circle at 82% 20%, color-mix(in srgb, var(--slide-accent) 26%, transparent), transparent 32%);
   pointer-events: none;
 }
 
@@ -248,7 +252,7 @@ body {
   position: absolute;
   top: 26px;
   right: 34px;
-  color: #7A5C4A;
+  color: rgba(255, 255, 255, 0.72);
   font-size: 13px;
   font-weight: 700;
 }
@@ -258,11 +262,12 @@ body {
   top: 16%;
   left: 8%;
   width: min(620px, 54vw);
+  z-index: 1;
 }
 
 .ppt-slide-kicker {
   margin-bottom: 12px;
-  color: #7A5C4A;
+  color: var(--slide-accent);
   font-size: 17px;
   font-weight: 800;
   text-transform: uppercase;
@@ -271,7 +276,7 @@ body {
 
 .ppt-slide h1 {
   max-width: 680px;
-  color: #3D2B1F;
+  color: #FFFAF5;
   font-family: 'Playfair Display', serif;
   font-size: clamp(44px, 6vw, 86px);
   font-weight: 600;
@@ -280,7 +285,7 @@ body {
 
 .ppt-slide-prompt {
   margin-top: 26px;
-  color: #4F3B2D;
+  color: #FFFAF5;
   font-size: clamp(24px, 2.4vw, 36px);
   font-weight: 700;
   line-height: 1.25;
@@ -297,8 +302,8 @@ body {
   border: 1px solid #F4C8B0;
   border-radius: 999px;
   padding: 8px 13px;
-  background: #FFFAF5CC;
-  color: #7A5C4A;
+  background: rgba(255, 255, 255, 0.08);
+  color: #FFFAF5;
   font-size: 14px;
   font-weight: 700;
 }
@@ -308,7 +313,7 @@ body {
   right: 8%;
   bottom: 20%;
   width: min(330px, 26vw);
-  color: #7A5C4A;
+  color: rgba(255, 255, 255, 0.72);
   font-size: 15px;
   line-height: 1.45;
 }
@@ -319,7 +324,7 @@ body {
   border: 10px solid #FFFAF5;
   border-radius: 8px;
   background:
-    linear-gradient(180deg, #B8CDD8 0 54%, #A8C5A0 54% 100%);
+    linear-gradient(180deg, rgba(0, 174, 239, 0.38) 0 54%, rgba(255, 255, 255, 0.14) 54% 100%);
   box-shadow: 0 12px 30px rgba(61, 43, 31, 0.12);
 }
 
@@ -361,20 +366,21 @@ body {
   position: absolute;
   right: 38px;
   bottom: 34px;
-  width: min(300px, 26vw);
-  min-width: 230px;
+  width: min(320px, 26vw);
+  min-width: 250px;
   display: grid;
   justify-items: center;
-  gap: 10px;
+  gap: 8px;
+  pointer-events: none;
 }
 
 .avatar-status,
 .avatar-readiness {
   width: 100%;
-  border: 1px solid #FFFFFF55;
+  border: 1px solid rgba(255, 255, 255, 0.24);
   border-radius: 8px;
   padding: 8px 10px;
-  background: rgba(29, 42, 50, 0.74);
+  background: rgba(13, 18, 42, 0.42);
   color: #FFFAF5;
   display: flex;
   justify-content: space-between;
@@ -390,8 +396,8 @@ body {
 
 .avatar-figure {
   position: relative;
-  width: 210px;
-  height: 270px;
+  width: 260px;
+  height: 230px;
   perspective: 900px;
   filter: drop-shadow(0 24px 32px rgba(0, 0, 0, 0.34));
 }
@@ -461,9 +467,7 @@ body {
 .real-avatar {
   border-radius: 8px;
   overflow: hidden;
-  background:
-    radial-gradient(circle at 48% 18%, rgba(255, 250, 245, 0.12), transparent 34%),
-    linear-gradient(180deg, rgba(29, 42, 50, 0.18), rgba(29, 42, 50, 0.5));
+  background: transparent;
 }
 
 .real-avatar canvas {
@@ -493,6 +497,7 @@ body {
   display: grid;
   grid-template-columns: 1fr;
   gap: 8px;
+  pointer-events: auto;
 }
 
 .avatar-audio-controls select,
@@ -515,6 +520,7 @@ body {
 .avatar-dock audio {
   width: 100%;
   height: 34px;
+  pointer-events: auto;
 }
 
 .session-input-bar {
