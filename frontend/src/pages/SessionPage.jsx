@@ -1,5 +1,11 @@
 import { useEffect, useRef, useState } from "react";
+import AvatarViewer from "../components/avatar/AvatarViewer";
 import api from "../services/api.js";
+import {
+  createEmptyLipSyncFrame,
+  getRhubarbMorphStateAtTime,
+  rhubarbJsonToTimeline,
+} from "../utils/lipSync.js";
 import theme from "../utils/theme";
 
 const defaultSlide = {
@@ -25,6 +31,21 @@ const defaultAvatar = {
   },
 };
 
+const audioFixtures = [
+  {
+    id: "1980s-singers",
+    label: "1980s singers",
+    audioUrl: "/audio/placeholder-1980s-singers.wav",
+    lipsyncUrl: "/lipsync/placeholder-1980s-singers.json",
+  },
+  {
+    id: "great-wall",
+    label: "Great Wall",
+    audioUrl: "/audio/placeholder-great-wall.wav",
+    lipsyncUrl: "/lipsync/placeholder-great-wall.json",
+  },
+];
+
 export default function SessionPage({ sessionId, onEnd, userName }) {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
@@ -33,11 +54,17 @@ export default function SessionPage({ sessionId, onEnd, userName }) {
   const [elapsed, setElapsed] = useState(0);
   const [slide, setSlide] = useState(defaultSlide);
   const [avatar, setAvatar] = useState(defaultAvatar);
-  const [visemeTick, setVisemeTick] = useState(0);
   const [connectionLabel, setConnectionLabel] = useState("Preparing session");
+  const [fixtureIndex, setFixtureIndex] = useState(0);
+  const [timeline, setTimeline] = useState(null);
+  const [lipSyncStatus, setLipSyncStatus] = useState("Loading Rhubarb fixture");
   const booted = useRef(false);
   const scrollRef = useRef(null);
   const startTime = useRef(null);
+  const audioRef = useRef(null);
+  const animationRef = useRef(null);
+  const lipSyncFrameRef = useRef(createEmptyLipSyncFrame());
+  const activeFixture = audioFixtures[fixtureIndex];
 
   useEffect(() => {
     startTime.current = Date.now();
@@ -51,13 +78,50 @@ export default function SessionPage({ sessionId, onEnd, userName }) {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
   }, [messages, typing]);
 
-  const applyTurn = (turn) => {
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadLipSyncFixture() {
+      setLipSyncStatus("Loading Rhubarb fixture");
+      lipSyncFrameRef.current = createEmptyLipSyncFrame();
+      if (animationRef.current) cancelAnimationFrame(animationRef.current);
+
+      try {
+        const response = await fetch(activeFixture.lipsyncUrl);
+        if (!response.ok) throw new Error("Could not load lipsync JSON");
+        const rhubarbJson = await response.json();
+        const nextTimeline = rhubarbJsonToTimeline(rhubarbJson, { minCueSeconds: 0.04 });
+        if (cancelled) return;
+        setTimeline(nextTimeline);
+        setLipSyncStatus(`Rhubarb fixture ready (${nextTimeline.rawCueCount} cues)`);
+      } catch (err) {
+        console.error("Failed to load Rhubarb fixture", err);
+        if (!cancelled) {
+          setTimeline(null);
+          setLipSyncStatus("Rhubarb fixture unavailable");
+        }
+      }
+    }
+
+    loadLipSyncFixture();
+    return () => {
+      cancelled = true;
+    };
+  }, [activeFixture.lipsyncUrl]);
+
+  useEffect(() => {
+    return () => {
+      if (animationRef.current) cancelAnimationFrame(animationRef.current);
+    };
+  }, []);
+
+  function applyTurn(turn) {
     setSlide(turn.slide || defaultSlide);
     setAvatar(turn.avatar || defaultAvatar);
     if (turn.assistantText) {
       setMessages((items) => [...items, { from: "avatar", text: turn.assistantText }]);
     }
-  };
+  }
 
   useEffect(() => {
     if (!sessionId || booted.current) return;
@@ -82,17 +146,55 @@ export default function SessionPage({ sessionId, onEnd, userName }) {
     startTurn();
   }, [sessionId, userName]);
 
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setVisemeTick((value) => value + 1);
-    }, 180);
-    return () => clearInterval(timer);
-  }, []);
-
   const formatElapsed = (seconds) =>
     `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
 
-  const sendMessage = async (text) => {
+  function publishLipSyncFrame(isPlaying) {
+    const audio = audioRef.current;
+
+    if (!audio || !timeline || !isPlaying) {
+      lipSyncFrameRef.current = createEmptyLipSyncFrame();
+      return;
+    }
+
+    lipSyncFrameRef.current = getRhubarbMorphStateAtTime(timeline, audio.currentTime, {
+      intensity: 1.5,
+      blendWindow: 0.03,
+    });
+  }
+
+  function tickLipSync() {
+    const audio = audioRef.current;
+    const isPlaying = Boolean(audio && !audio.paused && !audio.ended);
+    publishLipSyncFrame(isPlaying);
+
+    if (isPlaying) {
+      animationRef.current = requestAnimationFrame(tickLipSync);
+    }
+  }
+
+  async function playPlaceholderAudio() {
+    const audio = audioRef.current;
+    if (!audio) return;
+    if (animationRef.current) cancelAnimationFrame(animationRef.current);
+
+    try {
+      await audio.play();
+      tickLipSync();
+      setLipSyncStatus(`Playing ${activeFixture.label}`);
+    } catch (err) {
+      console.error("Could not play placeholder audio", err);
+      setLipSyncStatus("Press the audio controls to play");
+    }
+  }
+
+  function handleAudioPause() {
+    if (animationRef.current) cancelAnimationFrame(animationRef.current);
+    publishLipSyncFrame(false);
+    setLipSyncStatus(timeline ? `Rhubarb fixture ready (${timeline.rawCueCount} cues)` : "Paused");
+  }
+
+  async function sendMessage(text) {
     const content = text.trim();
     if (!content || typing) return;
 
@@ -117,16 +219,7 @@ export default function SessionPage({ sessionId, onEnd, userName }) {
     } finally {
       setTyping(false);
     }
-  };
-
-  const visemes = avatar?.lipsync?.visemes || [];
-  const mouth = visemes.length > 0 ? visemes[visemeTick % visemes.length].mouth : "rest";
-  const mouthShape = {
-    rest: "18px 7px 18px 7px",
-    AI: "18px 18px 14px 14px",
-    E: "24px 8px 24px 8px",
-    O: "16px 22px 16px 22px",
-  }[mouth] || "18px 7px 18px 7px";
+  }
 
   return (
     <div className="session-stage">
@@ -180,18 +273,38 @@ export default function SessionPage({ sessionId, onEnd, userName }) {
             <span>{connectionLabel}</span>
             <strong>{avatar.audio?.model || "gpt-realtime-mini"}</strong>
           </div>
-          <div className={`avatar-figure${listening || typing ? " active" : ""}`}>
-            <div className="avatar-head">
-              <div className="avatar-eye left" />
-              <div className="avatar-eye right" />
-              <div className="avatar-mouth" style={{ borderRadius: mouthShape }} />
-            </div>
-            <div className="avatar-torso" />
+          <div className="avatar-figure real-avatar">
+            <AvatarViewer lipSyncFrameRef={lipSyncFrameRef} />
           </div>
           <div className="avatar-readiness">
-            <span>Audio: {avatar.audio?.status || "pending"}</span>
-            <span>Lipsync: {avatar.lipsync?.status || "waiting"}</span>
+            <span>Audio: placeholder WAV</span>
+            <span>Lipsync: {lipSyncStatus}</span>
           </div>
+          <div className="avatar-audio-controls">
+            <select
+              value={fixtureIndex}
+              onChange={(event) => setFixtureIndex(Number(event.target.value))}
+              aria-label="Placeholder audio"
+            >
+              {audioFixtures.map((fixture, index) => (
+                <option key={fixture.id} value={index}>
+                  {fixture.label}
+                </option>
+              ))}
+            </select>
+            <button type="button" onClick={playPlaceholderAudio}>
+              Play test audio
+            </button>
+          </div>
+          <audio
+            ref={audioRef}
+            src={activeFixture.audioUrl}
+            onPlay={tickLipSync}
+            onPause={handleAudioPause}
+            onEnded={handleAudioPause}
+            onSeeked={() => publishLipSyncFrame(Boolean(audioRef.current && !audioRef.current.paused))}
+            controls
+          />
         </section>
       </main>
 
