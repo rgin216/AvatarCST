@@ -248,6 +248,22 @@ body {
   pointer-events: none;
 }
 
+.ppt-slide.has-slide-image::before {
+  display: none;
+}
+
+.ppt-slide.has-slide-image .ppt-slide-content,
+.ppt-slide.has-slide-image .ppt-slide-visual {
+  display: none;
+}
+
+.ppt-slide.has-slide-image .ppt-slide-progress {
+  padding: 7px 10px;
+  border-radius: 8px;
+  background: rgba(13, 18, 42, 0.42);
+  backdrop-filter: blur(8px);
+}
+
 .ppt-slide-progress {
   position: absolute;
   top: 26px;

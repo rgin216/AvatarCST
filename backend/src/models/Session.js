@@ -10,6 +10,7 @@ const sessionSchema = new Schema({
   presentationState: {
     slideIndex: { type: Number, default: 0 },
     deckSlide: { type: Number },
+    imageUrl: { type: String },
     title: { type: String },
     subtitle: { type: String },
     prompt: { type: String },
