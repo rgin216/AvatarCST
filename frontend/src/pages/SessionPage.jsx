@@ -12,6 +12,7 @@ const defaultSlide = {
   index: 0,
   total: 14,
   deckSlide: 1,
+  imageUrl: "/slides/session1/slide-01.jpg",
   title: "Virtual Cognitive Stimulation Therapy",
   subtitle: "Session 1: Introduction & Welcome",
   prompt: "How are you feeling right now?",
@@ -235,7 +236,7 @@ export default function SessionPage({ sessionId, onEnd, userName }) {
 
       <main className="session-slide-shell">
         <section
-          className="ppt-slide"
+          className={`ppt-slide${slide.imageUrl ? " has-slide-image" : ""}`}
           style={{
             "--slide-accent": slide.accent || theme.blush,
             backgroundImage: slide.imageUrl ? `url(${slide.imageUrl})` : undefined,

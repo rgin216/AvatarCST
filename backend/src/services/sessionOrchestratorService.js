@@ -26,6 +26,7 @@ const toSlide = ({ step, index, total }) => ({
   total,
   id: step.id,
   deckSlide: step.deckSlide,
+  imageUrl: step.deckSlide ? `/slides/session1/slide-${String(step.deckSlide).padStart(2, '0')}.jpg` : null,
   title: step.title,
   subtitle: step.subtitle,
   prompt: step.prompt,
@@ -132,6 +133,7 @@ export const respondToSessionTurn = async ({ sessionId, content }) => {
   session.presentationState = {
     slideIndex: slide.index,
     deckSlide: slide.deckSlide,
+    imageUrl: slide.imageUrl,
     title: slide.title,
     subtitle: slide.subtitle,
     prompt: slide.prompt,
