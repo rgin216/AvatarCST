@@ -6,7 +6,13 @@ import SessionPage from "./pages/SessionPage";
 import EndPage from "./pages/EndPage";
 import CaregiverPage from "./pages/CaregiverPage";
 
-const SCREENS = { LOGIN: "login", LANDING: "landing", SESSION: "session", END: "end", CAREGIVER: "caregiver" };
+const SCREENS = {
+  LOGIN: "login",
+  LANDING: "landing",
+  SESSION: "session",
+  END: "end",
+  CAREGIVER: "caregiver",
+};
 
 export default function App() {
   const [screen, setScreen] = useState(SCREENS.LOGIN);
@@ -23,16 +29,16 @@ export default function App() {
   const handleStartSession = async () => {
     if (!userId) return;
     try {
-      const { data } = await api.post("/sessions", { userId, title: "CST Session", theme: "Reminiscence" });
+      const { data } = await api.post("/sessions", {
+        userId,
+        title: "CST Session",
+        theme: "Reminiscence",
+      });
       setSessionId(data._id);
-      api.post(`/sessions/${data._id}/messages`, {
-        role: "assistant",
-        content: `Hello ${userName}! Lovely to see you today. How are you feeling this afternoon? 😊`,
-      }).catch(() => {});
+      setScreen(SCREENS.SESSION);
     } catch (err) {
       console.error("Failed to start session", err);
     }
-    setScreen(SCREENS.SESSION);
   };
 
   const handleEndSession = async () => {
@@ -49,11 +55,22 @@ export default function App() {
 
   return (
     <>
-      {screen === SCREENS.LOGIN     && <LoginPage onLogin={handleLogin} />}
-      {screen === SCREENS.LANDING   && <LandingPage onStart={handleStartSession} onCaregiver={() => setScreen(SCREENS.CAREGIVER)} userName={userName} userId={userId} />}
-      {screen === SCREENS.SESSION   && <SessionPage sessionId={sessionId} onEnd={handleEndSession} userName={userName} />}
-      {screen === SCREENS.END       && <EndPage onHome={() => setScreen(SCREENS.LANDING)} userName={userName} />}
-      {screen === SCREENS.CAREGIVER && <CaregiverPage userId={userId} onBack={() => setScreen(SCREENS.LANDING)} userName={userName} />}
+      {screen === SCREENS.LOGIN && <LoginPage onLogin={handleLogin} />}
+      {screen === SCREENS.LANDING && (
+        <LandingPage
+          onStart={handleStartSession}
+          onCaregiver={() => setScreen(SCREENS.CAREGIVER)}
+          userName={userName}
+          userId={userId}
+        />
+      )}
+      {screen === SCREENS.SESSION && (
+        <SessionPage sessionId={sessionId} onEnd={handleEndSession} userName={userName} />
+      )}
+      {screen === SCREENS.END && <EndPage onHome={() => setScreen(SCREENS.LANDING)} userName={userName} />}
+      {screen === SCREENS.CAREGIVER && (
+        <CaregiverPage userId={userId} onBack={() => setScreen(SCREENS.LANDING)} userName={userName} />
+      )}
     </>
   );
 }

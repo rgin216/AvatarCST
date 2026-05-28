@@ -1,30 +1,49 @@
-import { useState, useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import api from "../services/api.js";
 import theme from "../utils/theme";
-import useIsDesktop from "../hooks/useIsDesktop";
+
+const defaultSlide = {
+  index: 0,
+  total: 6,
+  title: "Welcome Back",
+  subtitle: "A gentle start",
+  prompt: "How are you feeling right now?",
+  bullets: ["Take your time", "Notice your body", "Share one feeling"],
+  visualHint: "Warm sitting room with soft daylight and a cup of tea",
+  accent: theme.blush,
+};
+
+const defaultAvatar = {
+  audio: {
+    status: "pending_generation",
+    model: "gpt-realtime-mini",
+    voice: "marin",
+  },
+  lipsync: {
+    status: "waiting_for_audio",
+    visemes: [],
+  },
+};
 
 export default function SessionPage({ sessionId, onEnd, userName }) {
-  const isDesktop = useIsDesktop();
-  const [messages, setMessages] = useState([
-    { from: "avatar", text: `Hello ${userName}! Lovely to see you today. How are you feeling this afternoon? 😊` },
-  ]);
+  const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [listening, setListening] = useState(false);
   const [typing, setTyping] = useState(false);
   const [elapsed, setElapsed] = useState(0);
+  const [slide, setSlide] = useState(defaultSlide);
+  const [avatar, setAvatar] = useState(defaultAvatar);
+  const [visemeTick, setVisemeTick] = useState(0);
+  const [connectionLabel, setConnectionLabel] = useState("Preparing session");
+  const booted = useRef(false);
   const scrollRef = useRef(null);
-  const replyIndex = useRef(0);
-  const startTime = useRef(Date.now());
-
-  const avatarReplies = [
-    "That's wonderful to hear! Let's start with a little word game. I'll say a word, and you tell me the first thing that comes to mind. Ready? 🌈 Rainbow!",
-    "Lovely! Speaking of colours, do you have a favourite colour that reminds you of a special memory?",
-    "How beautiful! You have such a vivid memory. Tell me more about that time — what was the weather like?",
-    "That sounds absolutely lovely. Shall we try a music round next? 🎵",
-  ];
+  const startTime = useRef(null);
 
   useEffect(() => {
-    const timer = setInterval(() => setElapsed(Math.floor((Date.now() - startTime.current) / 1000)), 1000);
+    startTime.current = Date.now();
+    const timer = setInterval(() => {
+      setElapsed(Math.floor((Date.now() - startTime.current) / 1000));
+    }, 1000);
     return () => clearInterval(timer);
   }, []);
 
@@ -32,83 +51,170 @@ export default function SessionPage({ sessionId, onEnd, userName }) {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
   }, [messages, typing]);
 
-  const formatElapsed = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
-
-  const sendMessage = async (text) => {
-    if (!text.trim()) return;
-    setMessages(m => [...m, { from: "user", text }]);
-    setInput("");
-    if (sessionId) {
-      api.post(`/sessions/${sessionId}/messages`, { role: "user", content: text }).catch(() => {});
+  const applyTurn = (turn) => {
+    setSlide(turn.slide || defaultSlide);
+    setAvatar(turn.avatar || defaultAvatar);
+    if (turn.assistantText) {
+      setMessages((items) => [...items, { from: "avatar", text: turn.assistantText }]);
     }
-    setTyping(true);
-    setTimeout(async () => {
-      setTyping(false);
-      const reply = avatarReplies[replyIndex.current++ % avatarReplies.length];
-      setMessages(m => [...m, { from: "avatar", text: reply }]);
-      if (sessionId) {
-        api.post(`/sessions/${sessionId}/messages`, { role: "assistant", content: reply }).catch(() => {});
-      }
-    }, 1800);
   };
 
-  const avatarPanel = (
-    <div style={{
-      display: "flex", flexDirection: "column", alignItems: "center",
-      padding: isDesktop ? "48px 32px" : "28px 24px 12px",
-      width: isDesktop ? 280 : "100%",
-      flexShrink: 0,
-      borderRight: isDesktop ? `1px solid ${theme.blush}44` : "none",
-      justifyContent: isDesktop ? "center" : undefined,
-    }}>
-      <div style={{ position: "relative", width: 130, height: 130 }}>
-        {listening && [0, 0.4, 0.8].map((d, i) => (
-          <div key={i} className="ripple-ring" style={{ animationDelay: `${d}s` }} />
-        ))}
-        <div className="avatar-float" style={{ width: 130, height: 130, borderRadius: "50%", background: `linear-gradient(145deg, ${theme.blush}, #D4A882)`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 56, boxShadow: `0 8px 40px ${theme.blush}88`, position: "relative", zIndex: 1 }}>🧓</div>
-      </div>
-      <div style={{ marginTop: 12, fontSize: 16, fontWeight: 700, color: theme.text, fontFamily: "'Playfair Display', serif" }}>Aria</div>
-      <div style={{ fontSize: 12, color: theme.textLight }}>Your therapy companion</div>
-    </div>
-  );
+  useEffect(() => {
+    if (!sessionId || booted.current) return;
+    booted.current = true;
+
+    const startTurn = async () => {
+      setTyping(true);
+      try {
+        const { data } = await api.post(`/sessions/${sessionId}/respond`, { content: "" });
+        applyTurn(data);
+        setConnectionLabel("Realtime-ready turn contract");
+      } catch (err) {
+        console.error("Failed to start orchestrated session", err);
+        const fallback = `Hello ${userName}. It is lovely to see you today. How are you feeling right now?`;
+        setMessages([{ from: "avatar", text: fallback }]);
+        setConnectionLabel("Local fallback");
+      } finally {
+        setTyping(false);
+      }
+    };
+
+    startTurn();
+  }, [sessionId, userName]);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setVisemeTick((value) => value + 1);
+    }, 180);
+    return () => clearInterval(timer);
+  }, []);
+
+  const formatElapsed = (seconds) =>
+    `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
+
+  const sendMessage = async (text) => {
+    const content = text.trim();
+    if (!content || typing) return;
+
+    setMessages((items) => [...items, { from: "user", text: content }]);
+    setInput("");
+    setTyping(true);
+
+    try {
+      const { data } = await api.post(`/sessions/${sessionId}/respond`, { content });
+      applyTurn(data);
+      setConnectionLabel("Realtime-ready turn contract");
+    } catch (err) {
+      console.error("Failed to get assistant response", err);
+      setMessages((items) => [
+        ...items,
+        {
+          from: "avatar",
+          text: "I am having trouble connecting right now. Let us take a breath and try again in a moment.",
+        },
+      ]);
+      setConnectionLabel("Connection issue");
+    } finally {
+      setTyping(false);
+    }
+  };
+
+  const visemes = avatar?.lipsync?.visemes || [];
+  const mouth = visemes.length > 0 ? visemes[visemeTick % visemes.length].mouth : "rest";
+  const mouthShape = {
+    rest: "18px 7px 18px 7px",
+    AI: "18px 18px 14px 14px",
+    E: "24px 8px 24px 8px",
+    O: "16px 22px 16px 22px",
+  }[mouth] || "18px 7px 18px 7px";
 
   return (
-    <div style={{ minHeight: "100vh", background: `linear-gradient(180deg, #E8D5C4 0%, ${theme.cream} 40%)`, display: "flex", flexDirection: "column" }}>
-      <div style={{ padding: "16px 24px", display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: `1px solid ${theme.blush}55`, background: theme.white + "CC", backdropFilter: "blur(12px)", flexShrink: 0 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <div className="pulse-dot" />
-          <span style={{ fontSize: 14, fontWeight: 600, color: theme.text }}>Session in progress</span>
+    <div className="session-stage">
+      <header className="session-topbar">
+        <div className="session-status">
+          <span className="pulse-dot" />
+          <span>Session in progress</span>
         </div>
-        <div style={{ fontSize: 13, color: theme.textLight }}>Reminiscence · {formatElapsed(elapsed)}</div>
-        <button onClick={onEnd} style={{ background: "#FDE8E8", border: "none", borderRadius: 12, padding: "8px 14px", fontSize: 13, color: "#C0504D", cursor: "pointer", fontWeight: 600, fontFamily: "'Nunito', sans-serif" }}>End</button>
-      </div>
+        <div className="session-meta">Reminiscence / {formatElapsed(elapsed)}</div>
+        <button onClick={onEnd} className="session-end-button">End</button>
+      </header>
 
-      <div style={{ flex: 1, display: "flex", flexDirection: isDesktop ? "row" : "column", minHeight: 0 }}>
-        {avatarPanel}
-
-        <div style={{ flex: 1, display: "flex", flexDirection: "column", minHeight: 0 }}>
-          <div ref={scrollRef} style={{ flex: 1, overflowY: "auto", padding: "16px 24px", display: "flex", flexDirection: "column", gap: 12 }}>
-            {messages.map((m, i) => (
-              <div key={i} className="slide-in" style={{ display: "flex", justifyContent: m.from === "user" ? "flex-end" : "flex-start" }}>
-                <div style={{ maxWidth: "78%", background: m.from === "avatar" ? theme.white : `linear-gradient(135deg, ${theme.sage}, ${theme.sageDark})`, color: m.from === "avatar" ? theme.text : theme.white, borderRadius: m.from === "avatar" ? "20px 20px 20px 6px" : "20px 20px 6px 20px", padding: "14px 18px", fontSize: 16, lineHeight: 1.55, boxShadow: "0 2px 16px rgba(0,0,0,0.06)" }}>{m.text}</div>
-              </div>
-            ))}
-            {typing && (
-              <div style={{ display: "flex", gap: 6, padding: "12px 16px" }}>
-                {[0, 0.2, 0.4].map((d, i) => <div key={i} className="typing-dot" style={{ animationDelay: `${d}s` }} />)}
-              </div>
-            )}
+      <main className="session-slide-shell">
+        <section className="ppt-slide" style={{ "--slide-accent": slide.accent || theme.blush }}>
+          <div className="ppt-slide-progress">
+            Slide {slide.index + 1} / {slide.total}
           </div>
-
-          <div style={{ padding: "16px 20px 28px", background: theme.white + "EE", backdropFilter: "blur(12px)", borderTop: `1px solid ${theme.blush}44`, flexShrink: 0 }}>
-            <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-              <button onClick={() => setListening(l => !l)} className={`mic-btn${listening ? " mic-btn-active" : ""}`}>{listening ? "🔴" : "🎤"}</button>
-              <input value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === "Enter" && sendMessage(input)} placeholder="Type your response..." className="chat-input" />
-              <button onClick={() => sendMessage(input)} className="send-btn">➤</button>
+          <div className="ppt-slide-content">
+            <p className="ppt-slide-kicker">{slide.subtitle}</p>
+            <h1>{slide.title}</h1>
+            <p className="ppt-slide-prompt">{slide.prompt}</p>
+            <div className="ppt-slide-bullets">
+              {(slide.bullets || []).map((bullet) => (
+                <span key={bullet}>{bullet}</span>
+              ))}
             </div>
           </div>
-        </div>
-      </div>
+          <div className="ppt-slide-visual">
+            <div className="ppt-slide-window" />
+            <p>{slide.visualHint}</p>
+          </div>
+        </section>
+
+        <aside className="session-transcript" ref={scrollRef}>
+          {messages.map((message, index) => (
+            <div key={`${message.from}-${index}`} className={`session-bubble ${message.from}`}>
+              {message.text}
+            </div>
+          ))}
+          {typing && (
+            <div className="session-bubble avatar">
+              <span className="typing-dot" />
+              <span className="typing-dot" />
+              <span className="typing-dot" />
+            </div>
+          )}
+        </aside>
+
+        <section className="avatar-dock" aria-label="Aria avatar">
+          <div className="avatar-status">
+            <span>{connectionLabel}</span>
+            <strong>{avatar.audio?.model || "gpt-realtime-mini"}</strong>
+          </div>
+          <div className={`avatar-figure${listening || typing ? " active" : ""}`}>
+            <div className="avatar-head">
+              <div className="avatar-eye left" />
+              <div className="avatar-eye right" />
+              <div className="avatar-mouth" style={{ borderRadius: mouthShape }} />
+            </div>
+            <div className="avatar-torso" />
+          </div>
+          <div className="avatar-readiness">
+            <span>Audio: {avatar.audio?.status || "pending"}</span>
+            <span>Lipsync: {avatar.lipsync?.status || "waiting"}</span>
+          </div>
+        </section>
+      </main>
+
+      <footer className="session-input-bar">
+        <button
+          type="button"
+          onClick={() => setListening((value) => !value)}
+          className={`mic-btn${listening ? " mic-btn-active" : ""}`}
+          aria-label={listening ? "Stop microphone" : "Start microphone"}
+        >
+          {listening ? "Rec" : "Mic"}
+        </button>
+        <input
+          value={input}
+          onChange={(event) => setInput(event.target.value)}
+          onKeyDown={(event) => event.key === "Enter" && sendMessage(input)}
+          placeholder="Type your response..."
+          className="chat-input"
+        />
+        <button type="button" onClick={() => sendMessage(input)} className="send-btn" aria-label="Send">
+          Send
+        </button>
+      </footer>
     </div>
   );
 }

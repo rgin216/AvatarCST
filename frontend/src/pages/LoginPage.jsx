@@ -28,7 +28,7 @@ export default function LoginPage({ onLogin }) {
         await Promise.all(SEED_MEMORIES.map(mem => api.post(`/memory/${user._id}/entries`, mem)));
       }
       onLogin(user._id, user.preferredName || user.name);
-    } catch (err) {
+    } catch {
       setError("Something went wrong.");
     } finally {
       setLoading(false);
