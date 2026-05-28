@@ -252,6 +252,12 @@ body {
   display: none;
 }
 
+.ppt-slide.has-slide-image {
+  background-color: #000;
+  background-repeat: no-repeat;
+  background-size: contain;
+}
+
 .ppt-slide.has-slide-image .ppt-slide-content,
 .ppt-slide.has-slide-image .ppt-slide-visual {
   display: none;
