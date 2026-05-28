@@ -8,6 +8,8 @@ import {
   addMessage,
   getMessages,
   clearUserSessions,
+  respondToSession,
+  createRealtimeSession,
 } from '../controllers/sessionController.js';
 
 const router = Router();
@@ -17,6 +19,8 @@ router.delete('/user/:userId', clearUserSessions);
 router.get('/:id', getSession);
 router.patch('/:id', updateSession);
 router.patch('/:id/end', endSession);
+router.post('/:id/respond', respondToSession);
+router.post('/:id/realtime-session', createRealtimeSession);
 router.post('/:id/messages', addMessage);
 router.get('/:id/messages', getMessages);
 

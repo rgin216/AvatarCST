@@ -5,6 +5,17 @@ const sessionSchema = new Schema({
   title: { type: String },
   theme: { type: String },
   status: { type: String, enum: ['pending', 'active', 'completed', 'abandoned'], default: 'pending' },
+  scriptId: { type: String, default: 'cst_intro_reminiscence' },
+  scriptStepIndex: { type: Number, default: 0, min: 0 },
+  presentationState: {
+    slideIndex: { type: Number, default: 0 },
+    title: { type: String },
+    subtitle: { type: String },
+    prompt: { type: String },
+    bullets: [{ type: String }],
+    visualHint: { type: String },
+    accent: { type: String },
+  },
   startedAt: { type: Date },
   endedAt: { type: Date },
 }, { timestamps: true });
