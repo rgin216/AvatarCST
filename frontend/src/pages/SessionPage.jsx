@@ -48,6 +48,11 @@ const audioFixtures = [
   },
 ];
 
+const LIP_SYNC_SETTINGS = {
+  intensity: 1.5,
+  minCueSeconds: 0.04,
+};
+
 export default function SessionPage({ sessionId, onEnd, userName }) {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
@@ -64,6 +69,10 @@ export default function SessionPage({ sessionId, onEnd, userName }) {
   const scrollRef = useRef(null);
   const startTime = useRef(null);
   const audioRef = useRef(null);
+  const audioContextRef = useRef(null);
+  const audioMeterRef = useRef(null);
+  const audioSamplesRef = useRef(null);
+  const mediaSourceRef = useRef(null);
   const animationRef = useRef(null);
   const lipSyncFrameRef = useRef(createEmptyLipSyncFrame());
   const activeFixture = audioFixtures[fixtureIndex];
@@ -92,7 +101,9 @@ export default function SessionPage({ sessionId, onEnd, userName }) {
         const response = await fetch(activeFixture.lipsyncUrl);
         if (!response.ok) throw new Error("Could not load lipsync JSON");
         const rhubarbJson = await response.json();
-        const nextTimeline = rhubarbJsonToTimeline(rhubarbJson, { minCueSeconds: 0.04 });
+        const nextTimeline = rhubarbJsonToTimeline(rhubarbJson, {
+          minCueSeconds: LIP_SYNC_SETTINGS.minCueSeconds,
+        });
         if (cancelled) return;
         setTimeline(nextTimeline);
         setLipSyncStatus(`Rhubarb fixture ready (${nextTimeline.rawCueCount} cues)`);
@@ -114,6 +125,12 @@ export default function SessionPage({ sessionId, onEnd, userName }) {
   useEffect(() => {
     return () => {
       if (animationRef.current) cancelAnimationFrame(animationRef.current);
+    };
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      audioContextRef.current?.close();
     };
   }, []);
 
@@ -151,6 +168,50 @@ export default function SessionPage({ sessionId, onEnd, userName }) {
   const formatElapsed = (seconds) =>
     `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
 
+  async function ensureAudioMeter() {
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    if (audioMeterRef.current) {
+      await audioContextRef.current?.resume();
+      return;
+    }
+
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContext) return;
+
+    const audioContext = new AudioContext();
+    const analyser = audioContext.createAnalyser();
+    analyser.fftSize = 512;
+    mediaSourceRef.current = audioContext.createMediaElementSource(audio);
+    mediaSourceRef.current.connect(analyser);
+    analyser.connect(audioContext.destination);
+    audioContextRef.current = audioContext;
+    audioMeterRef.current = analyser;
+    audioSamplesRef.current = new Float32Array(analyser.fftSize);
+
+    if (audioContext.state === "suspended") {
+      await audioContext.resume();
+    }
+  }
+
+  function getSpeechEnergy() {
+    const analyser = audioMeterRef.current;
+    const samples = audioSamplesRef.current;
+
+    if (!analyser || !samples) return 0;
+
+    analyser.getFloatTimeDomainData(samples);
+
+    let sum = 0;
+    for (let i = 0; i < samples.length; i += 1) {
+      sum += samples[i] * samples[i];
+    }
+
+    const rms = Math.sqrt(sum / samples.length);
+    return Math.min(1, Math.max(0, (rms - 0.015) * 4.8));
+  }
+
   function publishLipSyncFrame(isPlaying) {
     const audio = audioRef.current;
 
@@ -159,10 +220,15 @@ export default function SessionPage({ sessionId, onEnd, userName }) {
       return;
     }
 
-    lipSyncFrameRef.current = getRhubarbMorphStateAtTime(timeline, audio.currentTime, {
-      intensity: 1.5,
-      blendWindow: 0.03,
+    const frame = getRhubarbMorphStateAtTime(timeline, audio.currentTime, {
+      intensity: LIP_SYNC_SETTINGS.intensity,
+      blendWindow: LIP_SYNC_SETTINGS.minCueSeconds * 0.75,
     });
+
+    lipSyncFrameRef.current = {
+      ...frame,
+      speechEnergy: getSpeechEnergy(),
+    };
   }
 
   function tickLipSync() {
@@ -175,19 +241,31 @@ export default function SessionPage({ sessionId, onEnd, userName }) {
     }
   }
 
+  function startLipSyncPlayback() {
+    if (animationRef.current) cancelAnimationFrame(animationRef.current);
+    tickLipSync();
+  }
+
   async function playPlaceholderAudio() {
     const audio = audioRef.current;
     if (!audio) return;
     if (animationRef.current) cancelAnimationFrame(animationRef.current);
 
     try {
+      await ensureAudioMeter();
       await audio.play();
-      tickLipSync();
+      startLipSyncPlayback();
       setLipSyncStatus(`Playing ${activeFixture.label}`);
     } catch (err) {
       console.error("Could not play placeholder audio", err);
       setLipSyncStatus("Press the audio controls to play");
     }
+  }
+
+  async function handleAudioPlay() {
+    await ensureAudioMeter();
+    startLipSyncPlayback();
+    setLipSyncStatus(`Playing ${activeFixture.label}`);
   }
 
   function handleAudioPause() {
@@ -308,7 +386,7 @@ export default function SessionPage({ sessionId, onEnd, userName }) {
           <audio
             ref={audioRef}
             src={activeFixture.audioUrl}
-            onPlay={tickLipSync}
+            onPlay={handleAudioPlay}
             onPause={handleAudioPause}
             onEnded={handleAudioPause}
             onSeeked={() => publishLipSyncFrame(Boolean(audioRef.current && !audioRef.current.paused))}
