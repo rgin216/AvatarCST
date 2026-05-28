@@ -45,6 +45,11 @@ const FACIAL_TARGETS = [
   "mouthSmileRight",
 ];
 
+const HEAD_GAZE_OFFSET = {
+  pitchUp: -0.055,
+  turnRight: 0.11,
+};
+
 function findMorphIndex(dictionary, targetName) {
   if (!dictionary) return undefined;
   if (dictionary[targetName] !== undefined) return dictionary[targetName];
@@ -196,15 +201,21 @@ function AvatarModel({ lipSyncFrameRef }) {
       const speechTurn = naturalTurn * 0.011 * speech + consonants * 0.006;
 
       headBone.current.rotation.x =
-        baseHeadRotation.current.x + Math.sin(time * 0.8) * 0.012 + speechBob;
+        baseHeadRotation.current.x +
+        HEAD_GAZE_OFFSET.pitchUp +
+        Math.sin(time * 0.8) * 0.012 +
+        speechBob;
       headBone.current.rotation.y =
-        baseHeadRotation.current.y + Math.sin(time * 0.55) * 0.02 + speechTurn;
+        baseHeadRotation.current.y +
+        HEAD_GAZE_OFFSET.turnRight +
+        Math.sin(time * 0.55) * 0.02 +
+        speechTurn;
       headBone.current.rotation.z =
         baseHeadRotation.current.z + Math.sin(time * 0.7) * 0.01 + speechTurn * 0.35;
     }
   });
 
-  return <primitive object={scene} position={[0, -1.38, 0]} scale={1.18} />;
+  return <primitive object={scene} position={[0, -2, 0]} scale={1.18} />;
 }
 
 class AvatarErrorBoundary extends Component {
@@ -243,7 +254,7 @@ export default function AvatarViewer({ lipSyncFrameRef }) {
   return (
     <AvatarErrorBoundary>
       <Canvas
-        camera={{ position: [0, 0.18, 1.02], fov: 25 }}
+        camera={{ position: [0, 0, 1.2], fov: 25 }}
         gl={{ antialias: true, alpha: true }}
         shadows
       >
