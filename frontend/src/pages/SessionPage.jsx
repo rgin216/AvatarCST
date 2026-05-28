@@ -21,18 +21,6 @@ const defaultSlide = {
   accent: "#00AEEF",
 };
 
-const defaultAvatar = {
-  audio: {
-    status: "pending_generation",
-    model: "gpt-realtime-mini",
-    voice: "marin",
-  },
-  lipsync: {
-    status: "waiting_for_audio",
-    visemes: [],
-  },
-};
-
 const audioFixtures = [
   {
     id: "1980s-singers",
@@ -60,11 +48,8 @@ export default function SessionPage({ sessionId, onEnd, userName }) {
   const [typing, setTyping] = useState(false);
   const [elapsed, setElapsed] = useState(0);
   const [slide, setSlide] = useState(defaultSlide);
-  const [avatar, setAvatar] = useState(defaultAvatar);
-  const [connectionLabel, setConnectionLabel] = useState("Preparing session");
   const [fixtureIndex, setFixtureIndex] = useState(0);
   const [timeline, setTimeline] = useState(null);
-  const [lipSyncStatus, setLipSyncStatus] = useState("Loading Rhubarb fixture");
   const booted = useRef(false);
   const scrollRef = useRef(null);
   const startTime = useRef(null);
@@ -93,7 +78,6 @@ export default function SessionPage({ sessionId, onEnd, userName }) {
     let cancelled = false;
 
     async function loadLipSyncFixture() {
-      setLipSyncStatus("Loading Rhubarb fixture");
       lipSyncFrameRef.current = createEmptyLipSyncFrame();
       if (animationRef.current) cancelAnimationFrame(animationRef.current);
 
@@ -106,12 +90,10 @@ export default function SessionPage({ sessionId, onEnd, userName }) {
         });
         if (cancelled) return;
         setTimeline(nextTimeline);
-        setLipSyncStatus(`Rhubarb fixture ready (${nextTimeline.rawCueCount} cues)`);
       } catch (err) {
         console.error("Failed to load Rhubarb fixture", err);
         if (!cancelled) {
           setTimeline(null);
-          setLipSyncStatus("Rhubarb fixture unavailable");
         }
       }
     }
@@ -136,7 +118,6 @@ export default function SessionPage({ sessionId, onEnd, userName }) {
 
   function applyTurn(turn) {
     setSlide(turn.slide || defaultSlide);
-    setAvatar(turn.avatar || defaultAvatar);
     if (turn.assistantText) {
       setMessages((items) => [...items, { from: "avatar", text: turn.assistantText }]);
     }
@@ -151,12 +132,10 @@ export default function SessionPage({ sessionId, onEnd, userName }) {
       try {
         const { data } = await api.post(`/sessions/${sessionId}/respond`, { content: "" });
         applyTurn(data);
-        setConnectionLabel("Realtime-ready turn contract");
       } catch (err) {
         console.error("Failed to start orchestrated session", err);
         const fallback = `Hello ${userName}. It is lovely to see you today. How are you feeling right now?`;
         setMessages([{ from: "avatar", text: fallback }]);
-        setConnectionLabel("Local fallback");
       } finally {
         setTyping(false);
       }
@@ -255,23 +234,19 @@ export default function SessionPage({ sessionId, onEnd, userName }) {
       await ensureAudioMeter();
       await audio.play();
       startLipSyncPlayback();
-      setLipSyncStatus(`Playing ${activeFixture.label}`);
     } catch (err) {
       console.error("Could not play placeholder audio", err);
-      setLipSyncStatus("Press the audio controls to play");
     }
   }
 
   async function handleAudioPlay() {
     await ensureAudioMeter();
     startLipSyncPlayback();
-    setLipSyncStatus(`Playing ${activeFixture.label}`);
   }
 
   function handleAudioPause() {
     if (animationRef.current) cancelAnimationFrame(animationRef.current);
     publishLipSyncFrame(false);
-    setLipSyncStatus(timeline ? `Rhubarb fixture ready (${timeline.rawCueCount} cues)` : "Paused");
   }
 
   async function sendMessage(text) {
@@ -285,7 +260,6 @@ export default function SessionPage({ sessionId, onEnd, userName }) {
     try {
       const { data } = await api.post(`/sessions/${sessionId}/respond`, { content });
       applyTurn(data);
-      setConnectionLabel("Realtime-ready turn contract");
     } catch (err) {
       console.error("Failed to get assistant response", err);
       setMessages((items) => [
@@ -295,7 +269,6 @@ export default function SessionPage({ sessionId, onEnd, userName }) {
           text: "I am having trouble connecting right now. Let us take a breath and try again in a moment.",
         },
       ]);
-      setConnectionLabel("Connection issue");
     } finally {
       setTyping(false);
     }
@@ -356,16 +329,8 @@ export default function SessionPage({ sessionId, onEnd, userName }) {
         </aside>
 
         <section className="avatar-dock" aria-label="Aria avatar">
-          <div className="avatar-status">
-            <span>{connectionLabel}</span>
-            <strong>{avatar.audio?.model || "gpt-realtime-mini"}</strong>
-          </div>
           <div className="avatar-figure real-avatar">
             <AvatarViewer lipSyncFrameRef={lipSyncFrameRef} />
-          </div>
-          <div className="avatar-readiness">
-            <span>Audio: placeholder WAV</span>
-            <span>Lipsync: {lipSyncStatus}</span>
           </div>
           <div className="avatar-audio-controls">
             <select
@@ -390,7 +355,8 @@ export default function SessionPage({ sessionId, onEnd, userName }) {
             onPause={handleAudioPause}
             onEnded={handleAudioPause}
             onSeeked={() => publishLipSyncFrame(Boolean(audioRef.current && !audioRef.current.paused))}
-            controls
+            preload="metadata"
+            hidden
           />
         </section>
       </main>
