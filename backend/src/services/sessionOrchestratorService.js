@@ -25,6 +25,7 @@ const toSlide = ({ step, index, total }) => ({
   index,
   total,
   id: step.id,
+  deckSlide: step.deckSlide,
   title: step.title,
   subtitle: step.subtitle,
   prompt: step.prompt,
@@ -130,6 +131,7 @@ export const respondToSessionTurn = async ({ sessionId, content }) => {
   session.scriptStepIndex = nextStepIndex;
   session.presentationState = {
     slideIndex: slide.index,
+    deckSlide: slide.deckSlide,
     title: slide.title,
     subtitle: slide.subtitle,
     prompt: slide.prompt,

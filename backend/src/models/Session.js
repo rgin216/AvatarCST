@@ -9,6 +9,7 @@ const sessionSchema = new Schema({
   scriptStepIndex: { type: Number, default: 0, min: 0 },
   presentationState: {
     slideIndex: { type: Number, default: 0 },
+    deckSlide: { type: Number },
     title: { type: String },
     subtitle: { type: String },
     prompt: { type: String },

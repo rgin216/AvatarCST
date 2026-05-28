@@ -1,6 +1,6 @@
 import { Component, Suspense, useLayoutEffect, useRef } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
-import { Bounds, Html, OrbitControls, useGLTF } from "@react-three/drei";
+import { Html, useGLTF } from "@react-three/drei";
 import * as THREE from "three";
 
 const MODEL_PATH = "/models/harry.glb";
@@ -204,11 +204,7 @@ function AvatarModel({ lipSyncFrameRef }) {
     }
   });
 
-  return (
-    <Bounds fit clip observe margin={1.22}>
-      <primitive object={scene} />
-    </Bounds>
-  );
+  return <primitive object={scene} />;
 }
 
 class AvatarErrorBoundary extends Component {
@@ -247,7 +243,7 @@ export default function AvatarViewer({ lipSyncFrameRef }) {
   return (
     <AvatarErrorBoundary>
       <Canvas
-        camera={{ position: [0, 1.45, 3.2], fov: 35 }}
+        camera={{ position: [0, 1.58, 1.55], fov: 28 }}
         gl={{ antialias: true, alpha: true }}
         shadows
       >
@@ -263,14 +259,6 @@ export default function AvatarViewer({ lipSyncFrameRef }) {
         >
           <AvatarModel lipSyncFrameRef={lipSyncFrameRef} />
         </Suspense>
-        <OrbitControls
-          makeDefault
-          enableDamping
-          enablePan={false}
-          enableZoom={false}
-          dampingFactor={0.08}
-          target={[0, 1.35, 0]}
-        />
       </Canvas>
     </AvatarErrorBoundary>
   );

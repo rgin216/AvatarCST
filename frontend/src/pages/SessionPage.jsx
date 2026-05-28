@@ -10,13 +10,14 @@ import theme from "../utils/theme";
 
 const defaultSlide = {
   index: 0,
-  total: 6,
-  title: "Welcome Back",
-  subtitle: "A gentle start",
+  total: 14,
+  deckSlide: 1,
+  title: "Virtual Cognitive Stimulation Therapy",
+  subtitle: "Session 1: Introduction & Welcome",
   prompt: "How are you feeling right now?",
-  bullets: ["Take your time", "Notice your body", "Share one feeling"],
-  visualHint: "Warm sitting room with soft daylight and a cup of tea",
-  accent: theme.blush,
+  bullets: ["Welcome", "No preparation needed", "Nothing you can get wrong"],
+  visualHint: "Source deck: NZ01. Welcome.pptx, slide 1",
+  accent: "#00AEEF",
 };
 
 const defaultAvatar = {
@@ -233,9 +234,16 @@ export default function SessionPage({ sessionId, onEnd, userName }) {
       </header>
 
       <main className="session-slide-shell">
-        <section className="ppt-slide" style={{ "--slide-accent": slide.accent || theme.blush }}>
+        <section
+          className="ppt-slide"
+          style={{
+            "--slide-accent": slide.accent || theme.blush,
+            backgroundImage: slide.imageUrl ? `url(${slide.imageUrl})` : undefined,
+          }}
+        >
           <div className="ppt-slide-progress">
-            Slide {slide.index + 1} / {slide.total}
+            Session step {slide.index + 1} / {slide.total}
+            {slide.deckSlide ? ` / Deck slide ${slide.deckSlide}` : ""}
           </div>
           <div className="ppt-slide-content">
             <p className="ppt-slide-kicker">{slide.subtitle}</p>
