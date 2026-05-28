@@ -70,3 +70,15 @@ export const getMessages = async (req, res, next) => {
     next(err);
   }
 };
+
+export const clearUserSessions = async (req, res, next) => {
+  try {
+    const sessions = await Session.find({ userId: req.params.userId });
+    const ids = sessions.map(s => s._id);
+    await Message.deleteMany({ sessionId: { $in: ids } });
+    await Session.deleteMany({ userId: req.params.userId });
+    res.json({ deleted: sessions.length });
+  } catch (err) {
+    next(err);
+  }
+};
