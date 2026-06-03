@@ -14,11 +14,14 @@ const SCREENS = {
   CAREGIVER: "caregiver",
 };
 
+const devParams = new URLSearchParams(window.location.search);
+const devSessionEnabled = import.meta.env.DEV && devParams.get("devSession") === "1";
+
 export default function App() {
-  const [screen, setScreen] = useState(SCREENS.LOGIN);
-  const [userId, setUserId] = useState(null);
-  const [userName, setUserName] = useState("");
-  const [sessionId, setSessionId] = useState(null);
+  const [screen, setScreen] = useState(devSessionEnabled ? SCREENS.SESSION : SCREENS.LOGIN);
+  const [userId, setUserId] = useState(devSessionEnabled ? "dev-user" : null);
+  const [userName, setUserName] = useState(devSessionEnabled ? "Ryan" : "");
+  const [sessionId, setSessionId] = useState(devSessionEnabled ? "dev-session" : null);
 
   const handleLogin = (id, name) => {
     setUserId(id);

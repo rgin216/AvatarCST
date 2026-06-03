@@ -1,9 +1,38 @@
-import { Component, Suspense, useLayoutEffect, useRef } from "react";
-import { Canvas, useFrame } from "@react-three/fiber";
+import { Component, Suspense, useLayoutEffect, useMemo, useRef } from "react";
+import { Canvas, useFrame, useLoader } from "@react-three/fiber";
 import { Html, useGLTF } from "@react-three/drei";
+import * as SkeletonUtils from "three/examples/jsm/utils/SkeletonUtils.js";
+import { FBXLoader } from "three/examples/jsm/loaders/FBXLoader.js";
 import * as THREE from "three";
 
-const MODEL_PATH = "/models/harry.glb";
+const AVATAR_CONFIGS = {
+  male: {
+    modelPath: "/models/harry.glb",
+    position: [0, -2, 0],
+    scale: 1.18,
+    camera: { position: [0, 0, 1.2], fov: 25 },
+    headGazeOffset: { pitchUp: -0.07, turnRight: -0.1 },
+    headMotion: 1,
+    lipSyncAvailable: true,
+  },
+  female: {
+    loader: "fbx",
+    modelPath: "/models/female-rpm-vrchat/source/Wolf3D_readyplayerme_male_01.fbx",
+    position: [0, -1.55, -0.08],
+    scale: 0.0092,
+    camera: { position: [0, 0, 1.2], fov: 25 },
+    headGazeOffset: { pitchUp: -0.015, turnRight: 0.01 },
+    headMotion: 0.42,
+    prepareMaterials: true,
+    boneWorldRotationOffsets: [
+      { name: "LeftArm", axis: [0, 0, 1], angle: -0.95 },
+      { name: "RightArm", axis: [0, 0, 1], angle: 0.95 },
+    ],
+    lipSyncAvailable: true,
+  },
+};
+
+const VISUALIZER_CAMERA = { position: [0, 0, 3.05], fov: 34 };
 
 const VISEME_TARGETS = [
   "viseme_sil",
@@ -23,7 +52,15 @@ const VISEME_TARGETS = [
   "viseme_U",
 ];
 
-const MOUTH_TARGETS = ["mouthOpen", "mouthClose", "jawOpen"];
+const MOUTH_TARGETS = [
+  "mouthOpen",
+  "mouthClose",
+  "jawOpen",
+  "mouthFunnel",
+  "mouthPucker",
+  "mouthPressLeft",
+  "mouthPressRight",
+];
 const CONSONANT_HEAD_TARGETS = [
   "viseme_PP",
   "viseme_FF",
@@ -44,11 +81,6 @@ const FACIAL_TARGETS = [
   "mouthSmileLeft",
   "mouthSmileRight",
 ];
-
-const HEAD_GAZE_OFFSET = {
-  pitchUp: -0.055,
-  turnRight: 0.11,
-};
 
 function findMorphIndex(dictionary, targetName) {
   if (!dictionary) return undefined;
@@ -78,15 +110,59 @@ function setMorphDamped(mesh, morphIndex, value, delta) {
     return;
   }
 
-  const lambda = target > current ? 6.5 : 9.5;
+  const lambda = target > current ? 22 : 16;
   setMorph(mesh, morphIndex, THREE.MathUtils.damp(current, target, lambda, delta));
 }
 
-function AvatarModel({ lipSyncFrameRef }) {
-  const { scene } = useGLTF(MODEL_PATH);
+function resetMorphs(mesh) {
+  if (!mesh.morphTargetInfluences) return;
+  mesh.morphTargetInfluences.fill(0);
+}
+
+function prepareAvatarMaterial(material) {
+  if (!material) return;
+
+  const materials = Array.isArray(material) ? material : [material];
+  materials.forEach((item) => {
+    if (item.map) {
+      item.map.colorSpace = THREE.SRGBColorSpace;
+      item.map.needsUpdate = true;
+    }
+    if (item.normalMap) item.normalScale?.set?.(0.62, 0.62);
+    if (item.color) item.color.lerp(new THREE.Color(0xffffff), 0.18);
+    if ("roughness" in item) item.roughness = 0.34;
+    if ("metalness" in item) item.metalness = 0.02;
+    if ("shininess" in item) item.shininess = 38;
+    if (item.specular) item.specular.set("#242424");
+    item.toneMapped = true;
+    item.needsUpdate = true;
+  });
+}
+
+function applyWorldBoneRotationOffset(bone, axis, angle) {
+  if (!bone?.parent) return;
+
+  bone.parent.updateMatrixWorld(true);
+  bone.updateMatrixWorld(true);
+
+  const parentWorldQuaternion = bone.parent.getWorldQuaternion(new THREE.Quaternion());
+  const boneWorldQuaternion = bone.getWorldQuaternion(new THREE.Quaternion());
+  const worldRotationOffset = new THREE.Quaternion().setFromAxisAngle(
+    new THREE.Vector3(...axis),
+    angle,
+  );
+  const nextWorldQuaternion = worldRotationOffset.multiply(boneWorldQuaternion);
+
+  bone.quaternion.copy(parentWorldQuaternion.invert().multiply(nextWorldQuaternion));
+  bone.updateMatrixWorld(true);
+}
+
+function RiggedAvatarScene({ config, lipSyncFrameRef, sourceScene }) {
+  const scene = useMemo(() => SkeletonUtils.clone(sourceScene), [sourceScene]);
   const morphMeshes = useRef([]);
   const headBone = useRef(null);
   const baseHeadRotation = useRef(null);
+  const initialHeadRotation = useRef(null);
   const speechActivity = useRef(0);
   const consonantActivity = useRef(0);
   const consonantPulse = useRef(0);
@@ -95,8 +171,13 @@ function AvatarModel({ lipSyncFrameRef }) {
   useLayoutEffect(() => {
     const discoveredMorphMeshes = [];
     let discoveredHeadBone = null;
+    const posedBones = [];
 
     scene.traverse((object) => {
+      if ((object.isMesh || object.isSkinnedMesh) && config.prepareMaterials) {
+        prepareAvatarMaterial(object.material);
+      }
+
       if ((object.isMesh || object.isSkinnedMesh) && object.morphTargetDictionary) {
         const targets = FACIAL_TARGETS.reduce((found, targetName) => {
           const index = findMorphIndex(object.morphTargetDictionary, targetName);
@@ -117,10 +198,32 @@ function AvatarModel({ lipSyncFrameRef }) {
       }
     });
 
+    config.boneWorldRotationOffsets?.forEach(({ name, axis, angle }) => {
+      const bone = scene.getObjectByName(name);
+      if (!bone) return;
+      posedBones.push({ bone, initialQuaternion: bone.quaternion.clone() });
+      applyWorldBoneRotationOffset(bone, axis, angle);
+    });
+
     morphMeshes.current = discoveredMorphMeshes;
     headBone.current = discoveredHeadBone;
     baseHeadRotation.current = discoveredHeadBone?.rotation.clone() ?? null;
-  }, [scene]);
+    initialHeadRotation.current = discoveredHeadBone?.rotation.clone() ?? null;
+
+    return () => {
+      morphMeshes.current.forEach(({ mesh }) => resetMorphs(mesh));
+      posedBones.forEach(({ bone, initialQuaternion }) => {
+        bone.quaternion.copy(initialQuaternion);
+      });
+      if (headBone.current && initialHeadRotation.current) {
+        headBone.current.rotation.copy(initialHeadRotation.current);
+      }
+      morphMeshes.current = [];
+      headBone.current = null;
+      baseHeadRotation.current = null;
+      initialHeadRotation.current = null;
+    };
+  }, [config.boneWorldRotationOffsets, config.prepareMaterials, scene]);
 
   useFrame(({ clock }, delta) => {
     const time = clock.getElapsedTime();
@@ -173,10 +276,12 @@ function AvatarModel({ lipSyncFrameRef }) {
       mouthInfluences[targetName] = 0;
     });
 
-    Object.entries(lipSyncFrame?.visemes ?? {}).forEach(([targetName, value]) => {
-      mouthInfluences[targetName] = value;
-    });
-    mouthInfluences.jawOpen = lipSyncFrame?.jawOpen ?? 0;
+    if (config.lipSyncAvailable) {
+      Object.entries(lipSyncFrame?.visemes ?? {}).forEach(([targetName, value]) => {
+        mouthInfluences[targetName] = value;
+      });
+      mouthInfluences.jawOpen = lipSyncFrame?.jawOpen ?? 0;
+    }
 
     morphMeshes.current.forEach(({ mesh, targets }) => {
       Object.entries(mouthInfluences).forEach(([targetName, value]) => {
@@ -187,6 +292,8 @@ function AvatarModel({ lipSyncFrameRef }) {
     });
 
     if (headBone.current && baseHeadRotation.current) {
+      const headGazeOffset = config.headGazeOffset ?? { pitchUp: 0, turnRight: 0 };
+      const motionScale = config.headMotion ?? 1;
       const speech = speechActivity.current;
       const consonants = consonantActivity.current;
       const pulse = consonantPulse.current;
@@ -202,20 +309,147 @@ function AvatarModel({ lipSyncFrameRef }) {
 
       headBone.current.rotation.x =
         baseHeadRotation.current.x +
-        HEAD_GAZE_OFFSET.pitchUp +
-        Math.sin(time * 0.8) * 0.012 +
-        speechBob;
+        headGazeOffset.pitchUp +
+        (Math.sin(time * 0.8) * 0.012 + speechBob) * motionScale;
       headBone.current.rotation.y =
         baseHeadRotation.current.y +
-        HEAD_GAZE_OFFSET.turnRight +
-        Math.sin(time * 0.55) * 0.02 +
-        speechTurn;
+        headGazeOffset.turnRight +
+        (Math.sin(time * 0.55) * 0.02 + speechTurn) * motionScale;
       headBone.current.rotation.z =
-        baseHeadRotation.current.z + Math.sin(time * 0.7) * 0.01 + speechTurn * 0.35;
+        baseHeadRotation.current.z +
+        (Math.sin(time * 0.7) * 0.01 + speechTurn * 0.35) * motionScale;
     }
   });
 
-  return <primitive object={scene} position={[0, -2, 0]} scale={1.18} />;
+  return <primitive object={scene} position={config.position} scale={config.scale} />;
+}
+
+function GltfAvatarModel({ avatarMode, lipSyncFrameRef }) {
+  const config = AVATAR_CONFIGS[avatarMode] ?? AVATAR_CONFIGS.male;
+  const { scene } = useGLTF(config.modelPath);
+
+  return (
+    <RiggedAvatarScene config={config} lipSyncFrameRef={lipSyncFrameRef} sourceScene={scene} />
+  );
+}
+
+function FbxAvatarModel({ avatarMode, lipSyncFrameRef }) {
+  const config = AVATAR_CONFIGS[avatarMode] ?? AVATAR_CONFIGS.female;
+  const scene = useLoader(FBXLoader, config.modelPath);
+
+  return (
+    <RiggedAvatarScene config={config} lipSyncFrameRef={lipSyncFrameRef} sourceScene={scene} />
+  );
+}
+
+function PulseShell({ color, emissive, opacity, radius, rotationOffset, speed, energyRef }) {
+  const mesh = useRef(null);
+  const material = useRef(null);
+
+  useFrame(({ clock }) => {
+    const time = clock.getElapsedTime();
+    const energy = energyRef.current;
+    if (mesh.current) {
+      const pulse = radius + energy * 0.14 + Math.sin(time * speed + rotationOffset) * 0.018;
+      mesh.current.scale.set(pulse * 1.05, pulse * 0.92, pulse);
+      mesh.current.rotation.x = Math.sin(time * speed * 0.28 + rotationOffset) * 0.22;
+      mesh.current.rotation.y = time * speed * 0.16 + rotationOffset;
+      mesh.current.rotation.z = Math.cos(time * speed * 0.22 + rotationOffset) * 0.18;
+    }
+    if (material.current) {
+      material.opacity = opacity + energy * 0.14;
+      material.emissiveIntensity = 0.5 + energy * 1.1;
+    }
+  });
+
+  return (
+    <mesh ref={mesh}>
+      <sphereGeometry args={[0.55, 48, 48]} />
+      <meshStandardMaterial
+        ref={material}
+        blending={THREE.AdditiveBlending}
+        color={color}
+        depthWrite={false}
+        emissive={emissive}
+        emissiveIntensity={0.65}
+        opacity={opacity}
+        roughness={0.1}
+        transparent
+      />
+    </mesh>
+  );
+}
+
+function AudioPulseVisual({ lipSyncFrameRef }) {
+  const group = useRef(null);
+  const coreMaterial = useRef(null);
+  const energy = useRef(0);
+
+  useFrame(({ clock }, delta) => {
+    const time = clock.getElapsedTime();
+    const targetEnergy = THREE.MathUtils.clamp(
+      lipSyncFrameRef?.current?.speechEnergy ?? 0,
+      0,
+      1,
+    );
+
+    energy.current = THREE.MathUtils.damp(energy.current, targetEnergy, 10, delta);
+
+    if (group.current) {
+      const pulse = 0.88 + energy.current * 0.18 + Math.sin(time * 2.8) * 0.012;
+      group.current.scale.setScalar(pulse);
+      group.current.rotation.y = time * 0.12;
+    }
+
+    if (coreMaterial.current) {
+      coreMaterial.current.emissiveIntensity = 0.9 + energy.current * 1.9;
+      coreMaterial.current.opacity = 0.54 + energy.current * 0.2;
+    }
+  });
+
+  return (
+    <group ref={group} position={[0, 0, 0]}>
+      <PulseShell
+        color="#65D8FF"
+        emissive="#54C7FF"
+        energyRef={energy}
+        opacity={0.18}
+        radius={1.02}
+        rotationOffset={0.2}
+        speed={1.5}
+      />
+      <PulseShell
+        color="#B87CFF"
+        emissive="#9A6DFF"
+        energyRef={energy}
+        opacity={0.16}
+        radius={0.9}
+        rotationOffset={1.7}
+        speed={1.9}
+      />
+      <PulseShell
+        color="#FF78A9"
+        emissive="#FF6B9E"
+        energyRef={energy}
+        opacity={0.14}
+        radius={0.78}
+        rotationOffset={2.5}
+        speed={1.7}
+      />
+      <mesh>
+        <sphereGeometry args={[0.36, 48, 48]} />
+        <meshStandardMaterial
+          ref={coreMaterial}
+          color="#F8FBFF"
+          emissive="#B9EFFF"
+          emissiveIntensity={1}
+          opacity={0.64}
+          roughness={0.12}
+          transparent
+        />
+      </mesh>
+    </group>
+  );
 }
 
 class AvatarErrorBoundary extends Component {
@@ -250,17 +484,60 @@ function Loading() {
   return <div className="avatar-loading">Loading avatar...</div>;
 }
 
-export default function AvatarViewer({ lipSyncFrameRef }) {
+function AvatarLights({ avatarMode }) {
+  if (avatarMode === "female") {
+    return (
+      <>
+        <ambientLight intensity={0.2} />
+        <hemisphereLight args={["#FFF4E8", "#2F3840", 0.22]} />
+        <spotLight
+          angle={0.38}
+          castShadow
+          color="#FFF3E2"
+          intensity={4.2}
+          penumbra={0.58}
+          position={[0.85, 1.15, 2.55]}
+        />
+        <directionalLight color="#FFE5CC" position={[1.8, 1.4, 2.2]} intensity={1.25} />
+        <directionalLight color="#C9D8FF" position={[-2.3, 1.2, 1.4]} intensity={0.32} />
+      </>
+    );
+  }
+
+  if (avatarMode === "visualizer") {
+    return (
+      <>
+        <ambientLight intensity={0.55} />
+        <pointLight color="#65D8FF" intensity={2.3} position={[1.8, 1.6, 1.8]} />
+        <pointLight color="#FF78A9" intensity={1.5} position={[-1.8, -0.8, 1.2]} />
+      </>
+    );
+  }
+
   return (
-    <AvatarErrorBoundary>
+    <>
+      <ambientLight intensity={0.75} />
+      <directionalLight position={[3, 4, 5]} intensity={2.1} />
+      <directionalLight position={[-4, 2, -3]} intensity={0.7} />
+    </>
+  );
+}
+
+export default function AvatarViewer({ avatarMode = "male", lipSyncFrameRef }) {
+  const isVisualizer = avatarMode === "visualizer";
+  const camera = isVisualizer
+    ? VISUALIZER_CAMERA
+    : (AVATAR_CONFIGS[avatarMode] ?? AVATAR_CONFIGS.male).camera;
+
+  return (
+    <AvatarErrorBoundary key={avatarMode}>
       <Canvas
-        camera={{ position: [0, 0, 1.2], fov: 25 }}
+        key={avatarMode}
+        camera={camera}
         gl={{ antialias: true, alpha: true }}
         shadows
       >
-        <ambientLight intensity={0.75} />
-        <directionalLight position={[3, 4, 5]} intensity={2.1} />
-        <directionalLight position={[-4, 2, -3]} intensity={0.7} />
+        <AvatarLights avatarMode={avatarMode} />
         <Suspense
           fallback={
             <Html center>
@@ -268,11 +545,17 @@ export default function AvatarViewer({ lipSyncFrameRef }) {
             </Html>
           }
         >
-          <AvatarModel lipSyncFrameRef={lipSyncFrameRef} />
+          {isVisualizer ? (
+            <AudioPulseVisual lipSyncFrameRef={lipSyncFrameRef} />
+          ) : AVATAR_CONFIGS[avatarMode]?.loader === "fbx" ? (
+            <FbxAvatarModel avatarMode={avatarMode} lipSyncFrameRef={lipSyncFrameRef} />
+          ) : (
+            <GltfAvatarModel avatarMode={avatarMode} lipSyncFrameRef={lipSyncFrameRef} />
+          )}
         </Suspense>
       </Canvas>
     </AvatarErrorBoundary>
   );
 }
 
-useGLTF.preload(MODEL_PATH);
+useGLTF.preload(AVATAR_CONFIGS.male.modelPath);
