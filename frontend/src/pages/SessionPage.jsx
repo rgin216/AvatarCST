@@ -36,9 +36,24 @@ const audioFixtures = [
   },
 ];
 
+const avatarModes = [
+  { id: "male", label: "Male" },
+  { id: "female", label: "Female" },
+  { id: "visualizer", label: "Audio visual" },
+];
+const avatarModeIds = new Set(avatarModes.map((mode) => mode.id));
+
+function getInitialAvatarMode() {
+  if (!import.meta.env.DEV) return "male";
+  const requestedMode = new URLSearchParams(window.location.search).get("avatar");
+  return avatarModeIds.has(requestedMode) ? requestedMode : "male";
+}
+
 const LIP_SYNC_SETTINGS = {
   intensity: 1.5,
-  minCueSeconds: 0.04,
+  minCueSeconds: 0.025,
+  blendWindow: 0.04,
+  leadSeconds: 0.055,
 };
 
 export default function SessionPage({ sessionId, onEnd, userName }) {
@@ -49,6 +64,7 @@ export default function SessionPage({ sessionId, onEnd, userName }) {
   const [elapsed, setElapsed] = useState(0);
   const [slide, setSlide] = useState(defaultSlide);
   const [fixtureIndex, setFixtureIndex] = useState(0);
+  const [avatarMode, setAvatarMode] = useState(getInitialAvatarMode);
   const [timeline, setTimeline] = useState(null);
   const booted = useRef(false);
   const scrollRef = useRef(null);
@@ -199,10 +215,14 @@ export default function SessionPage({ sessionId, onEnd, userName }) {
       return;
     }
 
-    const frame = getRhubarbMorphStateAtTime(timeline, audio.currentTime, {
-      intensity: LIP_SYNC_SETTINGS.intensity,
-      blendWindow: LIP_SYNC_SETTINGS.minCueSeconds * 0.75,
-    });
+    const frame = getRhubarbMorphStateAtTime(
+      timeline,
+      audio.currentTime + LIP_SYNC_SETTINGS.leadSeconds,
+      {
+        intensity: LIP_SYNC_SETTINGS.intensity,
+        blendWindow: LIP_SYNC_SETTINGS.blendWindow,
+      },
+    );
 
     lipSyncFrameRef.current = {
       ...frame,
@@ -330,9 +350,20 @@ export default function SessionPage({ sessionId, onEnd, userName }) {
 
         <section className="avatar-dock" aria-label="Aria avatar">
           <div className="avatar-figure real-avatar">
-            <AvatarViewer lipSyncFrameRef={lipSyncFrameRef} />
+            <AvatarViewer avatarMode={avatarMode} lipSyncFrameRef={lipSyncFrameRef} />
           </div>
           <div className="avatar-audio-controls">
+            <select
+              value={avatarMode}
+              onChange={(event) => setAvatarMode(event.target.value)}
+              aria-label="Avatar mode"
+            >
+              {avatarModes.map((mode) => (
+                <option key={mode.id} value={mode.id}>
+                  {mode.label}
+                </option>
+              ))}
+            </select>
             <select
               value={fixtureIndex}
               onChange={(event) => setFixtureIndex(Number(event.target.value))}

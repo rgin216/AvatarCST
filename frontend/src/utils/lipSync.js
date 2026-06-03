@@ -38,6 +38,7 @@ export const RHUBARB_SHAPE_MAP = {
 };
 
 const DEFAULT_MIN_RHUBARB_CUE_SECONDS = 0.12;
+const RHUBARB_ARTICULATION_CUES = new Set(["A", "B", "G", "H"]);
 
 export function createEmptyLipSyncFrame() {
   return {
@@ -123,8 +124,9 @@ function removeShortRhubarbCues(cues, minCueSeconds) {
     const duration = cue.end - cue.start;
     const previous = stable[i - 1];
     const next = stable[i + 1];
+    const isArticulationCue = RHUBARB_ARTICULATION_CUES.has(cue.value);
 
-    if (duration >= minCueSeconds || cue.value === "X") continue;
+    if (duration >= minCueSeconds || cue.value === "X" || isArticulationCue) continue;
 
     if (previous && next && previous.value === next.value) {
       previous.end = next.end;
@@ -172,11 +174,13 @@ export function getRhubarbMorphStateAtTime(timeline, time, options = {}) {
   const cues = timeline?.cues ?? [];
 
   if (cues.length === 0) return createEmptyLipSyncFrame();
+  if (time < cues[0].start || time >= (timeline.duration ?? cues[cues.length - 1].end)) {
+    return createEmptyLipSyncFrame();
+  }
 
-  const cueIndex = Math.max(
-    0,
-    cues.findIndex((candidate) => time >= candidate.start && time < candidate.end),
-  );
+  const cueIndex = cues.findIndex((candidate) => time >= candidate.start && time < candidate.end);
+  if (cueIndex === -1) return createEmptyLipSyncFrame();
+
   const currentCue = cues[cueIndex] ?? cues[cues.length - 1];
   const previousCue = cues[Math.max(0, cueIndex - 1)];
   const nextCue = cues[Math.min(cues.length - 1, cueIndex + 1)];
