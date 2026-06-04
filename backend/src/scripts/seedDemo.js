@@ -36,6 +36,10 @@ const upsertDemoUser = async (query, data) =>
   User.findOneAndUpdate(query, { $set: data }, { new: true, upsert: true });
 
 const seedDemo = async () => {
+  if (process.env.NODE_ENV === 'production' && process.env.ALLOW_DEMO_SEED !== 'true') {
+    throw new Error('Refusing to run demo seed in production without ALLOW_DEMO_SEED=true');
+  }
+
   await connectDB();
 
   const patient = await upsertDemoUser(
