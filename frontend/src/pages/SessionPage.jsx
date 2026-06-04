@@ -133,9 +133,11 @@ export default function SessionPage({ sessionId, onEnd, userName }) {
   }, []);
 
   function applyTurn(turn) {
-    setSlide(turn.slide || defaultSlide);
+    const slide = turn.slide || defaultSlide;
+    setSlide(slide);
     if (turn.assistantText) {
-      setMessages((items) => [...items, { from: "avatar", text: turn.assistantText }]);
+      const debugSuffix = import.meta.env.DEV ? ` [Step ${slide.index + 1}/${slide.total}: ${slide.title}]` : '';
+      setMessages((items) => [...items, { from: "avatar", text: turn.assistantText + debugSuffix }]);
     }
   }
 

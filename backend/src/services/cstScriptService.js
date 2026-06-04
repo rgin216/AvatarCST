@@ -2,6 +2,7 @@ const scripts = {
   cst_intro_reminiscence: [
     {
       id: 'welcome_check_in',
+      turns: 1,
       deckSlide: 1,
       title: 'Virtual Cognitive Stimulation Therapy',
       subtitle: 'Session 1: Introduction & Welcome',
@@ -14,6 +15,7 @@ const scripts = {
     },
     {
       id: 'ai_introduction',
+      turns: 1,
       deckSlide: 3,
       title: 'Your Virtual CST Facilitator',
       subtitle: 'Meet Aria',
@@ -26,6 +28,7 @@ const scripts = {
     },
     {
       id: 'getting_to_know_you_name',
+      turns: 3, // name → where they live → who's at home
       deckSlide: 4,
       title: 'Introduce Yourselves',
       subtitle: 'Getting to know you',
@@ -38,6 +41,7 @@ const scripts = {
     },
     {
       id: 'todays_plan',
+      turns: 1,
       deckSlide: 5,
       title: "Today's Plan",
       subtitle: 'What we will do together',
@@ -50,6 +54,7 @@ const scripts = {
     },
     {
       id: 'getting_comfortable',
+      turns: 1,
       deckSlide: 6,
       title: 'Getting Comfortable',
       subtitle: 'A quick tech check',
@@ -62,6 +67,7 @@ const scripts = {
     },
     {
       id: 'what_is_cst',
+      turns: 1,
       deckSlide: 11,
       title: 'What is CST?',
       subtitle: 'Cognitive Stimulation Therapy',
@@ -74,6 +80,7 @@ const scripts = {
     },
     {
       id: 'cst_nutshell',
+      turns: 1,
       deckSlide: 13,
       title: 'CST in a Nutshell',
       subtitle: 'The spirit of our sessions',
@@ -86,6 +93,7 @@ const scripts = {
     },
     {
       id: 'session_logistics',
+      turns: 1,
       deckSlide: 14,
       title: 'Our Virtual CST Sessions',
       subtitle: 'How sessions will work',
@@ -98,6 +106,7 @@ const scripts = {
     },
     {
       id: 'session_name',
+      turns: 1,
       deckSlide: 17,
       title: 'Session Name',
       subtitle: 'A shared ritual',
@@ -110,6 +119,7 @@ const scripts = {
     },
     {
       id: 'theme_song',
+      turns: 1,
       deckSlide: 19,
       title: 'Theme Song',
       subtitle: 'Music that lifts the spirits',
@@ -122,6 +132,7 @@ const scripts = {
     },
     {
       id: 'orientation_day',
+      turns: 2, // day/date → season and weather
       deckSlide: 21,
       title: 'Getting Our Bearings',
       subtitle: 'A friendly check-in',
@@ -134,6 +145,7 @@ const scripts = {
     },
     {
       id: 'current_affairs',
+      turns: 1,
       deckSlide: 31,
       title: 'Current Affairs',
       subtitle: 'Big or small news',
@@ -146,6 +158,7 @@ const scripts = {
     },
     {
       id: 'gentle_movement',
+      turns: 1,
       deckSlide: 32,
       title: 'Get the Blood Flowing',
       subtitle: 'Gentle seated movement',
@@ -158,6 +171,7 @@ const scripts = {
     },
     {
       id: 'closing_reflection',
+      turns: 1,
       deckSlide: 34,
       title: 'See You Then',
       subtitle: 'Looking ahead',

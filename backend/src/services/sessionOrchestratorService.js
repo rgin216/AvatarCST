@@ -8,7 +8,7 @@ import { buildCstRealtimeInstructions } from './promptService.js';
 import { mintRealtimeClientSecret } from './realtimeService.js';
 import { generateResponse } from './llmService.js';
 
-const RECENT_MESSAGE_LIMIT = 12;
+const RECENT_MESSAGE_LIMIT = 30;
 
 const getDisplayName = (user) => user?.preferredName || user?.name || 'there';
 
@@ -91,6 +91,13 @@ export const getSessionTurnContext = async (sessionId) => {
     session.scriptStepIndex || 0
   );
   const slide = toSlide({ step, index: boundedIndex, total: totalSteps });
+  const nextSlide = isFinalStep
+    ? null
+    : toSlide({
+        step: getScriptStep(session.scriptId, boundedIndex + 1).step,
+        index: boundedIndex + 1,
+        total: totalSteps,
+      });
 
   return {
     session,
@@ -99,6 +106,7 @@ export const getSessionTurnContext = async (sessionId) => {
     recentMessages: recentMessages.reverse(),
     step,
     slide,
+    nextSlide,
     boundedIndex,
     isFinalStep,
     totalSteps,
@@ -110,7 +118,7 @@ export const respondToSessionTurn = async ({ sessionId, content }) => {
   const userContent = content?.trim();
 
   const context = await getSessionTurnContext(sessionId);
-  const { session, user, memoryEntries, recentMessages, step, slide, boundedIndex, isFinalStep, totalSteps } = context;
+  const { session, user, memoryEntries, recentMessages, step, slide, nextSlide, boundedIndex, isFinalStep, totalSteps } = context;
 
   assertCanUseSession(session, 'respond');
 
@@ -119,12 +127,16 @@ export const respondToSessionTurn = async ({ sessionId, content }) => {
     session.startedAt = session.startedAt || new Date();
   }
 
+  const stepTurns = step.turns || 1;
+  const currentTurnIndex = session.scriptStepTurnIndex || 0;
+
   let userMessage = null;
   if (userContent) {
     userMessage = await Message.create({ sessionId, role: 'user', content: userContent });
   }
 
-  const systemPrompt = buildCstRealtimeInstructions({ user, memoryEntries, slide, recentMessages });
+  const shouldAdvance = Boolean(userContent) && !isFinalStep && currentTurnIndex >= stepTurns;
+  const systemPrompt = buildCstRealtimeInstructions({ user, memoryEntries, slide, nextSlide, recentMessages, scriptId: session.scriptId, stepTurnIndex: currentTurnIndex, willAdvance: shouldAdvance });
   const llmMessages = [
     { role: 'system', content: systemPrompt },
     { role: 'user', content: userContent || 'Please greet the user and begin the current slide activity.' },
@@ -132,8 +144,9 @@ export const respondToSessionTurn = async ({ sessionId, content }) => {
   const assistantText = await generateResponse(llmMessages);
 
   const assistantMessage = await Message.create({ sessionId, role: 'assistant', content: assistantText });
-
-  const nextStepIndex = isFinalStep ? boundedIndex : boundedIndex + 1;
+  const nextStepIndex = shouldAdvance ? boundedIndex + 1 : boundedIndex;
+  // Reset to 1 (not 0) when advancing — the next step's opening was already delivered in this response
+  session.scriptStepTurnIndex = shouldAdvance ? 1 : currentTurnIndex + 1;
   session.scriptStepIndex = nextStepIndex;
   session.presentationState = {
     slideIndex: slide.index,
@@ -148,6 +161,8 @@ export const respondToSessionTurn = async ({ sessionId, content }) => {
   };
   await session.save();
 
+  const displaySlide = shouldAdvance ? nextSlide : slide;
+
   return {
     sessionId: session._id,
     sessionStatus: session.status,
@@ -159,10 +174,10 @@ export const respondToSessionTurn = async ({ sessionId, content }) => {
       isFinalStep,
       total: totalSteps,
     },
-    slide,
+    slide: displaySlide,
     prompt: {
       model: process.env.OPENAI_REALTIME_MODEL || 'gpt-realtime-mini',
-      instructions: buildCstRealtimeInstructions({ user, memoryEntries, slide, recentMessages }),
+      instructions: buildCstRealtimeInstructions({ user, memoryEntries, slide, recentMessages, scriptId: session.scriptId }),
     },
     assistantText,
     avatar: buildAvatarResponse({ text: assistantText }),
