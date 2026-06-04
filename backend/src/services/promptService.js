@@ -46,7 +46,7 @@ export const buildCstRealtimeInstructions = ({ user, memoryEntries, slide, nextS
     .filter((m) => m.role === 'user')
     .map((m) => m.content)
     .join(' ')
-    .match(/\bcall me (\w+)/i);
+    .match(/\bcall me\s+([a-z][a-z' -]{0,39})\b/i);
   const displayName = sessionNameMatch?.[1] || user?.preferredName || user?.name || 'there';
   const scriptSections = SESSION_SCRIPTS[scriptId] || SESSION_SCRIPTS.cst_intro_reminiscence;
   // +1 to skip the header section (index 0) which is the preamble, not a step
