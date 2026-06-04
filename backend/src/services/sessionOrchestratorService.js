@@ -1,3 +1,4 @@
+import mongoose from 'mongoose';
 import Message from '../models/Message.js';
 import Session from '../models/Session.js';
 import User from '../models/User.js';
@@ -11,8 +12,18 @@ const RECENT_MESSAGE_LIMIT = 12;
 
 const getDisplayName = (user) => user?.preferredName || user?.name || 'there';
 
-const getMemoryEntries = async (userId) => {
-  const memory = await Memory.findOne({ userId }).lean();
+const ACTIVE_SESSION_STATUSES = ['active', 'pending'];
+
+const assertCanUseSession = (session, action) => {
+  if (ACTIVE_SESSION_STATUSES.includes(session.status)) return;
+
+  const err = new Error(`Cannot ${action} for a ${session.status} session`);
+  err.status = 409;
+  throw err;
+};
+
+const getMemoryEntries = async (userId, txSession = null) => {
+  const memory = await Memory.findOne({ userId }).session(txSession).lean();
   return memory?.entries || [];
 };
 
@@ -61,19 +72,20 @@ const inferMemorySuggestions = (content = '') => {
   return suggestions;
 };
 
-export const getSessionTurnContext = async (sessionId) => {
-  const session = await Session.findById(sessionId);
+export const getSessionTurnContext = async (sessionId, txSession = null) => {
+  const session = await Session.findById(sessionId).session(txSession);
   if (!session) {
     const err = new Error('Session not found');
     err.status = 404;
     throw err;
   }
 
-  const user = await User.findById(session.userId).lean();
-  const memoryEntries = await getMemoryEntries(session.userId);
+  const user = await User.findById(session.userId).session(txSession).lean();
+  const memoryEntries = await getMemoryEntries(session.userId, txSession);
   const recentMessages = await Message.find({ sessionId })
     .sort({ timestamp: -1 })
     .limit(RECENT_MESSAGE_LIMIT)
+    .session(txSession)
     .lean();
   const { step, boundedIndex, isFinalStep, totalSteps } = getScriptStep(
     session.scriptId,
@@ -95,87 +107,97 @@ export const getSessionTurnContext = async (sessionId) => {
 };
 
 export const respondToSessionTurn = async ({ sessionId, content }) => {
-  const context = await getSessionTurnContext(sessionId);
-  const { session, user, memoryEntries, recentMessages, step, slide, boundedIndex, isFinalStep, totalSteps } = context;
-
-  if (!['active', 'pending'].includes(session.status)) {
-    const err = new Error(`Cannot respond to a ${session.status} session`);
-    err.status = 409;
-    throw err;
-  }
-
-  if (session.status === 'pending') {
-    session.status = 'active';
-    session.startedAt = session.startedAt || new Date();
-  }
-
   const userContent = content?.trim();
-  let userMessage = null;
-  if (userContent) {
-    userMessage = await Message.create({ sessionId, role: 'user', content: userContent });
+  const txSession = await mongoose.startSession();
+
+  try {
+    let turn;
+    await txSession.withTransaction(async () => {
+      const context = await getSessionTurnContext(sessionId, txSession);
+      const { session, user, memoryEntries, recentMessages, step, slide, boundedIndex, isFinalStep, totalSteps } = context;
+
+      assertCanUseSession(session, 'respond');
+
+      if (session.status === 'pending') {
+        session.status = 'active';
+        session.startedAt = session.startedAt || new Date();
+      }
+
+      let userMessage = null;
+      if (userContent) {
+        [userMessage] = await Message.create(
+          [{ sessionId, role: 'user', content: userContent }],
+          { session: txSession }
+        );
+      }
+
+      const assistantText = step.reply({
+        name: getDisplayName(user),
+        memoryLine: pickMemoryLine(memoryEntries),
+        recentMessages,
+        userMessage,
+      });
+
+      const [assistantMessage] = await Message.create(
+        [{ sessionId, role: 'assistant', content: assistantText }],
+        { session: txSession }
+      );
+
+      const nextStepIndex = isFinalStep ? boundedIndex : boundedIndex + 1;
+      session.scriptStepIndex = nextStepIndex;
+      session.presentationState = {
+        slideIndex: slide.index,
+        deckSlide: slide.deckSlide,
+        imageUrl: slide.imageUrl,
+        title: slide.title,
+        subtitle: slide.subtitle,
+        prompt: slide.prompt,
+        bullets: slide.bullets,
+        visualHint: slide.visualHint,
+        accent: slide.accent,
+      };
+      await session.save({ session: txSession });
+
+      turn = {
+        sessionId: session._id,
+        sessionStatus: session.status,
+        scriptId: session.scriptId,
+        scriptStep: {
+          id: step.id,
+          index: boundedIndex,
+          nextIndex: nextStepIndex,
+          isFinalStep,
+          total: totalSteps,
+        },
+        slide,
+        prompt: {
+          model: process.env.OPENAI_REALTIME_MODEL || 'gpt-realtime-mini',
+          instructions: buildCstRealtimeInstructions({ user, memoryEntries, slide, recentMessages }),
+        },
+        assistantText,
+        avatar: buildAvatarResponse({ text: assistantText }),
+        messages: {
+          user: userMessage,
+          assistant: assistantMessage,
+        },
+        memoryUsed: memoryEntries.slice(0, 4).map((entry) => ({
+          id: entry._id,
+          category: entry.category,
+          content: entry.content,
+        })),
+        suggestedMemoryUpdates: inferMemorySuggestions(userContent),
+      };
+    });
+
+    return turn;
+  } finally {
+    await txSession.endSession();
   }
-
-  const assistantText = step.reply({
-    name: getDisplayName(user),
-    memoryLine: pickMemoryLine(memoryEntries),
-    recentMessages,
-    userMessage,
-  });
-
-  const assistantMessage = await Message.create({
-    sessionId,
-    role: 'assistant',
-    content: assistantText,
-  });
-
-  const nextStepIndex = isFinalStep ? boundedIndex : boundedIndex + 1;
-  session.scriptStepIndex = nextStepIndex;
-  session.presentationState = {
-    slideIndex: slide.index,
-    deckSlide: slide.deckSlide,
-    imageUrl: slide.imageUrl,
-    title: slide.title,
-    subtitle: slide.subtitle,
-    prompt: slide.prompt,
-    bullets: slide.bullets,
-    visualHint: slide.visualHint,
-    accent: slide.accent,
-  };
-  await session.save();
-
-  return {
-    sessionId: session._id,
-    sessionStatus: session.status,
-    scriptId: session.scriptId,
-    scriptStep: {
-      id: step.id,
-      index: boundedIndex,
-      nextIndex: nextStepIndex,
-      isFinalStep,
-      total: totalSteps,
-    },
-    slide,
-    prompt: {
-      model: process.env.OPENAI_REALTIME_MODEL || 'gpt-realtime-mini',
-      instructions: buildCstRealtimeInstructions({ user, memoryEntries, slide, recentMessages }),
-    },
-    assistantText,
-    avatar: buildAvatarResponse({ text: assistantText }),
-    messages: {
-      user: userMessage,
-      assistant: assistantMessage,
-    },
-    memoryUsed: memoryEntries.slice(0, 4).map((entry) => ({
-      id: entry._id,
-      category: entry.category,
-      content: entry.content,
-    })),
-    suggestedMemoryUpdates: inferMemorySuggestions(userContent),
-  };
 };
 
 export const createRealtimeSessionForTurn = async (sessionId) => {
   const context = await getSessionTurnContext(sessionId);
+  assertCanUseSession(context.session, 'create realtime session');
   const secret = await mintRealtimeClientSecret(context);
   return {
     sessionId,

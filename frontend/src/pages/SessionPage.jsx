@@ -38,7 +38,7 @@ const audioFixtures = [
 
 const avatarModes = [
   { id: "male", label: "Male" },
-  { id: "female", label: "Female" },
+  { id: "female", label: "Alt avatar" },
   { id: "visualizer", label: "Audio visual" },
 ];
 const avatarModeIds = new Set(avatarModes.map((mode) => mode.id));

@@ -1,5 +1,7 @@
 import { buildCstRealtimeInstructions } from './promptService.js';
 
+const REALTIME_SECRET_TIMEOUT_MS = Number(process.env.OPENAI_REALTIME_SECRET_TIMEOUT_MS || 10000);
+
 export const createRealtimeSessionConfig = ({ user, memoryEntries, slide, recentMessages }) => ({
   session: {
     type: 'realtime',
@@ -20,14 +22,33 @@ export const mintRealtimeClientSecret = async (context) => {
     throw err;
   }
 
-  const response = await fetch('https://api.openai.com/v1/realtime/client_secrets', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(createRealtimeSessionConfig(context)),
-  });
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), REALTIME_SECRET_TIMEOUT_MS);
+  let response;
+
+  try {
+    response = await fetch('https://api.openai.com/v1/realtime/client_secrets', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(createRealtimeSessionConfig(context)),
+      signal: controller.signal,
+    });
+  } catch (originalError) {
+    const isTimeout = originalError?.name === 'AbortError';
+    const err = new Error(
+      isTimeout
+        ? `Timed out creating realtime session after ${REALTIME_SECRET_TIMEOUT_MS}ms`
+        : `Network failure creating realtime session${originalError?.status ? ` (${originalError.status})` : ''}`
+    );
+    err.status = isTimeout ? 504 : 502;
+    err.cause = originalError;
+    throw err;
+  } finally {
+    clearTimeout(timeout);
+  }
 
   if (!response.ok) {
     const detail = await response.text();

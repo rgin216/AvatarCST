@@ -214,7 +214,7 @@ body {
   padding: 8px 14px;
   color: #C0504D;
   cursor: pointer;
-  font: 700 13px 'Nunito', sans-serif;
+  font: 700 13px Nunito, sans-serif;
 }
 
 .session-slide-shell {
@@ -484,7 +484,7 @@ body {
   place-items: center;
   min-width: 160px;
   color: #FFFAF5;
-  font: 700 13px 'Nunito', sans-serif;
+  font: 700 13px Nunito, sans-serif;
   text-align: center;
 }
 
@@ -510,7 +510,7 @@ body {
   padding: 8px 10px;
   background: rgba(255, 250, 245, 0.94);
   color: #3D2B1F;
-  font: 700 12px 'Nunito', sans-serif;
+  font: 700 12px Nunito, sans-serif;
 }
 
 .avatar-audio-controls button {
