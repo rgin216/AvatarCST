@@ -81,6 +81,7 @@ const FACIAL_TARGETS = [
   "mouthSmileLeft",
   "mouthSmileRight",
 ];
+const REQUIRED_FACIAL_TARGETS = [...VISEME_TARGETS, ...MOUTH_TARGETS, "eyeBlinkLeft", "eyeBlinkRight"];
 
 function findMorphIndex(dictionary, targetName) {
   if (!dictionary) return undefined;
@@ -170,6 +171,7 @@ function RiggedAvatarScene({ config, lipSyncFrameRef, sourceScene }) {
 
   useLayoutEffect(() => {
     const discoveredMorphMeshes = [];
+    const discoveredTargets = new Set();
     let discoveredHeadBone = null;
     const posedBones = [];
 
@@ -181,7 +183,10 @@ function RiggedAvatarScene({ config, lipSyncFrameRef, sourceScene }) {
       if ((object.isMesh || object.isSkinnedMesh) && object.morphTargetDictionary) {
         const targets = FACIAL_TARGETS.reduce((found, targetName) => {
           const index = findMorphIndex(object.morphTargetDictionary, targetName);
-          if (index !== undefined) found[targetName] = index;
+          if (index !== undefined) {
+            found[targetName] = index;
+            discoveredTargets.add(targetName);
+          }
           return found;
         }, {});
 
@@ -197,6 +202,15 @@ function RiggedAvatarScene({ config, lipSyncFrameRef, sourceScene }) {
         }
       }
     });
+
+    const missingTargets = REQUIRED_FACIAL_TARGETS.filter(
+      (targetName) => !discoveredTargets.has(targetName),
+    );
+    if (missingTargets.length > 0) {
+      console.warn(
+        `[Avatar] ${config.modelPath} is missing facial morph targets; unavailable lip-sync/facial channels will be skipped: ${missingTargets.join(", ")}`,
+      );
+    }
 
     config.boneWorldRotationOffsets?.forEach(({ name, axis, angle }) => {
       const bone = scene.getObjectByName(name);
@@ -223,7 +237,7 @@ function RiggedAvatarScene({ config, lipSyncFrameRef, sourceScene }) {
       baseHeadRotation.current = null;
       initialHeadRotation.current = null;
     };
-  }, [config.boneWorldRotationOffsets, config.prepareMaterials, scene]);
+  }, [config.boneWorldRotationOffsets, config.modelPath, config.prepareMaterials, scene]);
 
   useFrame(({ clock }, delta) => {
     const time = clock.getElapsedTime();
