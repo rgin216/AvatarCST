@@ -12,7 +12,7 @@ export const generateResponse = async (messages) => {
       model: GROQ_MODEL,
       messages,
       temperature: 0.7,
-      max_tokens: 140,
+      max_tokens: 200,
     }),
   });
 

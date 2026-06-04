@@ -8,7 +8,7 @@ import { buildCstRealtimeInstructions } from './promptService.js';
 import { mintRealtimeClientSecret } from './realtimeService.js';
 import { generateResponse } from './llmService.js';
 
-const RECENT_MESSAGE_LIMIT = 30;
+const RECENT_MESSAGE_LIMIT = 20;
 
 const getDisplayName = (user) => user?.preferredName || user?.name || 'there';
 
@@ -135,8 +135,8 @@ export const respondToSessionTurn = async ({ sessionId, content }) => {
     userMessage = await Message.create({ sessionId, role: 'user', content: userContent });
   }
 
-  const shouldAdvance = Boolean(userContent) && !isFinalStep && currentTurnIndex >= stepTurns;
-  const systemPrompt = buildCstRealtimeInstructions({ user, memoryEntries, slide, nextSlide, recentMessages, scriptId: session.scriptId, stepTurnIndex: currentTurnIndex, willAdvance: shouldAdvance });
+  const willAdvance = Boolean(userContent) && !isFinalStep && currentTurnIndex >= stepTurns;
+  const systemPrompt = buildCstRealtimeInstructions({ user, memoryEntries, slide, nextSlide, recentMessages, scriptId: session.scriptId, stepTurnIndex: currentTurnIndex, willAdvance });
   const llmMessages = [
     { role: 'system', content: systemPrompt },
     { role: 'user', content: userContent || 'Please greet the user and begin the current slide activity.' },
@@ -144,9 +144,9 @@ export const respondToSessionTurn = async ({ sessionId, content }) => {
   const assistantText = await generateResponse(llmMessages);
 
   const assistantMessage = await Message.create({ sessionId, role: 'assistant', content: assistantText });
+  const shouldAdvance = userContent && !isFinalStep && currentTurnIndex >= stepTurns;
   const nextStepIndex = shouldAdvance ? boundedIndex + 1 : boundedIndex;
-  // Reset to 1 (not 0) when advancing — the next step's opening was already delivered in this response
-  session.scriptStepTurnIndex = shouldAdvance ? 1 : currentTurnIndex + 1;
+  session.scriptStepTurnIndex = shouldAdvance ? 0 : currentTurnIndex + 1;
   session.scriptStepIndex = nextStepIndex;
   session.presentationState = {
     slideIndex: slide.index,

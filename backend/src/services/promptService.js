@@ -93,9 +93,9 @@ ${stepTurnIndex === 0
 - If there is no user input: deliver the "You say" opening directly.`
   : willAdvance
   ? `TRANSITION TURN — this is the final exchange on this step, after which we move to the next step.
-- First: use ONLY the "**Adapt:**" section of the current step script to respond (1 sentence). Do NOT re-deliver the "**You say:**" opening of the current step.
-- Then: deliver the full "**You say:**" opening from the NEXT step's script section.
-${nextSlide ? `Next step title: "${nextSlide.title}"` : ''}`
+- First: use the "Adapt" guidance from the current step to respond to what the user said (1 sentence).
+- Then: immediately deliver the full "You say" opening of the NEXT STEP below, so the user does not need to send a filler message to continue.
+${nextSlide ? `Next step: "${nextSlide.title}" — use its "You say" script section.` : ''}`
   : `CONTINUATION TURN — the step opening has been delivered and this step has multiple sub-questions.
 - Ask exactly the next sub-question from the step script sequence, based on the conversation so far.
 - Accept whatever the user said — do not seek clarification or repeat a question. Move to the next one.
