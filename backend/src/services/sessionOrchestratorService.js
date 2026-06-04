@@ -177,7 +177,7 @@ export const respondToSessionTurn = async ({ sessionId, content }) => {
     slide: displaySlide,
     prompt: {
       model: process.env.OPENAI_REALTIME_MODEL || 'gpt-realtime-mini',
-      instructions: buildCstRealtimeInstructions({ user, memoryEntries, slide, recentMessages, scriptId: session.scriptId }),
+      instructions: buildCstRealtimeInstructions({ user, memoryEntries, slide: displaySlide, recentMessages, scriptId: session.scriptId }),
     },
     assistantText,
     avatar: buildAvatarResponse({ text: assistantText }),
