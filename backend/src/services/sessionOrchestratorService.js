@@ -30,7 +30,6 @@ const parseAnswerQuality = (text = '') => {
   if (/\banswered\s*["']?\s*:\s*false\b/i.test(text)) return false;
   return false;
 };
-};
 
 const getAskedScriptLine = (step, currentTurnIndex, context) =>
   currentTurnIndex <= 1
@@ -42,6 +41,8 @@ const getProgressScriptLine = ({ step, nextStep, currentTurnIndex, stepTurns, co
   if (currentTurnIndex >= stepTurns) return renderScriptReply(nextStep, context);
   return renderScriptFollowUp(step, currentTurnIndex - 1, context);
 };
+
+const hasPriorAssistantTurn = (messages = []) => messages.some((message) => message.role === 'assistant');
 
 const ACTIVE_SESSION_STATUSES = ['active', 'pending'];
 
@@ -164,6 +165,7 @@ export const respondToSessionTurn = async ({ sessionId, content }) => {
 
   const stepTurns = step.turns || 1;
   const currentTurnIndex = session.scriptStepTurnIndex || 0;
+  const effectiveTurnIndex = currentTurnIndex || (hasPriorAssistantTurn(recentMessages) ? 1 : 0);
   const currentRetryCount = session.scriptStepRetryCount || 0;
 
   let userMessage = null;
@@ -172,8 +174,9 @@ export const respondToSessionTurn = async ({ sessionId, content }) => {
   }
 
   const scriptContext = { name: getDisplayName(user) };
-  const hasDeliveredQuestion = currentTurnIndex > 0;
-  const expectedQuestion = getAskedScriptLine(step, currentTurnIndex, scriptContext);
+  const hasUserContent = Boolean(userContent);
+  const hasDeliveredQuestion = effectiveTurnIndex > 0;
+  const expectedQuestion = getAskedScriptLine(step, effectiveTurnIndex, scriptContext);
 
   let answeredCurrentQuestion = true;
   if (userContent && hasDeliveredQuestion) {
@@ -194,14 +197,16 @@ export const respondToSessionTurn = async ({ sessionId, content }) => {
   }
 
   const unansweredAttemptCount =
-    userContent && hasDeliveredQuestion && !answeredCurrentQuestion ? currentRetryCount + 1 : 0;
-  const shouldRepeatQuestion = Boolean(userContent) && hasDeliveredQuestion && !answeredCurrentQuestion && unansweredAttemptCount < MAX_UNANSWERED_ATTEMPTS;
-  const shouldForceProgress = Boolean(userContent) && hasDeliveredQuestion && !answeredCurrentQuestion && unansweredAttemptCount >= MAX_UNANSWERED_ATTEMPTS;
-  const canProgress = Boolean(userContent) && hasDeliveredQuestion && (answeredCurrentQuestion || shouldForceProgress);
-  const shouldAdvance = canProgress && !isFinalStep && currentTurnIndex >= stepTurns;
+    hasUserContent && hasDeliveredQuestion && !answeredCurrentQuestion ? currentRetryCount + 1 : 0;
+  const shouldRepeatQuestion = hasUserContent && hasDeliveredQuestion && !answeredCurrentQuestion && unansweredAttemptCount < MAX_UNANSWERED_ATTEMPTS;
+  const shouldForceProgress = hasUserContent && hasDeliveredQuestion && !answeredCurrentQuestion && unansweredAttemptCount >= MAX_UNANSWERED_ATTEMPTS;
+  const canProgress = hasUserContent && hasDeliveredQuestion && (answeredCurrentQuestion || shouldForceProgress);
+  const shouldAdvance = canProgress && !isFinalStep && effectiveTurnIndex >= stepTurns;
   const scriptedNextLine = shouldRepeatQuestion
     ? expectedQuestion
-    : getProgressScriptLine({ step, nextStep, currentTurnIndex, stepTurns, context: scriptContext });
+    : hasUserContent && hasDeliveredQuestion
+    ? getProgressScriptLine({ step, nextStep, currentTurnIndex: effectiveTurnIndex, stepTurns, context: scriptContext })
+    : expectedQuestion || renderScriptReply(step, scriptContext);
   const answerState = shouldRepeatQuestion
     ? 'repeat_question'
     : shouldForceProgress
@@ -230,13 +235,19 @@ export const respondToSessionTurn = async ({ sessionId, content }) => {
 
   const assistantMessage = await Message.create({ sessionId, role: 'assistant', content: assistantText });
   const nextStepIndex = shouldAdvance ? boundedIndex + 1 : boundedIndex;
-  const nextTurnIndex = shouldRepeatQuestion
+  const nextTurnIndex = !hasUserContent
+    ? currentTurnIndex
+    : shouldRepeatQuestion
     ? currentTurnIndex
     : shouldAdvance
     ? 1
-    : currentTurnIndex + 1;
+    : effectiveTurnIndex + 1;
   session.scriptStepTurnIndex = nextTurnIndex;
-  session.scriptStepRetryCount = shouldRepeatQuestion ? unansweredAttemptCount : 0;
+  session.scriptStepRetryCount = !hasUserContent
+    ? currentRetryCount
+    : shouldRepeatQuestion
+    ? unansweredAttemptCount
+    : 0;
   session.scriptStepIndex = nextStepIndex;
   const displaySlide = shouldAdvance ? nextSlide : slide;
   const displayNextSlide =
