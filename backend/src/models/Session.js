@@ -8,6 +8,7 @@ const sessionSchema = new Schema({
   scriptId: { type: String, default: 'cst_intro_reminiscence' },
   scriptStepIndex: { type: Number, default: 0, min: 0 },
   scriptStepTurnIndex: { type: Number, default: 0, min: 0 },
+  scriptStepRetryCount: { type: Number, default: 0, min: 0 },
   presentationState: {
     slideIndex: { type: Number, default: 0 },
     deckSlide: { type: Number },

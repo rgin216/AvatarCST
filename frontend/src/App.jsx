@@ -17,6 +17,21 @@ const SCREENS = {
 const devParams = new URLSearchParams(window.location.search);
 const devSessionEnabled = import.meta.env.DEV && devParams.get("devSession") === "1";
 
+const TEST_SESSIONS = [
+  {
+    id: "cst_intro_reminiscence",
+    label: "Session 1",
+    title: "Introduction & Welcome",
+    theme: "Introduction",
+  },
+  {
+    id: "cst_childhood",
+    label: "Session 2",
+    title: "Getting to Know You: Childhood",
+    theme: "Childhood",
+  },
+];
+
 export default function App() {
   const [screen, setScreen] = useState(devSessionEnabled ? SCREENS.SESSION : SCREENS.LOGIN);
   const [userId, setUserId] = useState(devSessionEnabled ? "dev-user" : null);
@@ -29,13 +44,14 @@ export default function App() {
     setScreen(SCREENS.LANDING);
   };
 
-  const handleStartSession = async () => {
+  const handleStartSession = async (sessionOption = TEST_SESSIONS[0]) => {
     if (!userId) return;
     try {
       const { data } = await api.post("/sessions", {
         userId,
-        title: "CST Session",
-        theme: "Reminiscence",
+        title: sessionOption.title,
+        theme: sessionOption.theme,
+        scriptId: sessionOption.id,
       });
       setSessionId(data._id);
       setScreen(SCREENS.SESSION);
@@ -65,6 +81,7 @@ export default function App() {
           onCaregiver={() => setScreen(SCREENS.CAREGIVER)}
           userName={userName}
           userId={userId}
+          sessionOptions={TEST_SESSIONS}
         />
       )}
       {screen === SCREENS.SESSION && (

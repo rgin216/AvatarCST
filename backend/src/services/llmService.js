@@ -3,7 +3,9 @@ const GROQ_MODEL = process.env.GROQ_MODEL || 'llama-3.3-70b-versatile';
 
 const GROQ_TIMEOUT_MS = 10_000;
 
-export const generateResponse = async (messages) => {
+export const generateResponse = async (messages, options = {}) => {
+  const temperature = options.temperature ?? 0.7;
+  const maxTokens = options.maxTokens ?? 140;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), GROQ_TIMEOUT_MS);
 
@@ -19,8 +21,8 @@ export const generateResponse = async (messages) => {
       body: JSON.stringify({
         model: GROQ_MODEL,
         messages,
-        temperature: 0.7,
-        max_tokens: 140,
+        temperature,
+        max_tokens: maxTokens,
       }),
     });
   } catch (err) {
