@@ -251,7 +251,7 @@ backend/
 - summaryText
 - createdAt
 
-### Future (Optiona ✅ COMPLETE
+### Future (Optional) ✅ COMPLETE
 - Create repo structure ✅
 - Initialise frontend and backend ✅
 - Add basic configs (health endpoint) ✅
@@ -261,11 +261,16 @@ backend/
 
 ## 9. Development Phases
 
-### Phase 1 – Setup
+### Phase 1 - Setup
+Status: COMPLETE
+
 - Create repo structure
 - Initialise frontend and backend
 - Add basic configs
- 🔄 NEXT
+
+### Phase 2 - Backend Foundation
+Status: NEXT
+
 - Express server setup ✅ (partial)
 - MongoDB connection (local for dev, Atlas later)
 - Database models (User, Session, Message, Summary)
@@ -276,29 +281,30 @@ backend/
 - Stub services (LLM, Avatar, Memory)
 - Basic error handling
 
-### Phase 3 – Frontend Foundation
+### Phase 3 - Frontend Foundation
 - Landing page
 - Dashboard
 - Session page
 - API connectivity
 
-### Phase 4 – Core Functionality
+### Phase 4 - Core Functionality
 - Create session
-- Store meOpenAI Realtime API
+- Store messages
+- OpenAI Realtime API
 - Inject session context into prompts
 - Generate conversational responses
 
-### Phase 6 – Avatar Integration
+### Phase 6 - Avatar Integration
 - Connect HeyGen API
 - Sync speech output + avatar animation
 - Real-time audio/video streaming
 
-### Phase 7 – Summaries
+### Phase 7 - Summaries
 - Generate session summaries (backend)
 - Store summaries in DB
 - Display summaries to caregivers (frontend)
 
-### Phase 8 – Caregiver Features (Future)
+### Phase 8 - Caregiver Features (Future)
 - Caregiver dashboard
 - Session history & insights
 - User preferences & management
@@ -426,9 +432,9 @@ The project will begin with:
 
 ## 14. Next Steps
 
-**Current focus:** Phase 2 – Backend Foundation (planning stage, no code yet)
+**Current focus:** Phase 2 - Backend Foundation (planning stage; backend implementation present, including the Session.js model)
 
-Once Phase 2 is implemented:
+As Phase 2 continues:
 1. Set up local MongoDB connection
 2. Create Mongoose models (User, Session, Message, Summary)
 3. Build controllers & routes

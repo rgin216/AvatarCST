@@ -103,7 +103,7 @@ export default function LandingPage({ onStart, onCaregiver, userName, userId, se
 
           <div className="fade-up delay-4">
             <div style={{ display: "grid", gap: 10 }}>
-              {(sessionOptions.length ? sessionOptions : [{ id: "cst_intro_reminiscence", label: "Session 1", title: "Introduction & Welcome" }]).map((session) => (
+              {(sessionOptions.length ? sessionOptions : [{ id: "cst_intro_reminiscence", label: "Session 1", title: "Introduction & Welcome", theme: "Introduction" }]).map((session) => (
                 <button
                   key={session.id}
                   onClick={() => onStart(session)}
