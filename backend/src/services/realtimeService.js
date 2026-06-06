@@ -2,11 +2,19 @@ import { buildCstRealtimeInstructions } from './promptService.js';
 
 const REALTIME_SECRET_TIMEOUT_MS = Number(process.env.OPENAI_REALTIME_SECRET_TIMEOUT_MS || 10000);
 
-export const createRealtimeSessionConfig = ({ user, memoryEntries, slide, recentMessages }) => ({
+export const createRealtimeSessionConfig = ({ session, user, memoryEntries, slide, nextSlide, recentMessages }) => ({
   session: {
     type: 'realtime',
     model: process.env.OPENAI_REALTIME_MODEL || 'gpt-realtime-mini',
-    instructions: buildCstRealtimeInstructions({ user, memoryEntries, slide, recentMessages }),
+    instructions: buildCstRealtimeInstructions({
+      user,
+      memoryEntries,
+      slide,
+      nextSlide,
+      recentMessages,
+      scriptId: session?.scriptId,
+      stepTurnIndex: session?.scriptStepTurnIndex || 0,
+    }),
     audio: {
       output: {
         voice: process.env.OPENAI_REALTIME_VOICE || 'marin',

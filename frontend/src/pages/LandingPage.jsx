@@ -11,7 +11,7 @@ const activities = [
   { icon: "🗞️", label: "Current Events", desc: "Chat about the world" },
 ];
 
-export default function LandingPage({ onStart, onCaregiver, userName, userId }) {
+export default function LandingPage({ onStart, onCaregiver, userName, userId, sessionOptions = [] }) {
   const isDesktop = useIsDesktop();
   const [lastSession, setLastSession] = useState(null);
 
@@ -102,7 +102,18 @@ export default function LandingPage({ onStart, onCaregiver, userName, userId }) 
           </div>
 
           <div className="fade-up delay-4">
-            <button onClick={onStart} className="btn-primary btn-float">▶ Start Session</button>
+            <div style={{ display: "grid", gap: 10 }}>
+              {(sessionOptions.length ? sessionOptions : [{ id: "cst_intro_reminiscence", label: "Session 1", title: "Introduction & Welcome" }]).map((session) => (
+                <button
+                  key={session.id}
+                  onClick={() => onStart(session)}
+                  className={session.id === "cst_intro_reminiscence" ? "btn-primary btn-float" : "btn-mist"}
+                  style={{ width: "100%" }}
+                >
+                  {session.label}: {session.title}
+                </button>
+              ))}
+            </div>
             <div style={{ textAlign: "center", marginTop: 12, fontSize: 13, color: theme.textLight }}>
               {lastSession ? `Last session: ${formatLastSession(lastSession)}` : "No sessions yet"}
             </div>

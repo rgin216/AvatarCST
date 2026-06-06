@@ -4,7 +4,7 @@
 
 ## 0. Current Status
 
-**Phase:** Phase 2 ✅ → Phase 3 (Next)
+**Phase:** Phase 1 ✅ → Phase 2 (Next)
 
 ### Completed
 - Folder structure (frontend/backend) ✅
@@ -13,21 +13,14 @@
 - Health endpoint (`/api/health`) ✅
 - Frontend basic health check ✅
 - Git initialized ✅
-- MongoDB Atlas connection ✅
-- Mongoose models (User, Session, Message, Summary, Memory) ✅
-- Controllers & routes (health, user, session, summary, memory) ✅
-- Error handling middleware ✅
-- Stub services (LLM, Avatar, Summary, Memory) ✅
-- `.env.example` template ✅
 
 ### Next Priority
-- Phase 3: Frontend Foundation
-  - Landing page
-  - Dashboard page
-  - Session page
-  - Caregiver page
-  - React Router setup
-  - Axios API connectivity
+- Phase 2: Backend Foundation
+  - MongoDB local connection setup
+  - Database models (User, Session, Message, Summary)
+  - Controllers and routes scaffolding
+  - Error handling middleware
+  - `.env.example` template
 
 ---
 
@@ -92,9 +85,9 @@ User → Audio → LLM → Response → Avatar → User
 - Avatar system (e.g. HeyGen)
 
 #### Database (MongoDB)
-- **Dev:** MongoDB Atlas (free tier)
-- **Production:** MongoDB Atlas (dedicated cluster, future)
-- Data: User data, Sessions, Messages, Summaries, Memory
+- **Initial:** Local MongoDB for development/testing
+- **Future:** MongoDB Atlas for production
+- Data: User data, Sessions, Messages, Summaries, Memory (future)
 
 ---
 
@@ -198,17 +191,13 @@ backend/
 │  │  ├─ db.js
 │  │  └─ env.js
 │  ├─ controllers/
-│  │  ├─ healthController.js
-│  │  ├─ userController.js
 │  │  ├─ sessionController.js
 │  │  ├─ summaryController.js
-│  │  └─ memoryController.js
+│  │  └─ healthController.js
 │  ├─ routes/
-│  │  ├─ healthRoutes.js
-│  │  ├─ userRoutes.js
 │  │  ├─ sessionRoutes.js
 │  │  ├─ summaryRoutes.js
-│  │  └─ memoryRoutes.js
+│  │  └─ healthRoutes.js
 │  ├─ services/
 │  │  ├─ llmService.js
 │  │  ├─ memoryService.js
@@ -218,8 +207,7 @@ backend/
 │  │  ├─ User.js
 │  │  ├─ Session.js
 │  │  ├─ Message.js
-│  │  ├─ Summary.js
-│  │  └─ Memory.js
+│  │  └─ Summary.js
 │  ├─ middleware/
 │  │  ├─ errorHandler.js
 │  │  └─ notFound.js
@@ -239,53 +227,54 @@ backend/
 
 ---
 
-## 8. Data Model
-
-### User
-- id, name, preferredName, dateOfBirth, culturalBackground
-- role (patient / caregiver)
-- caregivers[], patients[] (refs to other Users)
+## 8. Data Model (Initial)
 
 ### Session
-- id, userId, title, theme
-- status (pending / active / completed / abandoned)
-- startedAt, endedAt
+- id
+- userId
+- title
+- startedAt
+- endedAt
+- status
 
 ### Message
-- id, sessionId
-- role (user / assistant / system)
-- content, timestamp
+- id
+- sessionId
+- role (user / assistant)
+- content
+- timestamp
 
 ### Summary
-- id, sessionId, userId
-- summaryText, emotionalNotes, gamePerformance
-- keyTalkingPoints[]
+- id
+- sessionId
+- userId
+- summaryText
+- createdAt
 
-### Memory (memory bank)
-- id, userId (unique — one bank per user)
-- entries[]: { category, content, addedBy, timestamps }
-  - category: preference | personal | session_insight | caregiver_note
-  - addedBy: system | caregiver
-
----
-
-## 9. Development Phases
-
-### Phase 1 – Setup ✅ COMPLETE
+### Future (Optiona ✅ COMPLETE
 - Create repo structure ✅
 - Initialise frontend and backend ✅
 - Add basic configs (health endpoint) ✅
 - Git initialization ✅
 
-### Phase 2 – Backend Foundation ✅ COMPLETE
-- MongoDB Atlas connection ✅
-- Mongoose models (User, Session, Message, Summary, Memory) ✅
-- Controllers & routes (health, user, session, summary, memory) ✅
-- Error handling middleware ✅
-- `.env.example` template ✅
-- Stub services (LLM, Avatar, Memory, Summary) ✅
+---
 
-### Phase 3 – Frontend Foundation 🔄 NEXT
+## 9. Development Phases
+
+### Phase 1 – Setup
+- Create repo structure
+- Initialise frontend and backend
+- Add basic configs
+ 🔄 NEXT
+- Express server setup ✅ (partial)
+- MongoDB connection (local for dev, Atlas later)
+- Database models (User, Session, Message, Summary)
+- Controllers (session, summary, health)
+- Routes (session, summary)
+- Error handling middleware
+- `.env.example` template
+- Stub services (LLM, Avatar, Memory)
+- Basic error handling
 
 ### Phase 3 – Frontend Foundation
 - Landing page
@@ -402,7 +391,15 @@ The project will begin with:
 - Node/Express backend only
 - React frontends
 
-### Immediate (Phase 3)
+### Immediate (Phase 2)
+1. Set up local MongoDB connection
+2. Create Mongoose models (User, Session, Message, Summary)
+3. Build controllers & routes
+4. Add error handling middleware
+5. Create `.env.example` file
+6. Stub out LLM & Avatar services (placeholder code)
+
+### Then (Phase 3)
 - Build frontend pages (Landing, Dashboard, Session, Caregiver)
 - Add React Router setup
 - Connect frontend to backend APIs
@@ -421,18 +418,22 @@ The project will begin with:
 - **No sensitive keys in repo** ✅
 
 ### Development Environment
-- **Database:** MongoDB Atlas (free tier for dev, dedicated for production)
+- **Database:** Local MongoDB for dev/testing
+- **Deployment:** MongoDB Atlas (future production)
 - **Branching:** Feature branches, PR-based reviews
 
 ---
 
 ## 14. Next Steps
 
-**Current focus:** Phase 3 – Frontend Foundation
+**Current focus:** Phase 2 – Backend Foundation (planning stage, no code yet)
 
-1. Build frontend pages (Landing, Dashboard, Session, Caregiver)
-2. Set up React Router
-3. Configure Axios base client pointing to `http://localhost:5000`
-4. Connect frontend to backend APIs (sessions, memory, summaries)
+Once Phase 2 is implemented:
+1. Set up local MongoDB connection
+2. Create Mongoose models (User, Session, Message, Summary)
+3. Build controllers & routes
+4. Add error handling middleware
+5. Create `.env.example` file
+6. Stub out LLM & Avatar services (placeholder code)
 
-Then move to Phase 4+ (Core Functionality — conversation flow, AI integration)
+Then move to Phase 3 (Frontend Foundation) and Phase 4+ (Core Functionality)
