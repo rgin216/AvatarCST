@@ -26,9 +26,10 @@ const parseAnswerQuality = (text = '') => {
   } catch {
     // Fall through to a forgiving text parse.
   }
-  if (/\banswered\s*["']?\s*:\s*true\b/i.test(text) || /\btrue\b/i.test(text)) return true;
-  if (/\banswered\s*["']?\s*:\s*false\b/i.test(text) || /\bfalse\b/i.test(text)) return false;
-  return true;
+  if (/\banswered\s*["']?\s*:\s*true\b/i.test(text)) return true;
+  if (/\banswered\s*["']?\s*:\s*false\b/i.test(text)) return false;
+  return false;
+};
 };
 
 const getAskedScriptLine = (step, currentTurnIndex, context) =>
