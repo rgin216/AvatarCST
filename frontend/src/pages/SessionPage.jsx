@@ -71,7 +71,7 @@ export default function SessionPage({ sessionId, onEnd, userName }) {
   const [slide, setSlide] = useState(defaultSlide);
   const [fixtureIndex, setFixtureIndex] = useState(0);
   const [avatarMode, setAvatarMode] = useState(getInitialAvatarMode);
-  const [timeline, setTimeline] = useState(null);
+  const timelineRef = useRef(null);
   const [pendingPlay, setPendingPlay] = useState(false);
   const [pipelineMode, setPipelineMode] = useState("free");
 
@@ -115,6 +115,7 @@ export default function SessionPage({ sessionId, onEnd, userName }) {
     let cancelled = false;
 
     async function loadFixture() {
+      timelineRef.current = null;
       lipSyncFrameRef.current = createEmptyLipSyncFrame();
       if (animationRef.current) cancelAnimationFrame(animationRef.current);
 
@@ -125,15 +126,17 @@ export default function SessionPage({ sessionId, onEnd, userName }) {
         const nextTimeline = rhubarbJsonToTimeline(rhubarbJson, {
           minCueSeconds: LIP_SYNC_SETTINGS.minCueSeconds,
         });
-        if (!cancelled) setTimeline(nextTimeline);
+        if (!cancelled) timelineRef.current = nextTimeline;
       } catch (err) {
         console.error("Failed to load Rhubarb fixture", err);
-        if (!cancelled) setTimeline(null);
       }
     }
 
     loadFixture();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+      timelineRef.current = null;
+    };
   }, [activeFixture.lipsyncUrl]);
 
   useEffect(() => () => {
@@ -181,12 +184,10 @@ export default function SessionPage({ sessionId, onEnd, userName }) {
     audio.src = audioUrl;
     audio.load();
 
-    if (rhubarbJson) {
-      const nextTimeline = rhubarbJsonToTimeline(rhubarbJson, {
-        minCueSeconds: LIP_SYNC_SETTINGS.minCueSeconds,
-      });
-      setTimeline(nextTimeline);
-    }
+    // Update ref synchronously so the animation loop reads it on the very first frame
+    timelineRef.current = rhubarbJson
+      ? rhubarbJsonToTimeline(rhubarbJson, { minCueSeconds: LIP_SYNC_SETTINGS.minCueSeconds })
+      : null;
 
     try {
       await ensureAudioMeter();
@@ -267,12 +268,13 @@ export default function SessionPage({ sessionId, onEnd, userName }) {
 
   function publishLipSyncFrame(isPlaying) {
     const audio = audioRef.current;
-    if (!audio || !timeline || !isPlaying) {
+    const currentTimeline = timelineRef.current;
+    if (!audio || !currentTimeline || !isPlaying) {
       lipSyncFrameRef.current = createEmptyLipSyncFrame();
       return;
     }
     const frame = getRhubarbMorphStateAtTime(
-      timeline,
+      currentTimeline,
       audio.currentTime + LIP_SYNC_SETTINGS.leadSeconds,
       { intensity: LIP_SYNC_SETTINGS.intensity, blendWindow: LIP_SYNC_SETTINGS.blendWindow },
     );
