@@ -144,7 +144,7 @@ export const respondAudioToSession = async (req, res, next) => {
   try {
     let transcript = '';
     if (uploadedFilePath) {
-      transcript = await transcribeAudio(uploadedFilePath);
+      transcript = await transcribeAudio(uploadedFilePath, req.file?.originalname);
     }
 
     const turn = await respondToSessionTurn({ sessionId: req.params.id, content: transcript });

@@ -16,13 +16,14 @@ function getMimeType(filePath) {
   return map[ext] ?? 'audio/webm';
 }
 
-export async function transcribeAudio(audioFilePath) {
+export async function transcribeAudio(audioFilePath, originalName = 'audio.webm') {
   const model = process.env.GROQ_WHISPER_MODEL ?? 'whisper-large-v3-turbo';
   const buffer = fs.readFileSync(audioFilePath);
-  const blob = new Blob([buffer], { type: getMimeType(audioFilePath) });
+  // Groq infers format from the filename extension — use the original browser filename
+  const blob = new Blob([buffer], { type: getMimeType(originalName) });
 
   const formData = new FormData();
-  formData.append('file', blob, path.basename(audioFilePath));
+  formData.append('file', blob, originalName);
   formData.append('model', model);
   formData.append('response_format', 'json');
 
