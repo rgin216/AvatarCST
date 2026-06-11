@@ -55,8 +55,12 @@ export async function generateLipSync(audioFilePath) {
     let stderr = '';
     proc.stderr.on('data', (chunk) => { stderr += chunk.toString(); });
 
+    const unlinkSilent = (p) => fs.unlink(p, (err) => {
+      if (err) console.error(`[rhubarb] Failed to delete temp file ${p}:`, err.message);
+    });
+
     proc.on('close', (code) => {
-      if (tempWavPath) fs.unlink(tempWavPath, () => {});
+      if (tempWavPath) unlinkSilent(tempWavPath);
 
       if (code !== 0) {
         console.error('[rhubarb] Exited with code', code, stderr.slice(0, 500));
@@ -65,7 +69,7 @@ export async function generateLipSync(audioFilePath) {
       }
       try {
         const json = JSON.parse(fs.readFileSync(jsonOutputPath, 'utf-8'));
-        fs.unlink(jsonOutputPath, () => {});
+        unlinkSilent(jsonOutputPath);
         resolve(json);
       } catch (err) {
         console.error('[rhubarb] Failed to parse output:', err.message);
@@ -74,7 +78,7 @@ export async function generateLipSync(audioFilePath) {
     });
 
     proc.on('error', (err) => {
-      if (tempWavPath) fs.unlink(tempWavPath, () => {});
+      if (tempWavPath) unlinkSilent(tempWavPath);
       console.error('[rhubarb] Spawn failed:', err.message);
       resolve(null);
     });
