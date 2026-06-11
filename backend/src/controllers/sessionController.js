@@ -1,9 +1,18 @@
+import path from 'path';
+import fs from 'fs';
+import { v4 as uuidv4 } from 'uuid';
 import Session from '../models/Session.js';
 import Message from '../models/Message.js';
 import {
   createRealtimeSessionForTurn,
   respondToSessionTurn,
 } from '../services/sessionOrchestratorService.js';
+import { transcribeAudio } from '../services/sttService.js';
+import { synthesizeSpeech } from '../services/ttsService.js';
+import { generateLipSync } from '../services/rhubarbService.js';
+import { buildAvatarResponse } from '../services/avatarService.js';
+import { GENERATED_AUDIO_DIR } from '../config/storage.js';
+import { PIPELINE_MODE } from '../config/pipeline.js';
 
 export const createSession = async (req, res, next) => {
   try {
@@ -75,14 +84,37 @@ export const getMessages = async (req, res, next) => {
   }
 };
 
+async function generateAudioForTurn(assistantText) {
+  const audioFileName = `${uuidv4()}.mp3`;
+  const audioOutputPath = path.join(GENERATED_AUDIO_DIR, audioFileName);
+  await synthesizeSpeech(assistantText, audioOutputPath);
+  const rhubarbJson = await generateLipSync(audioOutputPath);
+  return { audioUrl: `/generated-audio/${audioFileName}`, rhubarbJson, audioOutputPath };
+}
+
 export const respondToSession = async (req, res, next) => {
+  let audioOutputPath = null;
   try {
     const turn = await respondToSessionTurn({
       sessionId: req.params.id,
       content: req.body?.content,
     });
+
+    try {
+      const audio = await generateAudioForTurn(turn.assistantText);
+      audioOutputPath = audio.audioOutputPath;
+      turn.avatar = buildAvatarResponse({
+        text: turn.assistantText,
+        audioUrl: audio.audioUrl,
+        rhubarbJson: audio.rhubarbJson,
+      });
+    } catch (ttsErr) {
+      console.error('[tts] Skipping audio for this turn:', ttsErr.message);
+    }
+
     res.status(201).json(turn);
   } catch (err) {
+    if (audioOutputPath) fs.unlink(audioOutputPath, () => {});
     next(err);
   }
 };
@@ -93,6 +125,49 @@ export const createRealtimeSession = async (req, res, next) => {
     res.status(201).json(session);
   } catch (err) {
     next(err);
+  }
+};
+
+export const getPipelineInfo = (_req, res) => {
+  const info = {
+    mode: PIPELINE_MODE,
+    ...(PIPELINE_MODE === 'free' && { stt: 'groq-whisper', llm: 'groq', tts: 'edge-tts', lipsync: 'rhubarb' }),
+    ...(PIPELINE_MODE === 'realtime' && { provider: 'openai-realtime-mini', lipsync: 'rhubarb' }),
+  };
+  res.json(info);
+};
+
+export const respondAudioToSession = async (req, res, next) => {
+  const uploadedFilePath = req.file?.path;
+  let audioOutputPath = null;
+
+  try {
+    let transcript = '';
+    if (uploadedFilePath) {
+      transcript = await transcribeAudio(uploadedFilePath);
+    }
+
+    const turn = await respondToSessionTurn({ sessionId: req.params.id, content: transcript });
+
+    try {
+      const audio = await generateAudioForTurn(turn.assistantText);
+      audioOutputPath = audio.audioOutputPath;
+      turn.avatar = buildAvatarResponse({
+        text: turn.assistantText,
+        audioUrl: audio.audioUrl,
+        rhubarbJson: audio.rhubarbJson,
+      });
+    } catch (ttsErr) {
+      console.error('[tts] Skipping audio for this turn:', ttsErr.message);
+    }
+
+    turn.transcript = transcript;
+    res.status(201).json(turn);
+  } catch (err) {
+    if (audioOutputPath) fs.unlink(audioOutputPath, () => {});
+    next(err);
+  } finally {
+    if (uploadedFilePath) fs.unlink(uploadedFilePath, () => {});
   }
 };
 

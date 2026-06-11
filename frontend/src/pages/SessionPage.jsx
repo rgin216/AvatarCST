@@ -49,6 +49,12 @@ function getInitialAvatarMode() {
   return avatarModeIds.has(requestedMode) ? requestedMode : "male";
 }
 
+// Strips '/api' suffix so the frontend can build full backend URLs for audio files.
+function getBackendBase() {
+  const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
+  return apiUrl.replace(/\/api$/, "");
+}
+
 const LIP_SYNC_SETTINGS = {
   intensity: 1.5,
   minCueSeconds: 0.025,
@@ -59,13 +65,16 @@ const LIP_SYNC_SETTINGS = {
 export default function SessionPage({ sessionId, onEnd, userName }) {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
-  const [listening, setListening] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
   const [typing, setTyping] = useState(false);
   const [elapsed, setElapsed] = useState(0);
   const [slide, setSlide] = useState(defaultSlide);
   const [fixtureIndex, setFixtureIndex] = useState(0);
   const [avatarMode, setAvatarMode] = useState(getInitialAvatarMode);
   const [timeline, setTimeline] = useState(null);
+  const [pendingPlay, setPendingPlay] = useState(false);
+  const [pipelineMode, setPipelineMode] = useState("free");
+
   const booted = useRef(false);
   const scrollRef = useRef(null);
   const startTime = useRef(null);
@@ -76,7 +85,18 @@ export default function SessionPage({ sessionId, onEnd, userName }) {
   const mediaSourceRef = useRef(null);
   const animationRef = useRef(null);
   const lipSyncFrameRef = useRef(createEmptyLipSyncFrame());
+  const mediaRecorderRef = useRef(null);
+  const recordingChunksRef = useRef([]);
+  const voicePlaceholderIdRef = useRef(null);
+
   const activeFixture = audioFixtures[fixtureIndex];
+
+  // Fetch pipeline mode from backend on mount
+  useEffect(() => {
+    api.get("/sessions/pipeline").then(({ data }) => {
+      if (data?.mode) setPipelineMode(data.mode);
+    }).catch(() => {});
+  }, []);
 
   useEffect(() => {
     startTime.current = Date.now();
@@ -90,10 +110,11 @@ export default function SessionPage({ sessionId, onEnd, userName }) {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
   }, [messages, typing]);
 
+  // Load fixture lipsync JSON only when no live audio is pending
   useEffect(() => {
     let cancelled = false;
 
-    async function loadLipSyncFixture() {
+    async function loadFixture() {
       lipSyncFrameRef.current = createEmptyLipSyncFrame();
       if (animationRef.current) cancelAnimationFrame(animationRef.current);
 
@@ -104,40 +125,81 @@ export default function SessionPage({ sessionId, onEnd, userName }) {
         const nextTimeline = rhubarbJsonToTimeline(rhubarbJson, {
           minCueSeconds: LIP_SYNC_SETTINGS.minCueSeconds,
         });
-        if (cancelled) return;
-        setTimeline(nextTimeline);
+        if (!cancelled) setTimeline(nextTimeline);
       } catch (err) {
         console.error("Failed to load Rhubarb fixture", err);
-        if (!cancelled) {
-          setTimeline(null);
-        }
+        if (!cancelled) setTimeline(null);
       }
     }
 
-    loadLipSyncFixture();
-    return () => {
-      cancelled = true;
-    };
+    loadFixture();
+    return () => { cancelled = true; };
   }, [activeFixture.lipsyncUrl]);
 
-  useEffect(() => {
-    return () => {
-      if (animationRef.current) cancelAnimationFrame(animationRef.current);
-    };
+  useEffect(() => () => {
+    if (animationRef.current) cancelAnimationFrame(animationRef.current);
   }, []);
 
-  useEffect(() => {
-    return () => {
-      audioContextRef.current?.close();
-    };
+  useEffect(() => () => {
+    audioContextRef.current?.close();
   }, []);
 
   function applyTurn(turn) {
-    const slide = turn.slide || defaultSlide;
-    setSlide(slide);
+    const slideData = turn.slide || defaultSlide;
+    setSlide(slideData);
+
     if (turn.assistantText) {
-      const debugSuffix = import.meta.env.DEV ? ` [Step ${slide.index + 1}/${slide.total}: ${slide.title}]` : '';
+      const debugSuffix = import.meta.env.DEV
+        ? ` [Step ${slideData.index + 1}/${slideData.total}: ${slideData.title}]`
+        : "";
       setMessages((items) => [...items, { from: "avatar", text: turn.assistantText + debugSuffix }]);
+    }
+
+    // Update voice placeholder message with the real transcript
+    if (turn.transcript && voicePlaceholderIdRef.current != null) {
+      const placeholderId = voicePlaceholderIdRef.current;
+      voicePlaceholderIdRef.current = null;
+      setMessages((items) =>
+        items.map((msg) =>
+          msg._id === placeholderId ? { ...msg, text: turn.transcript } : msg
+        )
+      );
+    }
+
+    // Real audio from free pipeline — load and auto-play
+    if (turn.avatar?.audio?.url) {
+      const audioUrl = getBackendBase() + turn.avatar.audio.url;
+      playLiveAudio(audioUrl, turn.avatar?.lipsync?.rhubarbJson ?? null);
+    }
+  }
+
+  async function playLiveAudio(audioUrl, rhubarbJson) {
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    audio.pause();
+    audio.src = audioUrl;
+    audio.load();
+
+    if (rhubarbJson) {
+      const nextTimeline = rhubarbJsonToTimeline(rhubarbJson, {
+        minCueSeconds: LIP_SYNC_SETTINGS.minCueSeconds,
+      });
+      setTimeline(nextTimeline);
+    }
+
+    try {
+      await ensureAudioMeter();
+      await audio.play();
+      startLipSyncPlayback();
+      setPendingPlay(false);
+    } catch (err) {
+      if (err.name === "NotAllowedError") {
+        // Autoplay blocked — show manual play button
+        setPendingPlay(true);
+      } else if (err.name !== "AbortError") {
+        console.warn("Audio play error:", err.message);
+      }
     }
   }
 
@@ -195,51 +257,33 @@ export default function SessionPage({ sessionId, onEnd, userName }) {
   function getSpeechEnergy() {
     const analyser = audioMeterRef.current;
     const samples = audioSamplesRef.current;
-
     if (!analyser || !samples) return 0;
-
     analyser.getFloatTimeDomainData(samples);
-
     let sum = 0;
-    for (let i = 0; i < samples.length; i += 1) {
-      sum += samples[i] * samples[i];
-    }
-
+    for (let i = 0; i < samples.length; i += 1) sum += samples[i] * samples[i];
     const rms = Math.sqrt(sum / samples.length);
     return Math.min(1, Math.max(0, (rms - 0.015) * 4.8));
   }
 
   function publishLipSyncFrame(isPlaying) {
     const audio = audioRef.current;
-
     if (!audio || !timeline || !isPlaying) {
       lipSyncFrameRef.current = createEmptyLipSyncFrame();
       return;
     }
-
     const frame = getRhubarbMorphStateAtTime(
       timeline,
       audio.currentTime + LIP_SYNC_SETTINGS.leadSeconds,
-      {
-        intensity: LIP_SYNC_SETTINGS.intensity,
-        blendWindow: LIP_SYNC_SETTINGS.blendWindow,
-      },
+      { intensity: LIP_SYNC_SETTINGS.intensity, blendWindow: LIP_SYNC_SETTINGS.blendWindow },
     );
-
-    lipSyncFrameRef.current = {
-      ...frame,
-      speechEnergy: getSpeechEnergy(),
-    };
+    lipSyncFrameRef.current = { ...frame, speechEnergy: getSpeechEnergy() };
   }
 
   function tickLipSync() {
     const audio = audioRef.current;
     const isPlaying = Boolean(audio && !audio.paused && !audio.ended);
     publishLipSyncFrame(isPlaying);
-
-    if (isPlaying) {
-      animationRef.current = requestAnimationFrame(tickLipSync);
-    }
+    if (isPlaying) animationRef.current = requestAnimationFrame(tickLipSync);
   }
 
   function startLipSyncPlayback() {
@@ -251,7 +295,11 @@ export default function SessionPage({ sessionId, onEnd, userName }) {
     const audio = audioRef.current;
     if (!audio) return;
     if (animationRef.current) cancelAnimationFrame(animationRef.current);
-
+    // Reset to fixture audio if we were playing live audio
+    if (audio.src !== activeFixture.audioUrl) {
+      audio.src = activeFixture.audioUrl;
+      audio.load();
+    }
     try {
       await ensureAudioMeter();
       await audio.play();
@@ -270,6 +318,87 @@ export default function SessionPage({ sessionId, onEnd, userName }) {
     if (animationRef.current) cancelAnimationFrame(animationRef.current);
     publishLipSyncFrame(false);
   }
+
+  // --- Mic recording (free pipeline) ---
+
+  async function startRecording() {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
+        ? "audio/webm;codecs=opus"
+        : "audio/webm";
+
+      const recorder = new MediaRecorder(stream, { mimeType });
+      recordingChunksRef.current = [];
+
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) recordingChunksRef.current.push(e.data);
+      };
+
+      recorder.onstop = async () => {
+        stream.getTracks().forEach((t) => t.stop());
+        const blob = new Blob(recordingChunksRef.current, { type: mimeType });
+        await sendAudioToBackend(blob);
+      };
+
+      recorder.start(100);
+      mediaRecorderRef.current = recorder;
+      setIsRecording(true);
+    } catch (err) {
+      console.error("Failed to start recording:", err);
+    }
+  }
+
+  function stopRecording() {
+    if (mediaRecorderRef.current?.state === "recording") {
+      mediaRecorderRef.current.stop();
+    }
+    setIsRecording(false);
+  }
+
+  async function sendAudioToBackend(blob) {
+    if (typing) return;
+
+    // Add a placeholder that will be replaced with the real transcript on response
+    const placeholderId = Date.now();
+    voicePlaceholderIdRef.current = placeholderId;
+    setMessages((items) => [...items, { from: "user", text: "...", _id: placeholderId }]);
+    setTyping(true);
+
+    try {
+      const formData = new FormData();
+      formData.append("audio", blob, "recording.webm");
+
+      const { data } = await api.post(`/sessions/${sessionId}/respond-audio`, formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+
+      applyTurn(data);
+    } catch (err) {
+      console.error("Failed to send audio:", err);
+      setMessages((items) => [
+        ...items,
+        { from: "avatar", text: "I could not hear that clearly. Please try again or type your response." },
+      ]);
+    } finally {
+      setTyping(false);
+    }
+  }
+
+  function handleMicClick() {
+    if (pipelineMode === "realtime") {
+      // Realtime pipeline will be wired up here — uses OpenAI Realtime mini via WebRTC
+      console.info("Realtime pipeline not yet configured. Set PIPELINE_MODE=free to use voice input.");
+      return;
+    }
+    if (isRecording) {
+      stopRecording();
+    } else {
+      startRecording();
+    }
+  }
+
+  // --- Text input ---
 
   async function sendMessage(text) {
     const content = text.trim();
@@ -361,9 +490,7 @@ export default function SessionPage({ sessionId, onEnd, userName }) {
               aria-label="Avatar mode"
             >
               {avatarModes.map((mode) => (
-                <option key={mode.id} value={mode.id}>
-                  {mode.label}
-                </option>
+                <option key={mode.id} value={mode.id}>{mode.label}</option>
               ))}
             </select>
             <select
@@ -372,21 +499,33 @@ export default function SessionPage({ sessionId, onEnd, userName }) {
               aria-label="Placeholder audio"
             >
               {audioFixtures.map((fixture, index) => (
-                <option key={fixture.id} value={index}>
-                  {fixture.label}
-                </option>
+                <option key={fixture.id} value={index}>{fixture.label}</option>
               ))}
             </select>
             <button type="button" onClick={playPlaceholderAudio}>
               Play test audio
             </button>
+            {pendingPlay && (
+              <button
+                type="button"
+                onClick={() => {
+                  audioRef.current?.play().then(() => {
+                    setPendingPlay(false);
+                    startLipSyncPlayback();
+                  });
+                }}
+              >
+                ▶ Play response
+              </button>
+            )}
           </div>
           <audio
             ref={audioRef}
             src={activeFixture.audioUrl}
+            crossOrigin="anonymous"
             onPlay={handleAudioPlay}
             onPause={handleAudioPause}
-            onEnded={handleAudioPause}
+            onEnded={() => { handleAudioPause(); setPendingPlay(false); }}
             onSeeked={() => publishLipSyncFrame(Boolean(audioRef.current && !audioRef.current.paused))}
             preload="metadata"
             hidden
@@ -397,11 +536,13 @@ export default function SessionPage({ sessionId, onEnd, userName }) {
       <footer className="session-input-bar">
         <button
           type="button"
-          onClick={() => setListening((value) => !value)}
-          className={`mic-btn${listening ? " mic-btn-active" : ""}`}
-          aria-label={listening ? "Stop microphone" : "Start microphone"}
+          onClick={handleMicClick}
+          className={`mic-btn${isRecording ? " mic-btn-active" : ""}`}
+          aria-label={isRecording ? "Stop recording" : "Start microphone"}
+          disabled={typing && !isRecording}
+          title={pipelineMode === "realtime" ? "Realtime mode — set PIPELINE_MODE=free to use mic" : undefined}
         >
-          {listening ? "Rec" : "Mic"}
+          {isRecording ? "Stop" : "Mic"}
         </button>
         <input
           value={input}
