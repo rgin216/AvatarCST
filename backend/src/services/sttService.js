@@ -17,6 +17,9 @@ function getMimeType(filePath) {
 }
 
 export async function transcribeAudio(audioFilePath, originalName = 'audio.webm') {
+  if (!process.env.GROQ_API_KEY) {
+    throw new Error('GROQ_API_KEY is not set — cannot transcribe audio');
+  }
   const model = process.env.GROQ_WHISPER_MODEL ?? 'whisper-large-v3-turbo';
   const buffer = fs.readFileSync(audioFilePath);
   // Groq infers format from the filename extension — use the original browser filename
@@ -25,6 +28,7 @@ export async function transcribeAudio(audioFilePath, originalName = 'audio.webm'
   const formData = new FormData();
   formData.append('file', blob, originalName);
   formData.append('model', model);
+  formData.append('language', 'en');
   formData.append('response_format', 'json');
 
   const res = await fetch(GROQ_STT_URL, {

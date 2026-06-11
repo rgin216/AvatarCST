@@ -37,7 +37,7 @@ function getInitialAvatarMode() {
 // Strips '/api' suffix so the frontend can build full backend URLs for audio files.
 function getBackendBase() {
   const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
-  return apiUrl.replace(/\/api$/, "");
+  return apiUrl.replace(/\/+$/, "").replace(/\/api$/, "");
 }
 
 const LIP_SYNC_SETTINGS = {
@@ -70,6 +70,7 @@ export default function SessionPage({ sessionId, onEnd, userName }) {
   const animationRef = useRef(null);
   const lipSyncFrameRef = useRef(createEmptyLipSyncFrame());
   const mediaRecorderRef = useRef(null);
+  const mediaStreamRef = useRef(null);
   const recordingChunksRef = useRef([]);
   const voicePlaceholderIdRef = useRef(null);
 
@@ -100,6 +101,14 @@ export default function SessionPage({ sessionId, onEnd, userName }) {
     audioContextRef.current?.close();
   }, []);
 
+  useEffect(() => () => {
+    if (mediaRecorderRef.current?.state === "recording") {
+      mediaRecorderRef.current.stop();
+    }
+    mediaStreamRef.current?.getTracks().forEach((t) => t.stop());
+    mediaStreamRef.current = null;
+  }, []);
+
   function applyTurn(turn) {
     const slideData = turn.slide || defaultSlide;
     setSlide(slideData);
@@ -111,14 +120,14 @@ export default function SessionPage({ sessionId, onEnd, userName }) {
       setMessages((items) => [...items, { from: "avatar", text: turn.assistantText + debugSuffix }]);
     }
 
-    // Update voice placeholder message with the real transcript
-    if (turn.transcript && voicePlaceholderIdRef.current != null) {
+    // Always resolve the voice placeholder — replace with transcript or remove if empty
+    if (voicePlaceholderIdRef.current != null) {
       const placeholderId = voicePlaceholderIdRef.current;
       voicePlaceholderIdRef.current = null;
       setMessages((items) =>
-        items.map((msg) =>
-          msg._id === placeholderId ? { ...msg, text: turn.transcript } : msg
-        )
+        turn.transcript
+          ? items.map((msg) => msg._id === placeholderId ? { ...msg, text: turn.transcript } : msg)
+          : items.filter((msg) => msg._id !== placeholderId)
       );
     }
 
@@ -274,12 +283,14 @@ export default function SessionPage({ sessionId, onEnd, userName }) {
 
       recorder.onstop = async () => {
         stream.getTracks().forEach((t) => t.stop());
+        mediaStreamRef.current = null;
         const blob = new Blob(recordingChunksRef.current, { type: mimeType });
         await sendAudioToBackend(blob);
       };
 
       recorder.start(100);
       mediaRecorderRef.current = recorder;
+      mediaStreamRef.current = stream;
       setIsRecording(true);
     } catch (err) {
       console.error("Failed to start recording:", err);
