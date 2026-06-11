@@ -21,21 +21,6 @@ const defaultSlide = {
   accent: "#00AEEF",
 };
 
-const audioFixtures = [
-  {
-    id: "1980s-singers",
-    label: "1980s singers",
-    audioUrl: "/audio/placeholder-1980s-singers.wav",
-    lipsyncUrl: "/lipsync/placeholder-1980s-singers.json",
-  },
-  {
-    id: "great-wall",
-    label: "Great Wall",
-    audioUrl: "/audio/placeholder-great-wall.wav",
-    lipsyncUrl: "/lipsync/placeholder-great-wall.json",
-  },
-];
-
 const avatarModes = [
   { id: "male", label: "Male" },
   { id: "female", label: "Female" },
@@ -69,7 +54,6 @@ export default function SessionPage({ sessionId, onEnd, userName }) {
   const [typing, setTyping] = useState(false);
   const [elapsed, setElapsed] = useState(0);
   const [slide, setSlide] = useState(defaultSlide);
-  const [fixtureIndex, setFixtureIndex] = useState(0);
   const [avatarMode, setAvatarMode] = useState(getInitialAvatarMode);
   const timelineRef = useRef(null);
   const [pendingPlay, setPendingPlay] = useState(false);
@@ -89,8 +73,6 @@ export default function SessionPage({ sessionId, onEnd, userName }) {
   const recordingChunksRef = useRef([]);
   const voicePlaceholderIdRef = useRef(null);
 
-  const activeFixture = audioFixtures[fixtureIndex];
-
   // Fetch pipeline mode from backend on mount
   useEffect(() => {
     api.get("/sessions/pipeline").then(({ data }) => {
@@ -109,35 +91,6 @@ export default function SessionPage({ sessionId, onEnd, userName }) {
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
   }, [messages, typing]);
-
-  // Load fixture lipsync JSON only when no live audio is pending
-  useEffect(() => {
-    let cancelled = false;
-
-    async function loadFixture() {
-      timelineRef.current = null;
-      lipSyncFrameRef.current = createEmptyLipSyncFrame();
-      if (animationRef.current) cancelAnimationFrame(animationRef.current);
-
-      try {
-        const response = await fetch(activeFixture.lipsyncUrl);
-        if (!response.ok) throw new Error("Could not load lipsync JSON");
-        const rhubarbJson = await response.json();
-        const nextTimeline = rhubarbJsonToTimeline(rhubarbJson, {
-          minCueSeconds: LIP_SYNC_SETTINGS.minCueSeconds,
-        });
-        if (!cancelled) timelineRef.current = nextTimeline;
-      } catch (err) {
-        console.error("Failed to load Rhubarb fixture", err);
-      }
-    }
-
-    loadFixture();
-    return () => {
-      cancelled = true;
-      timelineRef.current = null;
-    };
-  }, [activeFixture.lipsyncUrl]);
 
   useEffect(() => () => {
     if (animationRef.current) cancelAnimationFrame(animationRef.current);
@@ -291,24 +244,6 @@ export default function SessionPage({ sessionId, onEnd, userName }) {
   function startLipSyncPlayback() {
     if (animationRef.current) cancelAnimationFrame(animationRef.current);
     tickLipSync();
-  }
-
-  async function playPlaceholderAudio() {
-    const audio = audioRef.current;
-    if (!audio) return;
-    if (animationRef.current) cancelAnimationFrame(animationRef.current);
-    // Reset to fixture audio if we were playing live audio
-    if (audio.src !== activeFixture.audioUrl) {
-      audio.src = activeFixture.audioUrl;
-      audio.load();
-    }
-    try {
-      await ensureAudioMeter();
-      await audio.play();
-      startLipSyncPlayback();
-    } catch (err) {
-      console.error("Could not play placeholder audio", err);
-    }
   }
 
   async function handleAudioPlay() {
@@ -495,18 +430,6 @@ export default function SessionPage({ sessionId, onEnd, userName }) {
                 <option key={mode.id} value={mode.id}>{mode.label}</option>
               ))}
             </select>
-            <select
-              value={fixtureIndex}
-              onChange={(event) => setFixtureIndex(Number(event.target.value))}
-              aria-label="Placeholder audio"
-            >
-              {audioFixtures.map((fixture, index) => (
-                <option key={fixture.id} value={index}>{fixture.label}</option>
-              ))}
-            </select>
-            <button type="button" onClick={playPlaceholderAudio}>
-              Play test audio
-            </button>
             {pendingPlay && (
               <button
                 type="button"
@@ -523,7 +446,6 @@ export default function SessionPage({ sessionId, onEnd, userName }) {
           </div>
           <audio
             ref={audioRef}
-            src={activeFixture.audioUrl}
             crossOrigin="anonymous"
             onPlay={handleAudioPlay}
             onPause={handleAudioPause}
@@ -544,7 +466,18 @@ export default function SessionPage({ sessionId, onEnd, userName }) {
           disabled={typing && !isRecording}
           title={pipelineMode === "realtime" ? "Realtime mode — set PIPELINE_MODE=free to use mic" : undefined}
         >
-          {isRecording ? "Stop" : "Mic"}
+          {isRecording ? (
+            // Stop square
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <rect x="5" y="5" width="14" height="14" rx="2" />
+            </svg>
+          ) : (
+            // Microphone
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <path d="M12 1a4 4 0 0 1 4 4v7a4 4 0 0 1-8 0V5a4 4 0 0 1 4-4z"/>
+              <path d="M19 10v2a7 7 0 0 1-14 0v-2M12 19v4M8 23h8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" fill="none"/>
+            </svg>
+          )}
         </button>
         <input
           value={input}
@@ -554,7 +487,10 @@ export default function SessionPage({ sessionId, onEnd, userName }) {
           className="chat-input"
         />
         <button type="button" onClick={() => sendMessage(input)} className="send-btn" aria-label="Send">
-          Send
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <line x1="22" y1="2" x2="11" y2="13"/>
+            <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+          </svg>
         </button>
       </footer>
     </div>
