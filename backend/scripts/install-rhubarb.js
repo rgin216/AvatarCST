@@ -10,8 +10,9 @@ const BACKEND_ROOT = path.resolve(SCRIPT_DIR, '..');
 const INSTALL_ROOT = path.join(BACKEND_ROOT, 'vendor', 'rhubarb');
 const BIN_DIR = path.join(INSTALL_ROOT, 'bin');
 const BIN_PATH = path.join(BIN_DIR, process.platform === 'win32' ? 'rhubarb.exe' : 'rhubarb');
-const ZIP_PATH = path.join(INSTALL_ROOT, 'rhubarb.zip');
-const EXTRACT_DIR = path.join(INSTALL_ROOT, 'extract');
+const ZIP_PATH = path.join(INSTALL_ROOT, `rhubarb-${process.pid}.zip`);
+const EXTRACT_DIR = path.join(INSTALL_ROOT, `extract-${process.pid}`);
+const RESOURCE_DIR = path.join(BIN_DIR, 'res');
 
 const required = process.env.REQUIRE_RHUBARB === '1';
 const skip = process.env.RHUBARB_SKIP_INSTALL === '1' || process.env.RHUBARB_SKIP_INSTALL === 'true';
@@ -106,19 +107,53 @@ function run(command, args) {
   });
 }
 
+function quotePowerShellLiteral(value) {
+  return `'${String(value).replace(/'/g, "''")}'`;
+}
+
+async function rmQuiet(targetPath) {
+  try {
+    await fs.rm(targetPath, { recursive: true, force: true, maxRetries: 3, retryDelay: 300 });
+  } catch (err) {
+    console.warn(`[rhubarb-install] Could not clean ${targetPath}: ${err.message}`);
+  }
+}
+
+async function cleanOldTempFiles() {
+  let entries = [];
+  try {
+    entries = await fs.readdir(INSTALL_ROOT, { withFileTypes: true });
+  } catch {
+    return;
+  }
+
+  await Promise.all(
+    entries
+      .filter((entry) => entry.name.startsWith('extract-') || /^rhubarb-\d+\.zip$/i.test(entry.name))
+      .map((entry) => rmQuiet(path.join(INSTALL_ROOT, entry.name)))
+  );
+}
+
 async function extractZip() {
-  await fs.rm(EXTRACT_DIR, { recursive: true, force: true });
+  await rmQuiet(EXTRACT_DIR);
   await fs.mkdir(EXTRACT_DIR, { recursive: true });
 
   if (process.platform === 'win32') {
+    const command = [
+      'Add-Type -AssemblyName System.IO.Compression.FileSystem;',
+      '[System.IO.Compression.ZipFile]::ExtractToDirectory(',
+      quotePowerShellLiteral(ZIP_PATH),
+      ',',
+      quotePowerShellLiteral(EXTRACT_DIR),
+      ')',
+    ].join(' ');
+
     await run('powershell.exe', [
       '-NoProfile',
       '-ExecutionPolicy',
       'Bypass',
       '-Command',
-      'Expand-Archive -LiteralPath $args[0] -DestinationPath $args[1] -Force',
-      ZIP_PATH,
-      EXTRACT_DIR,
+      command,
     ]);
     return;
   }
@@ -151,6 +186,7 @@ async function main() {
 
   try {
     await fs.access(BIN_PATH);
+    await fs.access(RESOURCE_DIR);
     console.log(`[rhubarb-install] Rhubarb already installed at ${BIN_PATH}`);
     return;
   } catch {
@@ -159,7 +195,7 @@ async function main() {
 
   try {
     await fs.mkdir(INSTALL_ROOT, { recursive: true });
-    await fs.mkdir(BIN_DIR, { recursive: true });
+    await cleanOldTempFiles();
 
     const release = await fetchLatestRelease();
     const asset = pickAsset(release);
@@ -171,13 +207,16 @@ async function main() {
     const extractedBinary = await findBinary(EXTRACT_DIR);
     if (!extractedBinary) throw new Error('Downloaded archive did not contain a rhubarb binary');
 
-    await fs.copyFile(extractedBinary, BIN_PATH);
+    await fs.rm(BIN_DIR, { recursive: true, force: true });
+    await fs.cp(path.dirname(extractedBinary), BIN_DIR, { recursive: true });
     if (process.platform !== 'win32') await fs.chmod(BIN_PATH, 0o755);
-    await fs.rm(EXTRACT_DIR, { recursive: true, force: true });
-    await fs.rm(ZIP_PATH, { force: true });
+    await rmQuiet(EXTRACT_DIR);
+    await rmQuiet(ZIP_PATH);
 
     console.log(`[rhubarb-install] Installed Rhubarb at ${BIN_PATH}`);
   } catch (err) {
+    await rmQuiet(EXTRACT_DIR);
+    await rmQuiet(ZIP_PATH);
     finishWarning('Could not install Rhubarb automatically. Lip sync will fall back unless RHUBARB_PATH points to a valid binary.', err);
   }
 }
