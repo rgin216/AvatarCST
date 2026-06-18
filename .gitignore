@@ -141,3 +141,4 @@ vite.config.ts.timestamp-*
 # Runtime-generated files
 backend/generated-audio/
 backend/temp/
+backend/vendor/

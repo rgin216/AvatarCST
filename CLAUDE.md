@@ -1,445 +1,319 @@
-# AvatarCST – Project Context & Repository Plan
+# AvatarCST - Current Project Context
 
----
+## Product Goal
 
-## 0. Current Status
+AvatarCST is a prototype iCST (individual Cognitive Stimulation Therapy) facilitator for people living with dementia or memory changes. The core experience is a structured, adult-to-adult therapy-style session where:
 
-**Phase:** Phase 1 ✅ → Phase 2 (Next)
+- A slide deck sits in the background as the session structure.
+- Aria, the avatar facilitator, speaks the session script and adapts gently to the patient's responses.
+- Patient input can be typed or recorded through the microphone.
+- The avatar output should eventually be low-latency speech with lip-syncable mouth movement.
+- The system should use a patient memory bank so Aria can personalize sessions without making the user feel tested.
 
-### Completed
-- Folder structure (frontend/backend) ✅
-- Dependencies installed ✅
-- Basic backend server running (port 5000) ✅
-- Health endpoint (`/api/health`) ✅
-- Frontend basic health check ✅
-- Git initialized ✅
-
-### Next Priority
-- Phase 2: Backend Foundation
-  - MongoDB local connection setup
-  - Database models (User, Session, Message, Summary)
-  - Controllers and routes scaffolding
-  - Error handling middleware
-  - `.env.example` template
-
----
-
-## 1. Project Overview
-
-AvatarCST is an AI-driven conversational system designed to support elderly individuals, particularly those experiencing cognitive decline, through structured, Cognitive Stimulation Therapy (CST)-inspired interactions.
-
-The system aims to:
-- Deliver structured, guided conversational sessions
-- Maintain user-specific memory across sessions
-- Provide personalised interactions (e.g. using name, preferences)
-- Generate summaries for caregivers
-- Enable accessible, low-latency interaction through voice and avatar
-
-The system follows a real-time conversational pipeline:
-
-User → Audio → LLM → Response → Avatar → User  
-                              ↓  
-                       Database
-
----
-
-## 2. Key Objectives
-
-### Functional Objectives
-- Conversational AI delivering CST-inspired sessions
-- Personalised interaction (name, preferences, cultural context)
-- Persistent memory across sessions
-
-### Performance Objectives
-- Low latency (< 2–4 seconds)
-- Efficient retrieval of session/memory data
-
-### User Experience Objectives
-- High satisfaction for elderly users
-- Simple, intuitive interface
-- Accessible interaction (voice + visual avatar)
-
----
-
-## 3. System Architecture (High-Level)
-
-### Core Components
-
-#### Frontend (React)
-- Landing page
-- Dashboard / session start
-- Session interface (chat + avatar)
-- Caregiver summary views
-- Accessibility controls
-
-#### Backend (Node.js + Express)
-- API layer
-- Session management
-- User profiles & caregiver relationships
-- Memory/context handling
-- Summary generation
-- Integration with external services (LLM, avatar)
-
-#### External Services
-- Realtime LLM (audio + text processing)
-- Avatar system (e.g. HeyGen)
-
-#### Database (MongoDB)
-- **Initial:** Local MongoDB for development/testing
-- **Future:** MongoDB Atlas for production
-- Data: User data, Sessions, Messages, Summaries, Memory (future)
-
----
-
-## 4. Technology Stack
-
-### Frontend
-- React
-- Vite
-- React Router
-- Axios
-
-### Backend
-- Node.js
-- Express
-- MongoDB + Mongoose
-- dotenv
-- nodemon
-
-### AI / Integrations
-- OpenAI Realtime API (audio + text)
-- Avatar API (e.g. HeyGen)
-- **OpenAI Realtime API** (audio + text processing)
-  - Integration points stubbed out initially
-  - API keys will be shared via Discord (no repo storage)
-- **Avatar system (HeyGen)**
-  - Integration points stubbed out initially
-  - API keys will be shared via Discord (no repo storage)
-
-### Note on Python
-Python is NOT included initially.
-
-Reason:
-- All required logic (prompting, memory injection, API calls) can be handled in Node
-- Keeps architecture simple
-- Can be added later if needed for:
-  - advanced preprocessing
-  - ML pipelines
-  - embeddings/vector search
-
-### Integration Approach
-- Services will have **placeholder/stub implementations** initially
-- Actual API integration deferred to Phase 5-6
-- This allows Phase 2-4 to focus on backend structure & core conversation flow
-
-## 5. Repository Structure
-
-### Top-Level
-
-avatarcst/
-├─ frontend/
-├─ backend/
-├─ .gitignore
-├─ README.md
-└─ docker-compose.yml (optional)
-
----
-
-## 6. Frontend Structure
-
-frontend/
-├─ public/
-├─ src/
-│  ├─ assets/
-│  ├─ components/
-│  │  ├─ layout/
-│  │  ├─ ui/
-│  │  └─ session/
-│  ├─ pages/
-│  │  ├─ LandingPage.jsx
-│  │  ├─ DashboardPage.jsx
-│  │  ├─ SessionPage.jsx
-│  │  └─ CaregiverPage.jsx
-│  ├─ hooks/
-│  ├─ services/
-│  │  ├─ api.js
-│  │  ├─ sessionService.js
-│  │  └─ summaryService.js
-│  ├─ context/
-│  ├─ utils/
-│  ├─ App.jsx
-│  ├─ main.jsx
-│  └─ routes.jsx
-├─ .env.example
-├─ package.json
-└─ vite.config.js
-
-### Responsibilities
-- UI rendering
-- User interaction
-- Session interface
-- Avatar display
-- API communication
-
----
-
-## 7. Backend Structure
-
-backend/
-├─ src/
-│  ├─ config/
-│  │  ├─ db.js
-│  │  └─ env.js
-│  ├─ controllers/
-│  │  ├─ sessionController.js
-│  │  ├─ summaryController.js
-│  │  └─ healthController.js
-│  ├─ routes/
-│  │  ├─ sessionRoutes.js
-│  │  ├─ summaryRoutes.js
-│  │  └─ healthRoutes.js
-│  ├─ services/
-│  │  ├─ llmService.js
-│  │  ├─ memoryService.js
-│  │  ├─ summaryService.js
-│  │  └─ avatarService.js
-│  ├─ models/
-│  │  ├─ User.js
-│  │  ├─ Session.js
-│  │  ├─ Message.js
-│  │  └─ Summary.js
-│  ├─ middleware/
-│  │  ├─ errorHandler.js
-│  │  └─ notFound.js
-│  ├─ utils/
-│  ├─ app.js
-│  └─ server.js
-├─ .env.example
-├─ package.json
-└─ nodemon.json
-
-### Responsibilities
-- Business logic
-- Session orchestration
-- Memory/context injection
-- Database interaction
-- External API integration
-
----
-
-## 8. Data Model (Initial)
-
-### Session
-- id
-- userId
-- title
-- startedAt
-- endedAt
-- status
-
-### Message
-- id
-- sessionId
-- role (user / assistant)
-- content
-- timestamp
-
-### Summary
-- id
-- sessionId
-- userId
-- summaryText
-- createdAt
-
-### Future (Optional) ✅ COMPLETE
-- Create repo structure ✅
-- Initialise frontend and backend ✅
-- Add basic configs (health endpoint) ✅
-- Git initialization ✅
-
----
-
-## 9. Development Phases
-
-### Phase 1 - Setup
-Status: COMPLETE
-
-- Create repo structure
-- Initialise frontend and backend
-- Add basic configs
-
-### Phase 2 - Backend Foundation
-Status: NEXT
-
-- Express server setup ✅ (partial)
-- MongoDB connection (local for dev, Atlas later)
-- Database models (User, Session, Message, Summary)
-- Controllers (session, summary, health)
-- Routes (session, summary)
-- Error handling middleware
-- `.env.example` template
-- Stub services (LLM, Avatar, Memory)
-- Basic error handling
-
-### Phase 3 - Frontend Foundation
-- Landing page
-- Dashboard
-- Session page
-- API connectivity
-
-### Phase 4 - Core Functionality
-- Create session
-- Store messages
-- OpenAI Realtime API
-- Inject session context into prompts
-- Generate conversational responses
-
-### Phase 6 - Avatar Integration
-- Connect HeyGen API
-- Sync speech output + avatar animation
-- Real-time audio/video streaming
-
-### Phase 7 - Summaries
-- Generate session summaries (backend)
-- Store summaries in DB
-- Display summaries to caregivers (frontend)
-
-### Phase 8 - Caregiver Features (Future)
-- Caregiver dashboard
-- Session history & insights
-- User preferences & management
-
----
-
-## 10. Design Principles
-
-### 1. Start Simple
-Avoid overengineering. Focus on:
-- working pipeline
-- clean structure
-- incremental features
-
-### 2. Feature-Based Thinking
-Structure code around:
-- sessions
-- conversations
-- summaries
-- users
-
-### 3. Backend as Source of Truth
-- All logic flows through backend
-- Frontend stays thin
-
-### 4. Expand Only When Needed
-- Add Python or microservices later only if required
-
----
-
-## 11. Literature Review Summary
-
-### Dementia Context
-- Increasing global prevalence
-- Significant impact on cognition and quality of life
-- Need for scalable, accessible interventions
-
-### Cognitive Stimulation Therapy (CST)
-- Evidence-based intervention
-- Improves cognition and quality of life
-- Typically delivered in structured group sessions
-
-### Limitations of Traditional CST
-- Requires trained facilitators
-- Limited scalability
-- Requires physical attendance
-- Limited personalisation
-- Hard to retain session-specific user details
-
-### Digital Interventions
-Examples include:
-- ElliQ
-- Sunny (Newdays)
-- Other AI companions
-
-Limitations:
-- Often not structured like CST
-- Lack therapeutic grounding
-- Limited personalisation depth
-- Weak long-term memory handling
-
-### Role of AI and LLMs
-- Enable natural conversation
-- Context-aware responses
-- Real-time interaction
-- Potential to simulate structured therapy sessions
-
-### Research Gap
-Current systems:
-- Are conversational but not therapeutic
-- Lack CST structure
-- Do not combine:
-  - structured therapy
-  - personal memory
-  - real-time avatar interaction
-
-### Proposed Contribution
-AvatarCST aims to:
-- Combine CST structure with AI conversation
-- Deliver personalised sessions
-- Provide continuity via memory
-- Enable caregiver insights through summaries
-
----
-
-## 12. Final Direction
-
-The project will begin with:
-- Simple 2-folder repo (frontend + backend)
-- Node/Express backend only
-- React frontends
-
-### Immediate (Phase 2)
-1. Set up local MongoDB connection
-2. Create Mongoose models (User, Session, Message, Summary)
-3. Build controllers & routes
-4. Add error handling middleware
-5. Create `.env.example` file
-6. Stub out LLM & Avatar services (placeholder code)
-
-### Then (Phase 3)
-- Build frontend pages (Landing, Dashboard, Session, Caregiver)
-- Add React Router setup
-- Connect frontend to backend APIs
-
-### Then (Phase 4+)
-- Core conversation flow (store/retrieve messages)
-- AI integration
-- Avatar integration
-- Summaries generation
-- Caregiver features (future)
-## 13. Collaboration & Key Decisions
-
-### API Keys
-- OpenAI Realtime API keys → shared via Discord
-- HeyGen API keys → shared via Discord
-- **No sensitive keys in repo** ✅
-
-### Development Environment
-- **Database:** Local MongoDB for dev/testing
-- **Deployment:** MongoDB Atlas (future production)
-- **Branching:** Feature branches, PR-based reviews
-
----
-
-## 14. Next Steps
-
-**Current focus:** Phase 2 - Backend Foundation (planning stage; backend implementation present, including the Session.js model)
-
-As Phase 2 continues:
-1. Set up local MongoDB connection
-2. Create Mongoose models (User, Session, Message, Summary)
-3. Build controllers & routes
-4. Add error handling middleware
-5. Create `.env.example` file
-6. Stub out LLM & Avatar services (placeholder code)
-
-Then move to Phase 3 (Frontend Foundation) and Phase 4+ (Core Functionality)
+The project has moved beyond the old "basic backend foundation" phase. The main work now is polishing the scripted slide-led session flow, hardening memory save/query behavior, and making the audio pipeline switch cleanly between the free prototype path and OpenAI Realtime mini.
+
+## Current State
+
+### Implemented
+
+- React/Vite frontend and Express/Mongo backend.
+- Login flow that creates or loads a patient user by name.
+- Landing flow with two test sessions:
+  - `cst_intro_reminiscence` - Session 1: Introduction and Welcome.
+  - `cst_childhood` - Session 2: Getting to Know You: Childhood.
+- Scripted session orchestration through `POST /api/sessions/:id/respond`.
+- Microphone input path through `POST /api/sessions/:id/respond-audio`.
+- Slide-backed session UI using exported slide images under `frontend/public/slides/session1/` and `frontend/public/slides/session2/`.
+- Local avatar rendering with:
+  - male avatar path based on `frontend/public/models/harry.glb`,
+  - experimental female/avatar mode path,
+  - simple audio visualizer mode.
+- Rhubarb JSON mouth cues mapped to Three.js morph targets in the frontend.
+- Memory bank model, caregiver CRUD routes, and caregiver page UI.
+- Groq-based prototype LLM/STT path and Edge TTS output.
+- A partial OpenAI Realtime mini session-secret endpoint.
+
+### Still Rough
+
+- Memory is stored and injected, but retrieval is currently broad and simple: the orchestrator loads all memory entries and passes a small slice back as `memoryUsed`. There is no semantic search, scoring, approval flow for suggested memories, or robust memory writeback from sessions yet.
+- `suggestedMemoryUpdates` is heuristic only, based on simple regexes in `sessionOrchestratorService.js`.
+- Realtime mode is not fully wired in the frontend. The backend can mint a realtime client secret, but `SessionPage.jsx` currently disables the mic action when `PIPELINE_MODE=realtime`.
+- The current free pipeline still creates a full backend turn before returning audio, so it is not genuinely real-time.
+- The two sessions are useful test scripts, not polished clinical content.
+- Docs other than this file may still be stale; prefer source files over README text when they disagree.
+
+## Current Audio / LLM Pipeline
+
+Pipeline mode is controlled by `PIPELINE_MODE` in `backend/src/config/pipeline.js` and `backend/.env.example`.
+
+### `PIPELINE_MODE=free` (current working prototype)
+
+For recorded microphone input:
+
+1. Frontend records browser audio with `MediaRecorder`.
+2. `SessionPage.jsx` posts the audio blob to `POST /api/sessions/:id/respond-audio`.
+3. `sttService.js` sends the audio to Groq Whisper (`whisper-large-v3-turbo` by default).
+4. `sessionOrchestratorService.js` uses the transcript, session script state, recent messages, and memory entries.
+5. `llmService.js` calls Groq chat completions (`llama-3.3-70b-versatile` by default).
+6. `ttsService.js` synthesizes speech with `msedge-tts`.
+7. `rhubarbService.js` generates Rhubarb mouth cues for the produced audio file. It uses `RHUBARB_PATH` if set, otherwise it looks for the auto-installed binary under `backend/vendor/rhubarb/bin`.
+8. The backend returns `assistantText`, slide state, audio URL, Rhubarb JSON, memory used, and suggested memory updates.
+9. The frontend plays the audio and drives avatar mouth movement from the Rhubarb timeline plus audio energy.
+
+For typed input, the flow skips STT and starts at `POST /api/sessions/:id/respond`.
+
+### `PIPELINE_MODE=realtime` (planned official path)
+
+The intended target is:
+
+`patient audio -> OpenAI Realtime mini (STT + LLM + TTS) -> avatar audio playback + Rhubarb/lip-sync or realtime mouth animation`
+
+Current backend support:
+
+- `POST /api/sessions/:id/realtime-session` calls `createRealtimeSessionForTurn`.
+- `realtimeService.js` posts to `https://api.openai.com/v1/realtime/client_secrets`.
+- It builds session instructions from the same CST prompt, slide, script, memory, and recent message context.
+
+Current frontend gap:
+
+- The frontend detects `PIPELINE_MODE=realtime` via `GET /api/sessions/pipeline`.
+- The mic button currently logs that realtime is not configured and does not start a WebRTC session.
+
+## Session Orchestration
+
+The canonical turn endpoint is:
+
+```text
+POST /api/sessions/:id/respond
+POST /api/sessions/:id/respond-audio
+```
+
+The orchestration service owns:
+
+- session status checks,
+- current script step,
+- per-step turn counts,
+- recent transcript retrieval,
+- answer-quality checking,
+- retry/progress decisions,
+- adaptive response generation,
+- slide state updates,
+- assistant/user message persistence,
+- memory context injection,
+- suggested memory updates.
+
+Important files:
+
+- `backend/src/services/sessionOrchestratorService.js`
+- `backend/src/services/cstScriptService.js`
+- `backend/src/services/promptService.js`
+- `backend/src/controllers/sessionController.js`
+- `backend/src/models/Session.js`
+- `backend/src/models/Message.js`
+
+The session state fields that matter most are:
+
+- `scriptId`
+- `scriptStepIndex`
+- `scriptStepTurnIndex`
+- `scriptStepRetryCount`
+- `presentationState`
+
+## Scripts and Slides
+
+Script data is currently split across two layers:
+
+- `backend/src/services/cstScriptService.js` contains executable session steps used by the app.
+- `context/vCST_Session1_AI_Script.md` and `context/vCST_Session2_AI_Script.md` hold fuller source script text and adaptation guidance.
+- `context/vCST_Initial_Prompt.md` defines Aria's tone and CST facilitation principles.
+
+Slide images live in:
+
+- `frontend/public/slides/session1/`
+- `frontend/public/slides/session2/`
+
+When adding a session:
+
+1. Add or update a script ID in `cstScriptService.js`.
+2. Make sure the slide folder is registered in `scriptSlideFolders`.
+3. Export slide images to `frontend/public/slides/<session-folder>/slide-XX.jpg`.
+4. Add the session option in `frontend/src/App.jsx`.
+5. Keep script copy warm, brief, adult-to-adult, and non-testing.
+
+## Memory Bank
+
+Current model:
+
+- `backend/src/models/Memory.js`
+- One memory document per user.
+- Entries have `category`, `content`, `addedBy`, and timestamps.
+- Categories: `preference`, `personal`, `session_insight`, `caregiver_note`.
+
+Current routes:
+
+- `GET /api/memory/:userId`
+- `POST /api/memory/:userId/entries`
+- `DELETE /api/memory/:userId/entries/:entryId`
+- `DELETE /api/memory/:userId`
+
+Current frontend:
+
+- `frontend/src/pages/CaregiverPage.jsx` lets a caregiver view, add, and delete memory entries.
+- `frontend/src/pages/LoginPage.jsx` seeds a few starter memories when it creates a new user.
+
+Current orchestrator behavior:
+
+- Loads memory entries for the session user.
+- Injects memory into prompt instructions as quoted data.
+- Returns the first few entries in `memoryUsed`.
+- Generates basic `suggestedMemoryUpdates` when the patient states a favorite or life-history place.
+
+Recommended next memory work:
+
+1. Define the memory lifecycle: caregiver-entered, session-suggested, system-confirmed, archived/deleted.
+2. Add an explicit review/approval path for `suggestedMemoryUpdates` before saving them.
+3. Replace broad memory injection with query/relevance filtering.
+4. Track why a memory was used so caregiver review is explainable.
+5. Add tests around memory suggestion, saving, deletion, and prompt injection safety.
+
+## API Overview
+
+Mounted in `backend/src/app.js`:
+
+- `/api/health`
+- `/api/users`
+- `/api/sessions`
+- `/api/summaries`
+- `/api/memory`
+- `/generated-audio`
+
+Useful session endpoints:
+
+- `GET /api/sessions/pipeline`
+- `POST /api/sessions`
+- `GET /api/sessions/user/:userId`
+- `DELETE /api/sessions/user/:userId`
+- `GET /api/sessions/:id`
+- `PATCH /api/sessions/:id`
+- `PATCH /api/sessions/:id/end`
+- `POST /api/sessions/:id/respond`
+- `POST /api/sessions/:id/respond-audio`
+- `POST /api/sessions/:id/realtime-session`
+- `POST /api/sessions/:id/messages`
+- `GET /api/sessions/:id/messages`
+
+## Development Setup
+
+Backend:
+
+```powershell
+cd backend
+npm install
+npm run dev
+```
+
+Frontend:
+
+```powershell
+cd frontend
+npm install
+npm run dev
+```
+
+Defaults:
+
+- Backend: `http://localhost:5000`
+- Frontend: `http://localhost:5173`
+- Frontend API base: `VITE_API_URL` or `http://localhost:5000/api`
+
+Mongo:
+
+- Set `MONGO_URI` in `backend/.env`.
+- `docker-compose.yml` provides a local Mongo option.
+- If using local Docker Mongo, use a URI like `mongodb://127.0.0.1:27017/avatarcst`.
+
+Demo data:
+
+- `backend/src/scripts/seedDemo.js` creates Margaret and Sarah, links caregiver/patient, and seeds memory entries.
+- If a package script is not present, run it directly from `backend` with:
+
+```powershell
+node src/scripts/seedDemo.js
+```
+
+## Environment Variables
+
+Backend variables from `backend/.env.example`:
+
+- `PORT`
+- `MONGO_URI`
+- `NODE_ENV`
+- `OPENAI_API_KEY`
+- `OPENAI_REALTIME_MODEL`
+- `OPENAI_REALTIME_VOICE`
+- `RHUBARB_PATH`
+- `GROQ_API_KEY`
+- `GROQ_MODEL`
+- `GROQ_WHISPER_MODEL`
+- `PIPELINE_MODE`
+- `TTS_VOICE`
+
+Frontend variables:
+
+- `VITE_API_URL`
+- Optional fixed demo user ID if using seeded data: `VITE_DEMO_USER_ID`
+
+`backend/package.json` runs `scripts/install-rhubarb.js` on `npm install`. The script downloads the latest platform-specific Rhubarb release into `backend/vendor/rhubarb/bin`; that folder is git-ignored. Set `RHUBARB_SKIP_INSTALL=1` to skip the download, `REQUIRE_RHUBARB=1` to make install fail if Rhubarb cannot be fetched, or `RHUBARB_PATH` to point at a manually installed binary.
+
+Never commit real `.env` files or API keys.
+
+## Avatar and Lip Sync
+
+Main files:
+
+- `frontend/src/components/avatar/AvatarViewer.jsx`
+- `frontend/src/utils/lipSync.js`
+- `frontend/src/pages/SessionPage.jsx`
+- `backend/src/services/rhubarbService.js`
+- `backend/src/services/avatarService.js`
+
+The proven lip-sync path is the Harry/male avatar with Rhubarb mouth cues mapped to morph targets. The female avatar path is experimental because prior inspected assets did not expose the same reliable viseme targets. The visualizer mode is useful as a low-risk fallback when avatar rigging is not the focus.
+
+Dev URL helpers:
+
+- `?devSession=1` opens straight into session mode in Vite dev.
+- `?avatar=female` selects the female mode.
+- `?avatar=visualizer` selects the audio visual mode.
+
+## Engineering Principles
+
+- Keep the backend as the source of truth for session progression.
+- Keep the frontend thin: display the slide, avatar, transcript, and input controls based on backend turn envelopes.
+- Prefer small, testable changes around session orchestration; it touches script state, messages, memory, slides, audio, and avatar behavior.
+- Do not make the patient feel quizzed. Scripts should invite, reflect, reassure, and move on gently.
+- Treat memory as sensitive patient context. Avoid injecting too much, and make future memory writes reviewable.
+- Prefer real source files over stale docs when investigating current behavior.
+
+## Suggested Next Steps
+
+The proposed order sounds right:
+
+1. Memory bank hardening.
+   - Decide the memory schema and lifecycle.
+   - Add relevance/query behavior.
+   - Add reviewable memory suggestions.
+   - Add focused tests.
+
+2. Realtime mini integration.
+   - Wire the frontend WebRTC/client-secret flow.
+   - Decide how to keep Rhubarb/lip sync compatible with realtime audio, or use an interim audio-energy mouth animation.
+   - Keep the free Groq/Edge/Rhubarb path as a fallback.
+
+3. Session polish.
+   - Improve the two test sessions' scripts.
+   - Add caregiver-visible session summaries.
+   - Reduce visible dev/debug chrome before demos.
+
+4. Avatar polish.
+   - Keep Harry as the reliable baseline.
+   - Treat female avatar work as separate rig/asset work unless a better viseme-ready model is added.

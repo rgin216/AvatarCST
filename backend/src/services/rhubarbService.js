@@ -1,9 +1,26 @@
 import { spawn } from 'child_process';
 import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import ffmpeg from 'fluent-ffmpeg';
 import ffmpegPath from 'ffmpeg-static';
 
 ffmpeg.setFfmpegPath(ffmpegPath);
+
+const SERVICE_DIR = path.dirname(fileURLToPath(import.meta.url));
+const BACKEND_ROOT = path.resolve(SERVICE_DIR, '../..');
+const VENDORED_RHUBARB_PATH = path.join(
+  BACKEND_ROOT,
+  'vendor',
+  'rhubarb',
+  'bin',
+  process.platform === 'win32' ? 'rhubarb.exe' : 'rhubarb'
+);
+
+function resolveRhubarbPath() {
+  if (process.env.RHUBARB_PATH) return process.env.RHUBARB_PATH;
+  return VENDORED_RHUBARB_PATH;
+}
 
 // Convert audio file to 16-bit mono WAV at 24kHz — the format Rhubarb requires.
 function convertToWav(inputPath, outputPath) {
@@ -22,9 +39,8 @@ function convertToWav(inputPath, outputPath) {
 // Returns Rhubarb JSON ({ metadata, mouthCues }) or null if Rhubarb is unavailable/fails.
 // The caller is responsible for using placeholder visemes when null is returned.
 export async function generateLipSync(audioFilePath) {
-  const rhubarbPath = process.env.RHUBARB_PATH;
+  const rhubarbPath = resolveRhubarbPath();
 
-  if (!rhubarbPath) return null;
   if (!fs.existsSync(rhubarbPath)) {
     console.warn(`[rhubarb] Binary not found at: ${rhubarbPath}`);
     return null;

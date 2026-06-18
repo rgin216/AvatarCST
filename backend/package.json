@@ -4,6 +4,8 @@
   "description": "",
   "main": "index.js",
   "scripts": {
+    "postinstall": "node scripts/install-rhubarb.js",
+    "install:rhubarb": "node scripts/install-rhubarb.js",
     "dev": "nodemon src/server.js",
     "start": "node src/server.js"
   },
