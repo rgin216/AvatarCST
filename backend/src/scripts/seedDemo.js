@@ -9,26 +9,31 @@ const demoMemories = [
     category: 'personal',
     content: 'Has a daughter named Sarah who lives in Wellington',
     addedBy: 'caregiver',
+    status: 'approved',
   },
   {
     category: 'preference',
     content: 'Enjoys gardening and growing roses',
     addedBy: 'caregiver',
+    status: 'approved',
   },
   {
     category: 'preference',
     content: 'Favourite music era: 1960s; likes The Beatles',
     addedBy: 'caregiver',
+    status: 'approved',
   },
   {
     category: 'preference',
     content: 'Enjoys a cup of Earl Grey in the morning',
     addedBy: 'caregiver',
+    status: 'approved',
   },
   {
     category: 'personal',
     content: 'Grew up in Christchurch and moved to Auckland in 1978',
     addedBy: 'caregiver',
+    status: 'approved',
   },
 ];
 

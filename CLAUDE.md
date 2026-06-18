@@ -35,8 +35,8 @@ The project has moved beyond the old "basic backend foundation" phase. The main 
 
 ### Still Rough
 
-- Memory is stored and injected, but retrieval is currently broad and simple: the orchestrator loads all memory entries and passes a small slice back as `memoryUsed`. There is no semantic search, scoring, approval flow for suggested memories, or robust memory writeback from sessions yet.
-- `suggestedMemoryUpdates` is heuristic only, based on simple regexes in `sessionOrchestratorService.js`.
+- Memory is stored, reviewed, and injected, but retrieval is currently broad and simple: the orchestrator loads approved memory entries and passes a small slice back as `memoryUsed`. There is no semantic search or scoring yet.
+- `suggestedMemoryUpdates` is heuristic only, based on simple regexes in `sessionOrchestratorService.js`, and is now saved as pending caregiver-review memory.
 - Realtime mode is not fully wired in the frontend. The backend can mint a realtime client secret, but `SessionPage.jsx` currently disables the mic action when `PIPELINE_MODE=realtime`.
 - The current free pipeline still creates a full backend turn before returning audio, so it is not genuinely real-time.
 - The two sessions are useful test scripts, not polished clinical content.
@@ -147,34 +147,36 @@ Current model:
 - `backend/src/models/Memory.js`
 - One memory document per user.
 - Entries have `category`, `content`, `addedBy`, and timestamps.
+- Entries also have a review `status`: `pending`, `approved`, or `rejected`.
 - Categories: `preference`, `personal`, `session_insight`, `caregiver_note`.
 
 Current routes:
 
 - `GET /api/memory/:userId`
 - `POST /api/memory/:userId/entries`
+- `PATCH /api/memory/:userId/entries/:entryId/review`
 - `DELETE /api/memory/:userId/entries/:entryId`
 - `DELETE /api/memory/:userId`
 
 Current frontend:
 
 - `frontend/src/pages/CaregiverPage.jsx` lets a caregiver view, add, and delete memory entries.
+- The caregiver page separates approved memories from pending suggestions, and pending items can be approved or rejected.
 - `frontend/src/pages/LoginPage.jsx` seeds a few starter memories when it creates a new user.
 
 Current orchestrator behavior:
 
-- Loads memory entries for the session user.
+- Loads approved memory entries for the session user. Older entries without a `status` field are treated as approved for compatibility.
 - Injects memory into prompt instructions as quoted data.
 - Returns the first few entries in `memoryUsed`.
-- Generates basic `suggestedMemoryUpdates` when the patient states a favorite or life-history place.
+- Generates basic `suggestedMemoryUpdates` when the patient states a favorite or life-history place, saves new ones as pending memory entries, and deduplicates against non-rejected entries.
 
 Recommended next memory work:
 
-1. Define the memory lifecycle: caregiver-entered, session-suggested, system-confirmed, archived/deleted.
-2. Add an explicit review/approval path for `suggestedMemoryUpdates` before saving them.
-3. Replace broad memory injection with query/relevance filtering.
-4. Track why a memory was used so caregiver review is explainable.
-5. Add tests around memory suggestion, saving, deletion, and prompt injection safety.
+1. Replace broad approved-memory injection with query/relevance filtering.
+2. Improve memory suggestion extraction beyond regexes.
+3. Track why approved memories were selected so caregiver review is explainable.
+4. Add tests around memory suggestion, review, saving, deletion, and prompt injection safety.
 
 ## API Overview
 

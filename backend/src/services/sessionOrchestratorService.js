@@ -56,12 +56,7 @@ const assertCanUseSession = (session, action) => {
 
 const getMemoryEntries = async (userId) => {
   const memory = await Memory.findOne({ userId }).lean();
-  return memory?.entries || [];
-};
-
-const pickMemoryLine = (entries = []) => {
-  const entry = entries.find((item) => ['personal', 'preference', 'caregiver_note'].includes(item.category));
-  return entry?.content || '';
+  return (memory?.entries || []).filter((entry) => !entry.status || entry.status === 'approved');
 };
 
 const toSlide = ({ step, index, total }) => ({
@@ -104,6 +99,62 @@ const inferMemorySuggestions = (content = '') => {
   }
 
   return suggestions;
+};
+
+const normalizeMemoryContent = (content = '') => content.trim().replace(/\s+/g, ' ').toLowerCase();
+
+const savePendingMemorySuggestions = async ({ userId, sessionId, suggestions = [] }) => {
+  const normalizedSuggestions = suggestions
+    .map((suggestion) => ({
+      ...suggestion,
+      content: suggestion.content?.trim(),
+      reason: suggestion.reason?.trim(),
+    }))
+    .filter((suggestion) => suggestion.content);
+
+  if (normalizedSuggestions.length === 0) return [];
+
+  const memory = await Memory.findOne({ userId });
+  const existingContent = new Set(
+    (memory?.entries || [])
+      .filter((entry) => entry.status !== 'rejected')
+      .map((entry) => normalizeMemoryContent(entry.content))
+  );
+
+  const entriesToAdd = normalizedSuggestions
+    .filter((suggestion) => {
+      const normalized = normalizeMemoryContent(suggestion.content);
+      if (existingContent.has(normalized)) return false;
+      existingContent.add(normalized);
+      return true;
+    })
+    .map((suggestion) => ({
+      category: suggestion.category,
+      content: suggestion.content,
+      reason: suggestion.reason,
+      addedBy: 'system',
+      status: 'pending',
+      sourceSessionId: sessionId,
+    }));
+
+  if (entriesToAdd.length === 0) return [];
+
+  const updatedMemory = await Memory.findOneAndUpdate(
+    { userId },
+    { $push: { entries: { $each: entriesToAdd } } },
+    { new: true, upsert: true }
+  ).lean();
+
+  const addedContent = new Set(entriesToAdd.map((entry) => normalizeMemoryContent(entry.content)));
+  return (updatedMemory?.entries || [])
+    .filter((entry) => entry.status === 'pending' && addedContent.has(normalizeMemoryContent(entry.content)))
+    .map((entry) => ({
+      id: entry._id,
+      category: entry.category,
+      content: entry.content,
+      reason: entry.reason,
+      status: entry.status,
+    }));
 };
 
 export const getSessionTurnContext = async (sessionId) => {
@@ -271,6 +322,12 @@ export const respondToSessionTurn = async ({ sessionId, content }) => {
   };
   await session.save();
 
+  const suggestedMemoryUpdates = await savePendingMemorySuggestions({
+    userId: session.userId,
+    sessionId: session._id,
+    suggestions: inferMemorySuggestions(userContent),
+  });
+
   return {
     sessionId: session._id,
     sessionStatus: session.status,
@@ -310,7 +367,7 @@ export const respondToSessionTurn = async ({ sessionId, content }) => {
       category: entry.category,
       content: entry.content,
     })),
-    suggestedMemoryUpdates: inferMemorySuggestions(userContent),
+    suggestedMemoryUpdates,
   };
 };
 

@@ -38,6 +38,8 @@ export default function CaregiverPage({ userId, onBack, userName }) {
 
   useEffect(() => {
     if (!userId) return;
+    setLoadingMemory(true);
+    setLoadingHistory(true);
     api.get(`/memory/${userId}`)
       .then(({ data }) => setMemories(data.entries || []))
       .catch(() => {})
@@ -65,6 +67,15 @@ export default function CaregiverPage({ userId, onBack, userName }) {
     }
   };
 
+  const reviewMemory = async (entryId, status) => {
+    try {
+      const { data } = await api.patch(`/memory/${userId}/entries/${entryId}/review`, { status });
+      setMemories(data.entries || []);
+    } catch (err) {
+      console.error("Failed to review memory", err);
+    }
+  };
+
   const deleteMemory = async (entryId) => {
     try {
       const { data } = await api.delete(`/memory/${userId}/entries/${entryId}`);
@@ -73,6 +84,9 @@ export default function CaregiverPage({ userId, onBack, userName }) {
       console.error("Failed to delete memory", err);
     }
   };
+
+  const approvedMemories = memories.filter((memory) => (memory.status || "approved") === "approved");
+  const pendingMemories = memories.filter((memory) => memory.status === "pending");
 
   const formatSessionDate = (session) => {
     const date = new Date(session.startedAt || session.createdAt);
@@ -141,10 +155,32 @@ export default function CaregiverPage({ userId, onBack, userName }) {
 
       {tab === "memory" && (
         <div className="fade-up">
-          <div style={{ fontSize: 14, color: theme.textLight, marginBottom: 16, lineHeight: 1.6 }}>These are memories Aria uses to personalise sessions for {userName}. Add or remove them below.</div>
+          <div style={{ fontSize: 14, color: theme.textLight, marginBottom: 16, lineHeight: 1.6 }}>Approved memories are the only ones Aria uses to personalise sessions for {userName}. Review suggested memories before they become active.</div>
           {loadingMemory && <div style={{ textAlign: "center", padding: "32px 0", color: theme.textLight }}>Loading memories...</div>}
-          {!loadingMemory && memories.length === 0 && <div style={{ textAlign: "center", padding: "32px 0", color: theme.textLight, fontSize: 15 }}>No memories yet. Add one below.</div>}
-          {memories.map((m) => (
+          {!loadingMemory && pendingMemories.length > 0 && (
+            <div style={{ marginBottom: 20 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: theme.textLight, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 10 }}>Review suggested memories</div>
+              {pendingMemories.map((m) => (
+                <div key={m._id} style={{ background: "#FFF8EE", border: `1px solid ${theme.blush}88`, borderRadius: 16, padding: "16px 18px", marginBottom: 10, boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}>
+                  <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
+                    <span style={{ background: (CATEGORY_COLORS[m.category] || "#B8CDD8") + "55", borderRadius: 8, padding: "3px 10px", fontSize: 11, fontWeight: 700, color: theme.mistDark, flexShrink: 0, marginTop: 2 }}>
+                      {CATEGORY_LABELS[m.category] || m.category}
+                    </span>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 15, color: theme.text, lineHeight: 1.5 }}>{m.content}</div>
+                      {m.reason && <div style={{ fontSize: 12, color: theme.textLight, marginTop: 6 }}>{m.reason}</div>}
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+                    <button onClick={() => reviewMemory(m._id, "approved")} className="btn-primary" style={{ flex: 1, padding: "9px" }}>Approve</button>
+                    <button onClick={() => reviewMemory(m._id, "rejected")} className="btn-outline" style={{ flex: 1, padding: "9px" }}>Reject</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          {!loadingMemory && approvedMemories.length === 0 && <div style={{ textAlign: "center", padding: "32px 0", color: theme.textLight, fontSize: 15 }}>No approved memories yet. Add one below.</div>}
+          {approvedMemories.map((m) => (
             <div key={m._id} style={{ background: theme.white, borderRadius: 16, padding: "16px 18px", marginBottom: 10, display: "flex", alignItems: "flex-start", gap: 12, boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}>
               <span style={{ background: (CATEGORY_COLORS[m.category] || "#B8CDD8") + "55", borderRadius: 8, padding: "3px 10px", fontSize: 11, fontWeight: 700, color: theme.mistDark, flexShrink: 0, marginTop: 2 }}>
                 {CATEGORY_LABELS[m.category] || m.category}

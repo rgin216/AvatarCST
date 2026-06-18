@@ -8,6 +8,11 @@ const entrySchema = new Schema({
   },
   content: { type: String, required: true },
   addedBy: { type: String, enum: ['system', 'caregiver'], default: 'system' },
+  status: { type: String, enum: ['pending', 'approved', 'rejected'], default: 'approved' },
+  reason: { type: String },
+  sourceSessionId: { type: Schema.Types.ObjectId, ref: 'Session' },
+  reviewedAt: { type: Date },
+  reviewedBy: { type: String, enum: ['system', 'caregiver'] },
 }, { timestamps: true });
 
 const memorySchema = new Schema({
