@@ -12,7 +12,12 @@ import { synthesizeSpeech } from '../services/ttsService.js';
 import { generateLipSync } from '../services/rhubarbService.js';
 import { buildAvatarResponse } from '../services/avatarService.js';
 import { GENERATED_AUDIO_DIR } from '../config/storage.js';
-import { PIPELINE_MODE } from '../config/pipeline.js';
+import {
+  getSessionPipelineMode,
+  isOpenAIScriptedPipeline,
+  DEFAULT_PIPELINE_MODE,
+  SESSION_PIPELINE_MODES,
+} from '../config/pipeline.js';
 
 const nowMs = () => Number(process.hrtime.bigint() / 1_000_000n);
 
@@ -27,7 +32,12 @@ async function timeAsync(label, fn, timings) {
 
 export const createSession = async (req, res, next) => {
   try {
-    const session = await Session.create({ ...req.body, status: 'active', startedAt: new Date() });
+    const session = await Session.create({
+      ...req.body,
+      pipelineMode: getSessionPipelineMode(req.body?.pipelineMode),
+      status: 'active',
+      startedAt: new Date(),
+    });
     res.status(201).json(session);
   } catch (err) {
     next(err);
@@ -95,10 +105,13 @@ export const getMessages = async (req, res, next) => {
   }
 };
 
-async function generateAudioForTurn(assistantText, timings = {}) {
+const getProviderForPipeline = (mode) =>
+  isOpenAIScriptedPipeline(mode) ? 'openai' : undefined;
+
+async function generateAudioForTurn(assistantText, options = {}, timings = {}) {
   const audioFileName = `${uuidv4()}.mp3`;
   const audioOutputPath = path.join(GENERATED_AUDIO_DIR, audioFileName);
-  await timeAsync('ttsMs', () => synthesizeSpeech(assistantText, audioOutputPath), timings);
+  await timeAsync('ttsMs', () => synthesizeSpeech(assistantText, audioOutputPath, options), timings);
   const rhubarbJson = await timeAsync('rhubarbMs', () => generateLipSync(audioOutputPath), timings);
   return { audioUrl: `/generated-audio/${audioFileName}`, rhubarbJson, audioOutputPath };
 }
@@ -118,7 +131,11 @@ export const respondToSession = async (req, res, next) => {
     );
 
     try {
-      const audio = await generateAudioForTurn(turn.assistantText, timings);
+      const audio = await generateAudioForTurn(
+        turn.assistantText,
+        { provider: getProviderForPipeline(turn.pipelineMode) },
+        timings
+      );
       audioOutputPath = audio.audioOutputPath;
       turn.avatar = buildAvatarResponse({
         text: turn.assistantText,
@@ -148,9 +165,15 @@ export const createRealtimeSession = async (req, res, next) => {
 
 export const getPipelineInfo = (_req, res) => {
   const info = {
-    mode: PIPELINE_MODE,
-    ...(PIPELINE_MODE === 'free' && { stt: 'groq-whisper', llm: 'groq', tts: 'edge-tts', lipsync: 'rhubarb' }),
-    ...(PIPELINE_MODE === 'realtime' && { provider: 'openai-realtime-mini', lipsync: 'rhubarb' }),
+    mode: DEFAULT_PIPELINE_MODE,
+    ...(DEFAULT_PIPELINE_MODE === 'free' && { stt: 'groq-whisper', llm: 'groq', tts: 'edge-tts', lipsync: 'rhubarb' }),
+    ...(DEFAULT_PIPELINE_MODE === 'openai-scripted' && {
+      stt: 'openai-transcribe',
+      llm: 'openai-responses',
+      tts: 'openai-tts',
+      lipsync: 'rhubarb',
+    }),
+    availableModes: SESSION_PIPELINE_MODES,
   };
   res.json(info);
 };
@@ -162,9 +185,17 @@ export const respondAudioToSession = async (req, res, next) => {
   const startedAtMs = nowMs();
 
   try {
+    const session = await Session.findById(req.params.id).select('pipelineMode').lean();
+    if (!session) return res.status(404).json({ error: 'Session not found' });
+    const provider = getProviderForPipeline(session.pipelineMode);
+
     let transcript = '';
     if (uploadedFilePath) {
-      transcript = await timeAsync('sttMs', () => transcribeAudio(uploadedFilePath, req.file?.originalname), timings);
+      transcript = await timeAsync(
+        'sttMs',
+        () => transcribeAudio(uploadedFilePath, req.file?.originalname, { provider }),
+        timings
+      );
     }
 
     const turn = await timeAsync(
@@ -174,7 +205,7 @@ export const respondAudioToSession = async (req, res, next) => {
     );
 
     try {
-      const audio = await generateAudioForTurn(turn.assistantText, timings);
+      const audio = await generateAudioForTurn(turn.assistantText, { provider }, timings);
       audioOutputPath = audio.audioOutputPath;
       turn.avatar = buildAvatarResponse({
         text: turn.assistantText,

@@ -11,6 +11,7 @@ import {
 } from './promptService.js';
 import { mintRealtimeClientSecret } from './realtimeService.js';
 import { generateResponse } from './llmService.js';
+import { isOpenAIScriptedPipeline } from '../config/pipeline.js';
 
 const RECENT_MESSAGE_LIMIT = 20;
 const MAX_UNANSWERED_ATTEMPTS = 3;
@@ -71,6 +72,9 @@ const assertCanUseSession = (session, action) => {
   err.status = 409;
   throw err;
 };
+
+const getLlmProviderForSession = (session) =>
+  isOpenAIScriptedPipeline(session.pipelineMode) ? 'openai' : 'groq';
 
 const getMemoryEntries = async (userId) => {
   const memory = await Memory.findOne({ userId }).lean();
@@ -236,6 +240,7 @@ export const respondToSessionTurn = async ({ sessionId, content }) => {
   const currentTurnIndex = session.scriptStepTurnIndex || 0;
   const effectiveTurnIndex = currentTurnIndex || (hasPriorAssistantTurn(recentMessages) ? 1 : 0);
   const currentRetryCount = session.scriptStepRetryCount || 0;
+  const llmProvider = getLlmProviderForSession(session);
 
   let userMessage = null;
   if (userContent) {
@@ -263,7 +268,7 @@ export const respondToSessionTurn = async ({ sessionId, content }) => {
         { role: 'system', content: adaptiveTurnPrompt },
         { role: 'user', content: userContent },
       ],
-      { temperature: 0.25, maxTokens: 80 }
+      { provider: llmProvider, temperature: 0.25, maxTokens: 80 }
     );
     const adaptiveTurn = parseAdaptiveTurn(adaptiveTurnText);
     answeredCurrentQuestion = adaptiveTurn.answered;
@@ -303,7 +308,7 @@ export const respondToSessionTurn = async ({ sessionId, content }) => {
       { role: 'system', content: systemPrompt },
       { role: 'user', content: userContent },
     ];
-    adaptiveText = await generateResponse(llmMessages, { temperature: 0.4, maxTokens: 60 });
+    adaptiveText = await generateResponse(llmMessages, { provider: llmProvider, temperature: 0.4, maxTokens: 60 });
   }
 
   if (userContent) {
@@ -358,6 +363,7 @@ export const respondToSessionTurn = async ({ sessionId, content }) => {
     sessionId: session._id,
     sessionStatus: session.status,
     scriptId: session.scriptId,
+    pipelineMode: session.pipelineMode,
     scriptStep: {
       id: step.id,
       index: boundedIndex,

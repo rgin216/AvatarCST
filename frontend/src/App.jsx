@@ -16,6 +16,11 @@ const SCREENS = {
 
 const devParams = new URLSearchParams(window.location.search);
 const devSessionEnabled = import.meta.env.DEV && devParams.get("devSession") === "1";
+const pipelineModes = new Set(["free", "openai-scripted"]);
+const getInitialPipelineMode = () => {
+  const requestedMode = devParams.get("pipeline");
+  return pipelineModes.has(requestedMode) ? requestedMode : "free";
+};
 
 const TEST_SESSIONS = [
   {
@@ -37,6 +42,8 @@ export default function App() {
   const [userId, setUserId] = useState(devSessionEnabled ? "dev-user" : null);
   const [userName, setUserName] = useState(devSessionEnabled ? "Ryan" : "");
   const [sessionId, setSessionId] = useState(devSessionEnabled ? "dev-session" : null);
+  const [selectedPipelineMode, setSelectedPipelineMode] = useState(getInitialPipelineMode);
+  const [sessionPipelineMode, setSessionPipelineMode] = useState(getInitialPipelineMode);
 
   const handleLogin = (id, name) => {
     setUserId(id);
@@ -52,8 +59,10 @@ export default function App() {
         title: sessionOption.title,
         theme: sessionOption.theme,
         scriptId: sessionOption.id,
+        pipelineMode: selectedPipelineMode,
       });
       setSessionId(data._id);
+      setSessionPipelineMode(data.pipelineMode || selectedPipelineMode);
       setScreen(SCREENS.SESSION);
     } catch (err) {
       console.error("Failed to start session", err);
@@ -82,10 +91,17 @@ export default function App() {
           userName={userName}
           userId={userId}
           sessionOptions={TEST_SESSIONS}
+          pipelineMode={selectedPipelineMode}
+          onPipelineModeChange={setSelectedPipelineMode}
         />
       )}
       {screen === SCREENS.SESSION && (
-        <SessionPage sessionId={sessionId} onEnd={handleEndSession} userName={userName} />
+        <SessionPage
+          sessionId={sessionId}
+          onEnd={handleEndSession}
+          userName={userName}
+          pipelineMode={sessionPipelineMode}
+        />
       )}
       {screen === SCREENS.END && <EndPage onHome={() => setScreen(SCREENS.LANDING)} userName={userName} />}
       {screen === SCREENS.CAREGIVER && (

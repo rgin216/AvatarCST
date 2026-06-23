@@ -47,7 +47,7 @@ const LIP_SYNC_SETTINGS = {
   leadSeconds: 0.055,
 };
 
-export default function SessionPage({ sessionId, onEnd, userName }) {
+export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: initialPipelineMode = "free" }) {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [isRecording, setIsRecording] = useState(false);
@@ -57,7 +57,7 @@ export default function SessionPage({ sessionId, onEnd, userName }) {
   const [avatarMode, setAvatarMode] = useState(getInitialAvatarMode);
   const timelineRef = useRef(null);
   const [pendingPlay, setPendingPlay] = useState(false);
-  const [pipelineMode, setPipelineMode] = useState("free");
+  const [pipelineMode, setPipelineMode] = useState(initialPipelineMode);
 
   const booted = useRef(false);
   const scrollRef = useRef(null);
@@ -74,12 +74,9 @@ export default function SessionPage({ sessionId, onEnd, userName }) {
   const recordingChunksRef = useRef([]);
   const voicePlaceholderIdRef = useRef(null);
 
-  // Fetch pipeline mode from backend on mount
   useEffect(() => {
-    api.get("/sessions/pipeline").then(({ data }) => {
-      if (data?.mode) setPipelineMode(data.mode);
-    }).catch(() => {});
-  }, []);
+    setPipelineMode(initialPipelineMode || "free");
+  }, [initialPipelineMode]);
 
   useEffect(() => {
     startTime.current = Date.now();
