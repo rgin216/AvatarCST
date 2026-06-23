@@ -38,6 +38,10 @@ export default function CaregiverPage({ userId, onBack, userName }) {
 
   useEffect(() => {
     if (!userId) return;
+    setMemories([]);
+    setSessions([]);
+    setExpandedSessionId(null);
+    setSessionMessages({});
     setLoadingMemory(true);
     setLoadingHistory(true);
     api.get(`/memory/${userId}`)

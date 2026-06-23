@@ -1,3 +1,4 @@
+import { Types } from 'mongoose';
 import Memory from '../models/Memory.js';
 
 const APPROVABLE_STATUSES = ['approved', 'rejected'];
@@ -12,6 +13,8 @@ const buildMemoryEntry = (body = {}) => ({
   reviewedAt: body.status === 'pending' ? undefined : new Date(),
   reviewedBy: body.status === 'pending' ? undefined : 'caregiver',
 });
+
+const isValidObjectId = (value) => Types.ObjectId.isValid(value);
 
 export const getUserMemory = async (req, res, next) => {
   try {
@@ -58,6 +61,14 @@ export const reviewMemoryEntry = async (req, res, next) => {
     const status = req.body?.status;
     if (!APPROVABLE_STATUSES.includes(status)) {
       return res.status(400).json({ error: 'status must be approved or rejected' });
+    }
+
+    if (!isValidObjectId(req.params.userId)) {
+      return res.status(400).json({ error: 'Malformed userId' });
+    }
+
+    if (!isValidObjectId(req.params.entryId)) {
+      return res.status(400).json({ error: 'Malformed entryId' });
     }
 
     const memory = await Memory.findOneAndUpdate(
