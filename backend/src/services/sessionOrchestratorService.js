@@ -32,22 +32,40 @@ const parseAnswerQuality = (text = '') => {
   return false;
 };
 
-const parseAdaptiveTurn = (text = '') => {
+const extractJsonObject = (text = '') => {
+  const trimmed = text.trim();
+  if (!trimmed) return null;
+
+  const fencedMatch = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  const candidate = fencedMatch?.[1]?.trim() || trimmed;
+  const objectMatch = candidate.match(/\{[\s\S]*\}/);
+  if (!objectMatch) return null;
+
   try {
-    const parsed = JSON.parse(text);
+    return JSON.parse(objectMatch[0]);
+  } catch {
+    return null;
+  }
+};
+
+const parseAdaptiveTurn = (text = '') => {
+  const parsed = extractJsonObject(text);
+  if (parsed) {
     return {
-      answered: typeof parsed?.answered === 'boolean' ? parsed.answered : parseAnswerQuality(text),
+      answered: typeof parsed.answered === 'boolean' ? parsed.answered : true,
       response: typeof parsed?.response === 'string' ? parsed.response.trim() : '',
     };
-  } catch {
-    return {
-      answered: parseAnswerQuality(text),
-      response: text
-        .replace(/\{[\s\S]*$/, '')
-        .replace(/^(response:|aria says:?|as aria,?)\s*/i, '')
-        .trim(),
-    };
   }
+
+  const explicitAnswerQuality = parseAnswerQuality(text);
+  return {
+    answered: explicitAnswerQuality || !/\banswered\s*["']?\s*:\s*false\b/i.test(text),
+    response: text
+      .replace(/```(?:json)?[\s\S]*?```/gi, '')
+      .replace(/\{[\s\S]*$/, '')
+      .replace(/^(response:|aria says:?|as aria,?)\s*/i, '')
+      .trim(),
+  };
 };
 
 const getAskedScriptLine = (step, currentTurnIndex, context) =>

@@ -24,6 +24,17 @@ const chatMessagesToResponsesInput = (messages = []) =>
       content: message.content,
     }));
 
+const extractResponsesText = (data = {}) => {
+  if (typeof data.output_text === 'string') return data.output_text;
+
+  return (data.output || [])
+    .flatMap((item) => item.content || [])
+    .map((content) => content.text || content.transcript || '')
+    .filter(Boolean)
+    .join('\n')
+    .trim();
+};
+
 const generateGroqResponse = async (messages, options = {}) => {
   const temperature = options.temperature ?? 0.7;
   const maxTokens = options.maxTokens ?? 140;
@@ -101,7 +112,7 @@ const generateOpenAIResponse = async (messages, options = {}) => {
   }
 
   const data = await response.json();
-  return stripAssistantPrefix(data.output_text || '');
+  return stripAssistantPrefix(extractResponsesText(data));
 };
 
 export const generateResponse = async (messages, options = {}) => {
