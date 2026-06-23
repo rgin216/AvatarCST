@@ -11,7 +11,7 @@ import {
 } from './promptService.js';
 import { mintRealtimeClientSecret } from './realtimeService.js';
 import { generateResponse } from './llmService.js';
-import { isOpenAIScriptedPipeline } from '../config/pipeline.js';
+import { usesOpenAITextPipeline } from '../config/pipeline.js';
 
 const RECENT_MESSAGE_LIMIT = 20;
 const MAX_UNANSWERED_ATTEMPTS = 3;
@@ -74,7 +74,7 @@ const assertCanUseSession = (session, action) => {
 };
 
 const getLlmProviderForSession = (session) =>
-  isOpenAIScriptedPipeline(session.pipelineMode) ? 'openai' : 'groq';
+  usesOpenAITextPipeline(session.pipelineMode) ? 'openai' : 'groq';
 
 const getMemoryEntries = async (userId) => {
   const memory = await Memory.findOne({ userId }).lean();

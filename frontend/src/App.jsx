@@ -16,7 +16,7 @@ const SCREENS = {
 
 const devParams = new URLSearchParams(window.location.search);
 const devSessionEnabled = import.meta.env.DEV && devParams.get("devSession") === "1";
-const pipelineModes = new Set(["free", "openai-scripted"]);
+const pipelineModes = new Set(["free", "openai-scripted", "openai-audio"]);
 const getInitialPipelineMode = () => {
   const requestedMode = devParams.get("pipeline");
   return pipelineModes.has(requestedMode) ? requestedMode : "free";

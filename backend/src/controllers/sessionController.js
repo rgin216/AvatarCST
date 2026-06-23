@@ -14,9 +14,10 @@ import { buildAvatarResponse } from '../services/avatarService.js';
 import { GENERATED_AUDIO_DIR } from '../config/storage.js';
 import {
   getSessionPipelineMode,
-  isOpenAIScriptedPipeline,
+  isOpenAIAudioPipeline,
   DEFAULT_PIPELINE_MODE,
   SESSION_PIPELINE_MODES,
+  usesOpenAITextPipeline,
 } from '../config/pipeline.js';
 
 const nowMs = () => Number(process.hrtime.bigint() / 1_000_000n);
@@ -105,11 +106,17 @@ export const getMessages = async (req, res, next) => {
   }
 };
 
-const getProviderForPipeline = (mode) =>
-  isOpenAIScriptedPipeline(mode) ? 'openai' : undefined;
+const getTranscriptionProviderForPipeline = (mode) =>
+  usesOpenAITextPipeline(mode) ? 'openai' : undefined;
+
+const getSpeechProviderForPipeline = (mode) => {
+  if (isOpenAIAudioPipeline(mode)) return 'openai-audio';
+  if (usesOpenAITextPipeline(mode)) return 'openai';
+  return undefined;
+};
 
 async function generateAudioForTurn(assistantText, options = {}, timings = {}) {
-  const audioFileName = `${uuidv4()}.mp3`;
+  const audioFileName = `${uuidv4()}.${options.provider === 'openai-audio' ? 'wav' : 'mp3'}`;
   const audioOutputPath = path.join(GENERATED_AUDIO_DIR, audioFileName);
   await timeAsync('ttsMs', () => synthesizeSpeech(assistantText, audioOutputPath, options), timings);
   const rhubarbJson = await timeAsync('rhubarbMs', () => generateLipSync(audioOutputPath), timings);
@@ -133,7 +140,7 @@ export const respondToSession = async (req, res, next) => {
     try {
       const audio = await generateAudioForTurn(
         turn.assistantText,
-        { provider: getProviderForPipeline(turn.pipelineMode) },
+        { provider: getSpeechProviderForPipeline(turn.pipelineMode) },
         timings
       );
       audioOutputPath = audio.audioOutputPath;
@@ -173,6 +180,12 @@ export const getPipelineInfo = (_req, res) => {
       tts: 'openai-tts',
       lipsync: 'rhubarb',
     }),
+    ...(DEFAULT_PIPELINE_MODE === 'openai-audio' && {
+      stt: 'openai-transcribe',
+      llm: 'openai-responses',
+      tts: 'openai-audio-model',
+      lipsync: 'rhubarb',
+    }),
     availableModes: SESSION_PIPELINE_MODES,
   };
   res.json(info);
@@ -187,13 +200,14 @@ export const respondAudioToSession = async (req, res, next) => {
   try {
     const session = await Session.findById(req.params.id).select('pipelineMode').lean();
     if (!session) return res.status(404).json({ error: 'Session not found' });
-    const provider = getProviderForPipeline(session.pipelineMode);
+    const transcriptionProvider = getTranscriptionProviderForPipeline(session.pipelineMode);
+    const speechProvider = getSpeechProviderForPipeline(session.pipelineMode);
 
     let transcript = '';
     if (uploadedFilePath) {
       transcript = await timeAsync(
         'sttMs',
-        () => transcribeAudio(uploadedFilePath, req.file?.originalname, { provider }),
+        () => transcribeAudio(uploadedFilePath, req.file?.originalname, { provider: transcriptionProvider }),
         timings
       );
     }
@@ -205,7 +219,7 @@ export const respondAudioToSession = async (req, res, next) => {
     );
 
     try {
-      const audio = await generateAudioForTurn(turn.assistantText, { provider }, timings);
+      const audio = await generateAudioForTurn(turn.assistantText, { provider: speechProvider }, timings);
       audioOutputPath = audio.audioOutputPath;
       turn.avatar = buildAvatarResponse({
         text: turn.assistantText,
