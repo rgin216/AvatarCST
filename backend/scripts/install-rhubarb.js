@@ -1,10 +1,12 @@
 import { spawn } from 'child_process';
+import { createHash } from 'crypto';
 import fs from 'fs/promises';
 import https from 'https';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
-const RELEASE_API_URL = 'https://api.github.com/repos/DanielSWolf/rhubarb-lip-sync/releases/latest';
+const RHUBARB_VERSION = '1.14.0';
+const RELEASE_BASE_URL = `https://github.com/DanielSWolf/rhubarb-lip-sync/releases/download/v${RHUBARB_VERSION}`;
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const BACKEND_ROOT = path.resolve(SCRIPT_DIR, '..');
 const INSTALL_ROOT = path.join(BACKEND_ROOT, 'vendor', 'rhubarb');
@@ -17,10 +19,11 @@ const RESOURCE_DIR = path.join(BIN_DIR, 'res');
 const required = process.env.REQUIRE_RHUBARB === '1';
 const skip = process.env.RHUBARB_SKIP_INSTALL === '1' || process.env.RHUBARB_SKIP_INSTALL === 'true';
 
-const platformMatchers = {
-  win32: /windows.*\.zip$/i,
-  darwin: /(macos|osx|darwin).*\.zip$/i,
-  linux: /linux.*\.zip$/i,
+const pinnedAssets = {
+  win32: {
+    name: `Rhubarb-Lip-Sync-${RHUBARB_VERSION}-Windows.zip`,
+    sha256: '62fa416a8d5e382a3828ee4bef358ce520d0b4cabdeaea75a7ac266d098d1fe3',
+  },
 };
 
 function finishWarning(message, error) {
@@ -76,24 +79,24 @@ function requestBuffer(url, headers = {}, redirectCount = 0) {
   });
 }
 
-async function fetchLatestRelease() {
-  const buffer = await requestBuffer(RELEASE_API_URL);
-  return JSON.parse(buffer.toString('utf8'));
+function getPinnedAsset() {
+  const asset = pinnedAssets[process.platform];
+  if (!asset) {
+    throw new Error(`No pinned Rhubarb asset/checksum is configured for platform: ${process.platform}`);
+  }
+  return {
+    ...asset,
+    downloadUrl: `${RELEASE_BASE_URL}/${asset.name}`,
+  };
 }
 
-function pickAsset(release) {
-  const matcher = platformMatchers[process.platform];
-  if (!matcher) {
-    throw new Error(`Unsupported platform for automatic Rhubarb install: ${process.platform}`);
+function verifyChecksum(buffer, expectedSha256, assetName) {
+  const actualSha256 = createHash('sha256').update(buffer).digest('hex');
+  if (actualSha256 !== expectedSha256) {
+    throw new Error(
+      `Checksum mismatch for ${assetName}. Expected ${expectedSha256}, received ${actualSha256}`
+    );
   }
-
-  const assets = Array.isArray(release.assets) ? release.assets : [];
-  const asset = assets.find((item) => matcher.test(item.name));
-  if (!asset?.browser_download_url) {
-    const names = assets.map((item) => item.name).join(', ') || 'none';
-    throw new Error(`No Rhubarb asset matched ${process.platform}. Release assets: ${names}`);
-  }
-  return asset;
 }
 
 function run(command, args) {
@@ -197,10 +200,10 @@ async function main() {
     await fs.mkdir(INSTALL_ROOT, { recursive: true });
     await cleanOldTempFiles();
 
-    const release = await fetchLatestRelease();
-    const asset = pickAsset(release);
+    const asset = getPinnedAsset();
     console.log(`[rhubarb-install] Downloading ${asset.name}`);
-    const zip = await requestBuffer(asset.browser_download_url, { Accept: 'application/octet-stream' });
+    const zip = await requestBuffer(asset.downloadUrl, { Accept: 'application/octet-stream' });
+    verifyChecksum(zip, asset.sha256, asset.name);
     await fs.writeFile(ZIP_PATH, zip);
 
     await extractZip();
