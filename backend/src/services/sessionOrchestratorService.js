@@ -6,7 +6,7 @@ import { buildAvatarResponse } from './avatarService.js';
 import { getScriptStep, renderScriptFollowUp, renderScriptReply } from './cstScriptService.js';
 import {
   buildCstAdaptiveResponseInstructions,
-  buildCstAnswerQualityInstructions,
+  buildCstAdaptiveTurnInstructions,
   buildCstRealtimeInstructions,
 } from './promptService.js';
 import { mintRealtimeClientSecret } from './realtimeService.js';
@@ -29,6 +29,24 @@ const parseAnswerQuality = (text = '') => {
   if (/\banswered\s*["']?\s*:\s*true\b/i.test(text)) return true;
   if (/\banswered\s*["']?\s*:\s*false\b/i.test(text)) return false;
   return false;
+};
+
+const parseAdaptiveTurn = (text = '') => {
+  try {
+    const parsed = JSON.parse(text);
+    return {
+      answered: typeof parsed?.answered === 'boolean' ? parsed.answered : parseAnswerQuality(text),
+      response: typeof parsed?.response === 'string' ? parsed.response.trim() : '',
+    };
+  } catch {
+    return {
+      answered: parseAnswerQuality(text),
+      response: text
+        .replace(/\{[\s\S]*$/, '')
+        .replace(/^(response:|aria says:?|as aria,?)\s*/i, '')
+        .trim(),
+    };
+  }
 };
 
 const getAskedScriptLine = (step, currentTurnIndex, context) =>
@@ -230,21 +248,26 @@ export const respondToSessionTurn = async ({ sessionId, content }) => {
   const expectedQuestion = getAskedScriptLine(step, effectiveTurnIndex, scriptContext);
 
   let answeredCurrentQuestion = true;
+  let adaptiveText = '';
   if (userContent && hasDeliveredQuestion) {
-    const qualityPrompt = buildCstAnswerQualityInstructions({
+    const adaptiveTurnPrompt = buildCstAdaptiveTurnInstructions({
+      user,
+      memoryEntries,
       slide,
       recentMessages,
       scriptId: session.scriptId,
       expectedQuestion,
     });
-    const qualityText = await generateResponse(
+    const adaptiveTurnText = await generateResponse(
       [
-        { role: 'system', content: qualityPrompt },
+        { role: 'system', content: adaptiveTurnPrompt },
         { role: 'user', content: userContent },
       ],
-      { temperature: 0, maxTokens: 20 }
+      { temperature: 0.25, maxTokens: 80 }
     );
-    answeredCurrentQuestion = parseAnswerQuality(qualityText);
+    const adaptiveTurn = parseAdaptiveTurn(adaptiveTurnText);
+    answeredCurrentQuestion = adaptiveTurn.answered;
+    adaptiveText = adaptiveTurn.response;
   }
 
   const unansweredAttemptCount =
@@ -265,7 +288,7 @@ export const respondToSessionTurn = async ({ sessionId, content }) => {
     : 'answered';
 
   let assistantText = scriptedNextLine;
-  if (userContent) {
+  if (userContent && !adaptiveText) {
     const systemPrompt = buildCstAdaptiveResponseInstructions({
       user,
       memoryEntries,
@@ -280,7 +303,10 @@ export const respondToSessionTurn = async ({ sessionId, content }) => {
       { role: 'system', content: systemPrompt },
       { role: 'user', content: userContent },
     ];
-    const adaptiveText = await generateResponse(llmMessages, { temperature: 0.4, maxTokens: 60 });
+    adaptiveText = await generateResponse(llmMessages, { temperature: 0.4, maxTokens: 60 });
+  }
+
+  if (userContent) {
     assistantText = joinSpeechParts(adaptiveText, scriptedNextLine);
   }
 
