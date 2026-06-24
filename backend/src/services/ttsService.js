@@ -1,6 +1,7 @@
 import { MsEdgeTTS, OUTPUT_FORMAT } from 'msedge-tts';
 import fs from 'fs';
 import { pipeline } from 'stream/promises';
+import { Readable } from 'stream';
 
 const OPENAI_SPEECH_URL = 'https://api.openai.com/v1/audio/speech';
 const OPENAI_CHAT_COMPLETIONS_URL = 'https://api.openai.com/v1/chat/completions';
@@ -45,6 +46,36 @@ async function synthesizeOpenAISpeech(text, outputPath) {
 
   const buffer = Buffer.from(await response.arrayBuffer());
   await fs.promises.writeFile(outputPath, buffer);
+}
+
+async function fetchOpenAISpeech(text, options = {}) {
+  if (!process.env.OPENAI_API_KEY) {
+    throw new Error('OPENAI_API_KEY is not set - cannot stream OpenAI speech');
+  }
+
+  const response = await fetch(OPENAI_SPEECH_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+    },
+    body: JSON.stringify({
+      model: process.env.OPENAI_TTS_MODEL || 'gpt-4o-mini-tts',
+      voice: process.env.OPENAI_TTS_VOICE || 'marin',
+      input: text,
+      response_format: options.responseFormat || 'mp3',
+      instructions: process.env.OPENAI_TTS_INSTRUCTIONS
+        || 'Speak warmly, clearly, and gently for an older adult in a cognitive stimulation therapy session.',
+    }),
+    signal: AbortSignal.timeout(30_000),
+  });
+
+  if (!response.ok) {
+    const body = await response.text().catch(() => '');
+    throw new Error(`OpenAI TTS failed ${response.status}: ${body}`);
+  }
+
+  return response;
 }
 
 async function synthesizeOpenAIAudioSpeech(text, outputPath) {
@@ -103,4 +134,17 @@ export async function synthesizeSpeech(text, outputPath, options = {}) {
   }
 
   await synthesizeEdgeSpeech(text, outputPath);
+}
+
+export async function pipeSpeechStream(text, writable, options = {}) {
+  if (typeof text !== 'string' || !text.trim()) {
+    throw new Error('pipeSpeechStream: text must be a non-empty string');
+  }
+
+  if (options.provider !== 'openai') {
+    throw new Error('Streaming speech currently supports only OpenAI TTS');
+  }
+
+  const response = await fetchOpenAISpeech(text, options);
+  await pipeline(Readable.fromWeb(response.body), writable);
 }

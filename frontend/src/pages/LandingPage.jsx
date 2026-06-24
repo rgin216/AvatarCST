@@ -15,6 +15,7 @@ const pipelineOptions = [
   { id: "free", label: "Free", detail: "Groq + Edge TTS" },
   { id: "openai-scripted", label: "OpenAI scripted", detail: "OpenAI STT + TTS" },
   { id: "openai-scripted-energy", label: "OpenAI energy", detail: "No Rhubarb pass" },
+  { id: "openai-fast-scripted", label: "OpenAI fast", detail: "Script-locked streaming" },
   { id: "openai-audio", label: "OpenAI audio", detail: "Audio model voice" },
 ];
 

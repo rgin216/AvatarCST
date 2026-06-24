@@ -8,13 +8,15 @@ import {
   respondToSessionTurn,
 } from '../services/sessionOrchestratorService.js';
 import { transcribeAudio } from '../services/sttService.js';
-import { synthesizeSpeech } from '../services/ttsService.js';
+import { pipeSpeechStream, synthesizeSpeech } from '../services/ttsService.js';
 import { generateLipSync } from '../services/rhubarbService.js';
 import { buildAvatarResponse } from '../services/avatarService.js';
+import { createSpeechStreamToken, getSpeechStream } from '../services/speechStreamService.js';
 import { GENERATED_AUDIO_DIR } from '../config/storage.js';
 import {
   getSessionPipelineMode,
   isOpenAIAudioPipeline,
+  isOpenAIFastScriptedPipeline,
   isOpenAIScriptedEnergyPipeline,
   DEFAULT_PIPELINE_MODE,
   SESSION_PIPELINE_MODES,
@@ -116,6 +118,11 @@ const getSpeechProviderForPipeline = (mode) => {
   return undefined;
 };
 
+const usesAudioEnergyLipsync = (mode) =>
+  isOpenAIScriptedEnergyPipeline(mode) || isOpenAIFastScriptedPipeline(mode);
+
+const usesStreamingSpeech = (mode) => isOpenAIFastScriptedPipeline(mode);
+
 async function generateAudioForTurn(assistantText, options = {}, timings = {}) {
   const audioFileName = `${uuidv4()}.${options.provider === 'openai-audio' ? 'wav' : 'mp3'}`;
   const audioOutputPath = path.join(GENERATED_AUDIO_DIR, audioFileName);
@@ -124,6 +131,37 @@ async function generateAudioForTurn(assistantText, options = {}, timings = {}) {
     ? null
     : await timeAsync('rhubarbMs', () => generateLipSync(audioOutputPath), timings);
   return { audioUrl: `/generated-audio/${audioFileName}`, rhubarbJson, audioOutputPath };
+}
+
+function createStreamedAudioForTurn(assistantText, options = {}) {
+  const token = createSpeechStreamToken({
+    text: assistantText,
+    provider: options.provider || 'openai',
+    lipsync: 'audio-energy',
+  });
+
+  return {
+    audioUrl: `/api/sessions/speech-stream/${token}`,
+    rhubarbJson: null,
+    audioOutputPath: null,
+    streaming: true,
+  };
+}
+
+async function createAudioForTurn(assistantText, pipelineMode, timings) {
+  const provider = getSpeechProviderForPipeline(pipelineMode);
+  if (usesStreamingSpeech(pipelineMode)) {
+    return createStreamedAudioForTurn(assistantText, { provider });
+  }
+
+  return generateAudioForTurn(
+    assistantText,
+    {
+      provider,
+      lipsync: usesAudioEnergyLipsync(pipelineMode) ? 'audio-energy' : 'rhubarb',
+    },
+    timings
+  );
 }
 
 export const respondToSession = async (req, res, next) => {
@@ -141,20 +179,15 @@ export const respondToSession = async (req, res, next) => {
     );
 
     try {
-      const audio = await generateAudioForTurn(
-        turn.assistantText,
-        {
-          provider: getSpeechProviderForPipeline(turn.pipelineMode),
-          lipsync: isOpenAIScriptedEnergyPipeline(turn.pipelineMode) ? 'audio-energy' : 'rhubarb',
-        },
-        timings
-      );
+      const audio = await createAudioForTurn(turn.assistantText, turn.pipelineMode, timings);
       audioOutputPath = audio.audioOutputPath;
       turn.avatar = buildAvatarResponse({
         text: turn.assistantText,
         audioUrl: audio.audioUrl,
         rhubarbJson: audio.rhubarbJson,
+        lipsyncEngine: usesAudioEnergyLipsync(turn.pipelineMode) ? 'audio-energy' : 'rhubarb',
       });
+      if (audio.streaming) turn.avatar.audio.streaming = true;
     } catch (ttsErr) {
       console.error('[tts] Skipping audio for this turn:', ttsErr.message);
     }
@@ -192,6 +225,12 @@ export const getPipelineInfo = (_req, res) => {
       tts: 'openai-tts',
       lipsync: 'audio-energy',
     }),
+    ...(DEFAULT_PIPELINE_MODE === 'openai-fast-scripted' && {
+      stt: 'openai-transcribe',
+      llm: 'deterministic-script',
+      tts: 'openai-tts-stream',
+      lipsync: 'audio-energy',
+    }),
     ...(DEFAULT_PIPELINE_MODE === 'openai-audio' && {
       stt: 'openai-transcribe',
       llm: 'openai-responses',
@@ -213,7 +252,6 @@ export const respondAudioToSession = async (req, res, next) => {
     const session = await Session.findById(req.params.id).select('pipelineMode').lean();
     if (!session) return res.status(404).json({ error: 'Session not found' });
     const transcriptionProvider = getTranscriptionProviderForPipeline(session.pipelineMode);
-    const speechProvider = getSpeechProviderForPipeline(session.pipelineMode);
 
     let transcript = '';
     if (uploadedFilePath) {
@@ -231,20 +269,15 @@ export const respondAudioToSession = async (req, res, next) => {
     );
 
     try {
-      const audio = await generateAudioForTurn(
-        turn.assistantText,
-        {
-          provider: speechProvider,
-          lipsync: isOpenAIScriptedEnergyPipeline(session.pipelineMode) ? 'audio-energy' : 'rhubarb',
-        },
-        timings
-      );
+      const audio = await createAudioForTurn(turn.assistantText, session.pipelineMode, timings);
       audioOutputPath = audio.audioOutputPath;
       turn.avatar = buildAvatarResponse({
         text: turn.assistantText,
         audioUrl: audio.audioUrl,
         rhubarbJson: audio.rhubarbJson,
+        lipsyncEngine: usesAudioEnergyLipsync(session.pipelineMode) ? 'audio-energy' : 'rhubarb',
       });
+      if (audio.streaming) turn.avatar.audio.streaming = true;
     } catch (ttsErr) {
       console.error('[tts] Skipping audio for this turn:', ttsErr.message);
     }
@@ -257,6 +290,26 @@ export const respondAudioToSession = async (req, res, next) => {
     next(err);
   } finally {
     if (uploadedFilePath) fs.unlink(uploadedFilePath, () => {});
+  }
+};
+
+export const streamSpeechToken = async (req, res, next) => {
+  try {
+    const speech = getSpeechStream(req.params.token);
+    if (!speech) return res.status(404).json({ error: 'Speech stream expired or not found' });
+
+    res.setHeader('Content-Type', 'audio/mpeg');
+    res.setHeader('Cache-Control', 'no-store');
+    await pipeSpeechStream(speech.text, res, {
+      provider: speech.provider,
+      responseFormat: 'mp3',
+    });
+  } catch (err) {
+    if (res.headersSent) {
+      res.destroy(err);
+      return;
+    }
+    next(err);
   }
 };
 
