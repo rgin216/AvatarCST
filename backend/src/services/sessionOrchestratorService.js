@@ -336,7 +336,7 @@ export const respondToSessionTurn = async ({ sessionId, content }) => {
   const assistantMessage = await Message.create({ sessionId, role: 'assistant', content: assistantText });
   const nextStepIndex = shouldAdvance ? boundedIndex + 1 : boundedIndex;
   const nextTurnIndex = !hasUserContent
-    ? currentTurnIndex
+    ? Math.max(currentTurnIndex, 1)
     : shouldRepeatQuestion
     ? currentTurnIndex
     : shouldAdvance
