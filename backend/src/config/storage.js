@@ -6,10 +6,9 @@ import multer from 'multer';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const BACKEND_ROOT = path.resolve(__dirname, '..', '..');
 
-export const GENERATED_AUDIO_DIR = path.join(BACKEND_ROOT, 'generated-audio');
 export const TEMP_UPLOAD_DIR = path.join(BACKEND_ROOT, 'temp', 'uploads');
 
-[GENERATED_AUDIO_DIR, TEMP_UPLOAD_DIR].forEach((dir) => {
+[TEMP_UPLOAD_DIR].forEach((dir) => {
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 });
 

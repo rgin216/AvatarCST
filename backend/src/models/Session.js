@@ -7,7 +7,7 @@ const sessionSchema = new Schema({
   status: { type: String, enum: ['pending', 'active', 'completed', 'abandoned'], default: 'pending' },
   pipelineMode: {
     type: String,
-    enum: ['free', 'openai-scripted', 'openai-scripted-energy', 'openai-fast-scripted', 'openai-audio'],
+    enum: ['free', 'openai-fast-scripted'],
     default: 'free',
   },
   scriptId: { type: String, default: 'cst_intro_reminiscence' },

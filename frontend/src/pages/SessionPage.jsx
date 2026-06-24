@@ -1,11 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import AvatarViewer from "../components/avatar/AvatarViewer";
 import api from "../services/api.js";
-import {
-  createEmptyLipSyncFrame,
-  getRhubarbMorphStateAtTime,
-  rhubarbJsonToTimeline,
-} from "../utils/lipSync.js";
+import { createEmptyLipSyncFrame } from "../utils/lipSync.js";
 import theme from "../utils/theme";
 
 const defaultSlide = {
@@ -40,13 +36,6 @@ function getBackendBase() {
   return apiUrl.replace(/\/+$/, "").replace(/\/api$/, "");
 }
 
-const LIP_SYNC_SETTINGS = {
-  intensity: 1.5,
-  minCueSeconds: 0.025,
-  blendWindow: 0.04,
-  leadSeconds: 0.055,
-};
-
 export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: initialPipelineMode = "free" }) {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
@@ -55,7 +44,6 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
   const [elapsed, setElapsed] = useState(0);
   const [slide, setSlide] = useState(defaultSlide);
   const [avatarMode, setAvatarMode] = useState(getInitialAvatarMode);
-  const timelineRef = useRef(null);
   const [pendingPlay, setPendingPlay] = useState(false);
   const [pipelineMode, setPipelineMode] = useState(initialPipelineMode);
 
@@ -131,22 +119,17 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
     // Real audio from free pipeline — load and auto-play
     if (turn.avatar?.audio?.url) {
       const audioUrl = getBackendBase() + turn.avatar.audio.url;
-      playLiveAudio(audioUrl, turn.avatar?.lipsync?.rhubarbJson ?? null);
+      playLiveAudio(audioUrl);
     }
   }
 
-  async function playLiveAudio(audioUrl, rhubarbJson) {
+  async function playLiveAudio(audioUrl) {
     const audio = audioRef.current;
     if (!audio) return;
 
     audio.pause();
     audio.src = audioUrl;
     audio.load();
-
-    // Update ref synchronously so the animation loop reads it on the very first frame
-    timelineRef.current = rhubarbJson
-      ? rhubarbJsonToTimeline(rhubarbJson, { minCueSeconds: LIP_SYNC_SETTINGS.minCueSeconds })
-      : null;
 
     try {
       await ensureAudioMeter();
@@ -227,32 +210,21 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
 
   function publishLipSyncFrame(isPlaying) {
     const audio = audioRef.current;
-    const currentTimeline = timelineRef.current;
     if (!audio || !isPlaying) {
       lipSyncFrameRef.current = createEmptyLipSyncFrame();
       return;
     }
 
-    if (!currentTimeline) {
-      const energy = getSpeechEnergy();
-      lipSyncFrameRef.current = {
-        visemes: {
-          viseme_aa: energy * 0.28,
-          mouthOpen: energy * 0.72,
-        },
-        jawOpen: energy * 0.45,
-        speechEnergy: energy,
-        active: energy > 0.015,
-      };
-      return;
-    }
-
-    const frame = getRhubarbMorphStateAtTime(
-      currentTimeline,
-      audio.currentTime + LIP_SYNC_SETTINGS.leadSeconds,
-      { intensity: LIP_SYNC_SETTINGS.intensity, blendWindow: LIP_SYNC_SETTINGS.blendWindow },
-    );
-    lipSyncFrameRef.current = { ...frame, speechEnergy: getSpeechEnergy() };
+    const energy = getSpeechEnergy();
+    lipSyncFrameRef.current = {
+      visemes: {
+        viseme_aa: energy * 0.28,
+        mouthOpen: energy * 0.72,
+      },
+      jawOpen: energy * 0.45,
+      speechEnergy: energy,
+      active: energy > 0.015,
+    };
   }
 
   function tickLipSync() {

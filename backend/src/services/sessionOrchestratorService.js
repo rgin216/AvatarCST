@@ -7,9 +7,7 @@ import { getScriptStep, renderScriptFollowUp, renderScriptReply } from './cstScr
 import {
   buildCstAdaptiveResponseInstructions,
   buildCstAdaptiveTurnInstructions,
-  buildCstRealtimeInstructions,
 } from './promptService.js';
-import { mintRealtimeClientSecret } from './realtimeService.js';
 import { generateResponse } from './llmService.js';
 import { isOpenAIFastScriptedPipeline, usesOpenAITextPipeline } from '../config/pipeline.js';
 
@@ -361,14 +359,6 @@ export const respondToSessionTurn = async ({ sessionId, content }) => {
     : 0;
   session.scriptStepIndex = nextStepIndex;
   const displaySlide = shouldAdvance ? nextSlide : slide;
-  const displayNextSlide =
-    nextStepIndex >= totalSteps - 1
-      ? null
-      : toSlide({
-          step: getScriptStep(session.scriptId, nextStepIndex + 1).step,
-          index: nextStepIndex + 1,
-          total: totalSteps,
-        });
   session.presentationState = {
     slideIndex: displaySlide.index,
     deckSlide: displaySlide.deckSlide,
@@ -406,18 +396,6 @@ export const respondToSessionTurn = async ({ sessionId, content }) => {
       total: totalSteps,
     },
     slide: displaySlide,
-    prompt: {
-      model: process.env.OPENAI_REALTIME_MODEL || 'gpt-realtime-mini',
-      instructions: buildCstRealtimeInstructions({
-        user,
-        memoryEntries,
-        slide: displaySlide,
-        nextSlide: displayNextSlide,
-        recentMessages,
-        scriptId: session.scriptId,
-        stepTurnIndex: session.scriptStepTurnIndex,
-      }),
-    },
     assistantText,
     avatar: buildAvatarResponse({ text: assistantText }),
     messages: {
@@ -430,18 +408,5 @@ export const respondToSessionTurn = async ({ sessionId, content }) => {
       content: entry.content,
     })),
     suggestedMemoryUpdates,
-  };
-};
-
-export const createRealtimeSessionForTurn = async (sessionId) => {
-  const context = await getSessionTurnContext(sessionId);
-  assertCanUseSession(context.session, 'create realtime session');
-  const secret = await mintRealtimeClientSecret(context);
-  return {
-    sessionId,
-    slide: context.slide,
-    model: process.env.OPENAI_REALTIME_MODEL || 'gpt-realtime-mini',
-    voice: process.env.OPENAI_REALTIME_VOICE || 'marin',
-    clientSecret: secret,
   };
 };
