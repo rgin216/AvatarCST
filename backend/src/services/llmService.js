@@ -80,6 +80,7 @@ const generateOpenAIResponse = async (messages, options = {}) => {
   }
 
   const maxTokens = options.maxTokens ?? 140;
+  const model = options.model || OPENAI_TEXT_MODEL;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), OPENAI_TIMEOUT_MS);
 
@@ -93,7 +94,7 @@ const generateOpenAIResponse = async (messages, options = {}) => {
         Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
       },
       body: JSON.stringify({
-        model: OPENAI_TEXT_MODEL,
+        model,
         instructions: getResponsesInstructions(messages),
         input: chatMessagesToResponsesInput(messages),
         max_output_tokens: maxTokens,

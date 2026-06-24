@@ -81,16 +81,6 @@ const getProgressScriptLine = ({ step, nextStep, currentTurnIndex, stepTurns, co
 
 const hasPriorAssistantTurn = (messages = []) => messages.some((message) => message.role === 'assistant');
 
-const getFastScriptedAcknowledgement = (content = '') => {
-  if (/\b(don't know|do not know|not sure|can't remember|cannot remember|unsure)\b/i.test(content)) {
-    return 'That is completely alright.';
-  }
-  if (/^\s*(yes|yeah|yep|no|nope|ok|okay|sure|maybe)\s*[.!?]?\s*$/i.test(content)) {
-    return 'Thank you.';
-  }
-  return 'Thank you for sharing that.';
-};
-
 const ACTIVE_SESSION_STATUSES = ['active', 'pending'];
 
 const assertCanUseSession = (session, action) => {
@@ -283,7 +273,7 @@ export const respondToSessionTurn = async ({ sessionId, content }) => {
 
   let answeredCurrentQuestion = true;
   let adaptiveText = '';
-  if (userContent && hasDeliveredQuestion && !useFastScriptedTurn) {
+  if (userContent && hasDeliveredQuestion) {
     const adaptiveTurnPrompt = buildCstAdaptiveTurnInstructions({
       user,
       memoryEntries,
@@ -297,7 +287,12 @@ export const respondToSessionTurn = async ({ sessionId, content }) => {
         { role: 'system', content: adaptiveTurnPrompt },
         { role: 'user', content: userContent },
       ],
-      { provider: llmProvider, temperature: 0.25, maxTokens: 80 }
+      {
+        provider: llmProvider,
+        temperature: 0.25,
+        maxTokens: 80,
+        model: useFastScriptedTurn ? process.env.OPENAI_FAST_TEXT_MODEL : undefined,
+      }
     );
     const adaptiveTurn = parseAdaptiveTurn(adaptiveTurnText);
     answeredCurrentQuestion = adaptiveTurn.answered;
@@ -323,25 +318,26 @@ export const respondToSessionTurn = async ({ sessionId, content }) => {
 
   let assistantText = scriptedNextLine;
   if (userContent && !adaptiveText) {
-    if (useFastScriptedTurn) {
-      adaptiveText = getFastScriptedAcknowledgement(userContent);
-    } else {
-      const systemPrompt = buildCstAdaptiveResponseInstructions({
-        user,
-        memoryEntries,
-        slide,
-        recentMessages,
-        scriptId: session.scriptId,
-        scriptedNextLine,
-        isFinalStep,
-        answerState,
-      });
-      const llmMessages = [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userContent },
-      ];
-      adaptiveText = await generateResponse(llmMessages, { provider: llmProvider, temperature: 0.4, maxTokens: 60 });
-    }
+    const systemPrompt = buildCstAdaptiveResponseInstructions({
+      user,
+      memoryEntries,
+      slide,
+      recentMessages,
+      scriptId: session.scriptId,
+      scriptedNextLine,
+      isFinalStep,
+      answerState,
+    });
+    const llmMessages = [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: userContent },
+    ];
+    adaptiveText = await generateResponse(llmMessages, {
+      provider: llmProvider,
+      temperature: 0.4,
+      maxTokens: 60,
+      model: useFastScriptedTurn ? process.env.OPENAI_FAST_TEXT_MODEL : undefined,
+    });
   }
 
   if (userContent) {
@@ -405,7 +401,7 @@ export const respondToSessionTurn = async ({ sessionId, content }) => {
       retryCount: session.scriptStepRetryCount,
       answeredCurrentQuestion,
       forcedProgress: shouldForceProgress,
-      progressionSource: useFastScriptedTurn ? 'deterministic-script' : 'llm-assisted',
+      progressionSource: useFastScriptedTurn ? 'llm-assisted-fast-script' : 'llm-assisted',
       isFinalStep,
       total: totalSteps,
     },
