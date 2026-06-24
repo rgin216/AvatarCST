@@ -228,10 +228,25 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
   function publishLipSyncFrame(isPlaying) {
     const audio = audioRef.current;
     const currentTimeline = timelineRef.current;
-    if (!audio || !currentTimeline || !isPlaying) {
+    if (!audio || !isPlaying) {
       lipSyncFrameRef.current = createEmptyLipSyncFrame();
       return;
     }
+
+    if (!currentTimeline) {
+      const energy = getSpeechEnergy();
+      lipSyncFrameRef.current = {
+        visemes: {
+          viseme_aa: energy * 0.28,
+          mouthOpen: energy * 0.72,
+        },
+        jawOpen: energy * 0.45,
+        speechEnergy: energy,
+        active: energy > 0.015,
+      };
+      return;
+    }
+
     const frame = getRhubarbMorphStateAtTime(
       currentTimeline,
       audio.currentTime + LIP_SYNC_SETTINGS.leadSeconds,

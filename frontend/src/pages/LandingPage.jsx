@@ -14,6 +14,7 @@ const activities = [
 const pipelineOptions = [
   { id: "free", label: "Free", detail: "Groq + Edge TTS" },
   { id: "openai-scripted", label: "OpenAI scripted", detail: "OpenAI STT + TTS" },
+  { id: "openai-scripted-energy", label: "OpenAI energy", detail: "No Rhubarb pass" },
   { id: "openai-audio", label: "OpenAI audio", detail: "Audio model voice" },
 ];
 
@@ -118,7 +119,7 @@ export default function LandingPage({
           <div className="fade-up delay-4">
             <div style={{ marginBottom: 16 }}>
               <div style={{ fontSize: 14, fontWeight: 600, color: theme.textLight, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 10 }}>Voice mode</div>
-              <div style={{ display: "grid", gridTemplateColumns: isDesktop ? "1fr 1fr 1fr" : "1fr", gap: 10 }}>
+              <div style={{ display: "grid", gridTemplateColumns: isDesktop ? "1fr 1fr" : "1fr", gap: 10 }}>
                 {pipelineOptions.map((option) => {
                   const active = pipelineMode === option.id;
                   return (

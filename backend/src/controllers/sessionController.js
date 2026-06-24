@@ -15,6 +15,7 @@ import { GENERATED_AUDIO_DIR } from '../config/storage.js';
 import {
   getSessionPipelineMode,
   isOpenAIAudioPipeline,
+  isOpenAIScriptedEnergyPipeline,
   DEFAULT_PIPELINE_MODE,
   SESSION_PIPELINE_MODES,
   usesOpenAITextPipeline,
@@ -119,7 +120,9 @@ async function generateAudioForTurn(assistantText, options = {}, timings = {}) {
   const audioFileName = `${uuidv4()}.${options.provider === 'openai-audio' ? 'wav' : 'mp3'}`;
   const audioOutputPath = path.join(GENERATED_AUDIO_DIR, audioFileName);
   await timeAsync('ttsMs', () => synthesizeSpeech(assistantText, audioOutputPath, options), timings);
-  const rhubarbJson = await timeAsync('rhubarbMs', () => generateLipSync(audioOutputPath), timings);
+  const rhubarbJson = options.lipsync === 'audio-energy'
+    ? null
+    : await timeAsync('rhubarbMs', () => generateLipSync(audioOutputPath), timings);
   return { audioUrl: `/generated-audio/${audioFileName}`, rhubarbJson, audioOutputPath };
 }
 
@@ -140,7 +143,10 @@ export const respondToSession = async (req, res, next) => {
     try {
       const audio = await generateAudioForTurn(
         turn.assistantText,
-        { provider: getSpeechProviderForPipeline(turn.pipelineMode) },
+        {
+          provider: getSpeechProviderForPipeline(turn.pipelineMode),
+          lipsync: isOpenAIScriptedEnergyPipeline(turn.pipelineMode) ? 'audio-energy' : 'rhubarb',
+        },
         timings
       );
       audioOutputPath = audio.audioOutputPath;
@@ -179,6 +185,12 @@ export const getPipelineInfo = (_req, res) => {
       llm: 'openai-responses',
       tts: 'openai-tts',
       lipsync: 'rhubarb',
+    }),
+    ...(DEFAULT_PIPELINE_MODE === 'openai-scripted-energy' && {
+      stt: 'openai-transcribe',
+      llm: 'openai-responses',
+      tts: 'openai-tts',
+      lipsync: 'audio-energy',
     }),
     ...(DEFAULT_PIPELINE_MODE === 'openai-audio' && {
       stt: 'openai-transcribe',
@@ -219,7 +231,14 @@ export const respondAudioToSession = async (req, res, next) => {
     );
 
     try {
-      const audio = await generateAudioForTurn(turn.assistantText, { provider: speechProvider }, timings);
+      const audio = await generateAudioForTurn(
+        turn.assistantText,
+        {
+          provider: speechProvider,
+          lipsync: isOpenAIScriptedEnergyPipeline(session.pipelineMode) ? 'audio-energy' : 'rhubarb',
+        },
+        timings
+      );
       audioOutputPath = audio.audioOutputPath;
       turn.avatar = buildAvatarResponse({
         text: turn.assistantText,

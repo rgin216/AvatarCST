@@ -5,7 +5,11 @@ const sessionSchema = new Schema({
   title: { type: String },
   theme: { type: String },
   status: { type: String, enum: ['pending', 'active', 'completed', 'abandoned'], default: 'pending' },
-  pipelineMode: { type: String, enum: ['free', 'openai-scripted', 'openai-audio'], default: 'free' },
+  pipelineMode: {
+    type: String,
+    enum: ['free', 'openai-scripted', 'openai-scripted-energy', 'openai-audio'],
+    default: 'free',
+  },
   scriptId: { type: String, default: 'cst_intro_reminiscence' },
   scriptStepIndex: { type: Number, default: 0, min: 0 },
   scriptStepTurnIndex: { type: Number, default: 0, min: 0 },

@@ -6,7 +6,13 @@ const DEFAULT_VISEME_MAP = [
   { at: 620, mouth: 'rest' },
 ];
 
-export const buildAvatarResponse = ({ text, audioUrl = null, visemes = null, rhubarbJson = null }) => ({
+export const buildAvatarResponse = ({
+  text,
+  audioUrl = null,
+  visemes = null,
+  rhubarbJson = null,
+  lipsyncEngine = null,
+}) => ({
   placement: 'bottom-right',
   renderer: 'three-js',
   audio: {
@@ -16,7 +22,7 @@ export const buildAvatarResponse = ({ text, audioUrl = null, visemes = null, rhu
     voice: process.env.OPENAI_REALTIME_VOICE || 'marin',
   },
   lipsync: {
-    engine: 'rhubarb',
+    engine: lipsyncEngine || (rhubarbJson ? 'rhubarb' : 'audio-energy'),
     status: rhubarbJson || audioUrl ? 'ready' : 'waiting_for_audio',
     visemes: visemes || DEFAULT_VISEME_MAP,
     ...(rhubarbJson && { rhubarbJson }),
