@@ -1,11 +1,19 @@
+import path from 'path';
 import fs from 'fs';
+import { v4 as uuidv4 } from 'uuid';
 import Session from '../models/Session.js';
 import Message from '../models/Message.js';
 import { respondToSessionTurn } from '../services/sessionOrchestratorService.js';
 import { transcribeAudio } from '../services/sttService.js';
-import { pipeSpeechStream } from '../services/ttsService.js';
+import {
+  getVoiceOptionsForAvatar,
+  pipeSpeechStream,
+  synthesizeSpeech,
+} from '../services/ttsService.js';
+import { generateLipSync } from '../services/rhubarbService.js';
 import { buildAvatarResponse } from '../services/avatarService.js';
 import { createSpeechStreamToken, getSpeechStream } from '../services/speechStreamService.js';
+import { GENERATED_AUDIO_DIR } from '../config/storage.js';
 import {
   getSessionPipelineMode,
   isOpenAIFastScriptedPipeline,
@@ -15,6 +23,7 @@ import {
 } from '../config/pipeline.js';
 
 const nowMs = () => Number(process.hrtime.bigint() / 1_000_000n);
+const AVATAR_MODES = new Set(['male', 'female', 'visualizer']);
 
 async function timeAsync(label, fn, timings) {
   const start = nowMs();
@@ -108,10 +117,25 @@ const getSpeechProviderForPipeline = (mode) => {
   return 'edge';
 };
 
-function createAudioForTurn(assistantText, pipelineMode) {
+const getAvatarMode = (value) => (AVATAR_MODES.has(value) ? value : 'male');
+
+const shouldUseRhubarbForAvatar = (avatarMode) => avatarMode === 'male' || avatarMode === 'female';
+
+function getSpeechOptions(pipelineMode, avatarMode) {
+  const voices = getVoiceOptionsForAvatar(avatarMode);
+  const provider = getSpeechProviderForPipeline(pipelineMode);
+  return {
+    provider,
+    voice: provider === 'openai' ? voices.openAiVoice : voices.edgeVoice,
+  };
+}
+
+function createStreamedAudioForTurn(assistantText, pipelineMode, avatarMode) {
+  const speechOptions = getSpeechOptions(pipelineMode, avatarMode);
   const token = createSpeechStreamToken({
     text: assistantText,
-    provider: getSpeechProviderForPipeline(pipelineMode),
+    provider: speechOptions.provider,
+    voice: speechOptions.voice,
     lipsync: 'audio-energy',
   });
 
@@ -121,10 +145,39 @@ function createAudioForTurn(assistantText, pipelineMode) {
   };
 }
 
+async function createRhubarbAudioForTurn(assistantText, pipelineMode, avatarMode, timings) {
+  const speechOptions = getSpeechOptions(pipelineMode, avatarMode);
+  const audioFileName = `${uuidv4()}.mp3`;
+  const audioOutputPath = path.join(GENERATED_AUDIO_DIR, audioFileName);
+  await timeAsync(
+    'ttsMs',
+    () => synthesizeSpeech(assistantText, audioOutputPath, speechOptions),
+    timings
+  );
+  const rhubarbJson = await timeAsync('rhubarbMs', () => generateLipSync(audioOutputPath), timings);
+
+  return {
+    audioUrl: `/generated-audio/${audioFileName}`,
+    rhubarbJson,
+    audioOutputPath,
+    streaming: false,
+  };
+}
+
+async function createAudioForTurn(assistantText, pipelineMode, avatarMode, timings) {
+  if (!shouldUseRhubarbForAvatar(avatarMode)) {
+    return createStreamedAudioForTurn(assistantText, pipelineMode, avatarMode);
+  }
+
+  return createRhubarbAudioForTurn(assistantText, pipelineMode, avatarMode, timings);
+}
+
 export const respondToSession = async (req, res, next) => {
   const timings = {};
+  let audioOutputPath = null;
   const startedAtMs = nowMs();
   try {
+    const avatarMode = getAvatarMode(req.body?.avatarMode);
     const turn = await timeAsync(
       'orchestratorMs',
       () => respondToSessionTurn({
@@ -135,11 +188,13 @@ export const respondToSession = async (req, res, next) => {
     );
 
     try {
-      const audio = createAudioForTurn(turn.assistantText, turn.pipelineMode);
+      const audio = await createAudioForTurn(turn.assistantText, turn.pipelineMode, avatarMode, timings);
+      audioOutputPath = audio.audioOutputPath;
       turn.avatar = buildAvatarResponse({
         text: turn.assistantText,
         audioUrl: audio.audioUrl,
-        lipsyncEngine: 'audio-energy',
+        rhubarbJson: audio.rhubarbJson,
+        lipsyncEngine: audio.rhubarbJson ? 'rhubarb' : 'audio-energy',
       });
       if (audio.streaming) turn.avatar.audio.streaming = true;
     } catch (ttsErr) {
@@ -149,6 +204,7 @@ export const respondToSession = async (req, res, next) => {
     turn.timings = { ...timings, totalMs: nowMs() - startedAtMs };
     res.status(201).json(turn);
   } catch (err) {
+    if (audioOutputPath) fs.unlink(audioOutputPath, () => {});
     next(err);
   }
 };
@@ -159,14 +215,14 @@ export const getPipelineInfo = (_req, res) => {
     ...(DEFAULT_PIPELINE_MODE === 'free' && {
       stt: 'groq-whisper',
       llm: 'groq',
-      tts: 'edge-tts-stream',
-      lipsync: 'audio-energy',
+      tts: 'edge-tts',
+      lipsync: 'rhubarb-for-avatars/audio-energy-for-visualizer',
     }),
     ...(DEFAULT_PIPELINE_MODE === 'openai-fast-scripted' && {
       stt: 'openai-transcribe',
       llm: 'openai-responses',
-      tts: 'openai-tts-stream',
-      lipsync: 'audio-energy',
+      tts: 'openai-tts',
+      lipsync: 'rhubarb-for-avatars/audio-energy-for-visualizer',
     }),
     availableModes: SESSION_PIPELINE_MODES,
   };
@@ -175,10 +231,12 @@ export const getPipelineInfo = (_req, res) => {
 
 export const respondAudioToSession = async (req, res, next) => {
   const uploadedFilePath = req.file?.path;
+  let audioOutputPath = null;
   const timings = {};
   const startedAtMs = nowMs();
 
   try {
+    const avatarMode = getAvatarMode(req.body?.avatarMode);
     const session = await Session.findById(req.params.id).select('pipelineMode').lean();
     if (!session) return res.status(404).json({ error: 'Session not found' });
     const transcriptionProvider = getTranscriptionProviderForPipeline(session.pipelineMode);
@@ -199,11 +257,13 @@ export const respondAudioToSession = async (req, res, next) => {
     );
 
     try {
-      const audio = createAudioForTurn(turn.assistantText, session.pipelineMode);
+      const audio = await createAudioForTurn(turn.assistantText, session.pipelineMode, avatarMode, timings);
+      audioOutputPath = audio.audioOutputPath;
       turn.avatar = buildAvatarResponse({
         text: turn.assistantText,
         audioUrl: audio.audioUrl,
-        lipsyncEngine: 'audio-energy',
+        rhubarbJson: audio.rhubarbJson,
+        lipsyncEngine: audio.rhubarbJson ? 'rhubarb' : 'audio-energy',
       });
       if (audio.streaming) turn.avatar.audio.streaming = true;
     } catch (ttsErr) {
@@ -214,6 +274,7 @@ export const respondAudioToSession = async (req, res, next) => {
     turn.timings = { ...timings, totalMs: nowMs() - startedAtMs };
     res.status(201).json(turn);
   } catch (err) {
+    if (audioOutputPath) fs.unlink(audioOutputPath, () => {});
     next(err);
   } finally {
     if (uploadedFilePath) fs.unlink(uploadedFilePath, () => {});
@@ -229,6 +290,7 @@ export const streamSpeechToken = async (req, res, next) => {
     res.setHeader('Cache-Control', 'no-store');
     await pipeSpeechStream(speech.text, res, {
       provider: speech.provider,
+      voice: speech.voice,
       responseFormat: 'mp3',
     });
   } catch (err) {

@@ -1,7 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import AvatarViewer from "../components/avatar/AvatarViewer";
 import api from "../services/api.js";
-import { createEmptyLipSyncFrame } from "../utils/lipSync.js";
+import {
+  createEmptyLipSyncFrame,
+  getRhubarbMorphStateAtTime,
+  rhubarbJsonToTimeline,
+} from "../utils/lipSync.js";
 import theme from "../utils/theme";
 
 const defaultSlide = {
@@ -36,6 +40,13 @@ function getBackendBase() {
   return apiUrl.replace(/\/+$/, "").replace(/\/api$/, "");
 }
 
+const LIP_SYNC_SETTINGS = {
+  intensity: 1.5,
+  minCueSeconds: 0.025,
+  blendWindow: 0.04,
+  leadSeconds: 0.055,
+};
+
 export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: initialPipelineMode = "free" }) {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
@@ -46,6 +57,8 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
   const [avatarMode, setAvatarMode] = useState(getInitialAvatarMode);
   const [pendingPlay, setPendingPlay] = useState(false);
   const [pipelineMode, setPipelineMode] = useState(initialPipelineMode);
+  const timelineRef = useRef(null);
+  const avatarModeRef = useRef(avatarMode);
 
   const booted = useRef(false);
   const scrollRef = useRef(null);
@@ -65,6 +78,11 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
   useEffect(() => {
     setPipelineMode(initialPipelineMode || "free");
   }, [initialPipelineMode]);
+
+  useEffect(() => {
+    avatarModeRef.current = avatarMode;
+    if (avatarMode === "visualizer") timelineRef.current = null;
+  }, [avatarMode]);
 
   useEffect(() => {
     startTime.current = Date.now();
@@ -119,17 +137,21 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
     // Real audio from free pipeline — load and auto-play
     if (turn.avatar?.audio?.url) {
       const audioUrl = getBackendBase() + turn.avatar.audio.url;
-      playLiveAudio(audioUrl);
+      const useRhubarb = avatarModeRef.current !== "visualizer";
+      playLiveAudio(audioUrl, useRhubarb ? turn.avatar?.lipsync?.rhubarbJson : null);
     }
   }
 
-  async function playLiveAudio(audioUrl) {
+  async function playLiveAudio(audioUrl, rhubarbJson = null) {
     const audio = audioRef.current;
     if (!audio) return;
 
     audio.pause();
     audio.src = audioUrl;
     audio.load();
+    timelineRef.current = rhubarbJson
+      ? rhubarbJsonToTimeline(rhubarbJson, { minCueSeconds: LIP_SYNC_SETTINGS.minCueSeconds })
+      : null;
 
     try {
       await ensureAudioMeter();
@@ -153,7 +175,10 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
     const startTurn = async () => {
       setTyping(true);
       try {
-        const { data } = await api.post(`/sessions/${sessionId}/respond`, { content: "" });
+        const { data } = await api.post(`/sessions/${sessionId}/respond`, {
+          content: "",
+          avatarMode: avatarModeRef.current,
+        });
         applyTurn(data);
       } catch (err) {
         console.error("Failed to start orchestrated session", err);
@@ -210,8 +235,19 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
 
   function publishLipSyncFrame(isPlaying) {
     const audio = audioRef.current;
+    const currentTimeline = timelineRef.current;
     if (!audio || !isPlaying) {
       lipSyncFrameRef.current = createEmptyLipSyncFrame();
+      return;
+    }
+
+    if (currentTimeline) {
+      const frame = getRhubarbMorphStateAtTime(
+        currentTimeline,
+        audio.currentTime + LIP_SYNC_SETTINGS.leadSeconds,
+        { intensity: LIP_SYNC_SETTINGS.intensity, blendWindow: LIP_SYNC_SETTINGS.blendWindow },
+      );
+      lipSyncFrameRef.current = { ...frame, speechEnergy: getSpeechEnergy() };
       return;
     }
 
@@ -302,6 +338,7 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
     try {
       const formData = new FormData();
       formData.append("audio", blob, "recording.webm");
+      formData.append("avatarMode", avatarModeRef.current);
 
       const { data } = await api.post(`/sessions/${sessionId}/respond-audio`, formData, {
         headers: { "Content-Type": "multipart/form-data" },
@@ -338,7 +375,10 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
     setTyping(true);
 
     try {
-      const { data } = await api.post(`/sessions/${sessionId}/respond`, { content });
+      const { data } = await api.post(`/sessions/${sessionId}/respond`, {
+        content,
+        avatarMode: avatarModeRef.current,
+      });
       applyTurn(data);
     } catch (err) {
       console.error("Failed to get assistant response", err);

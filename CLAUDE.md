@@ -28,10 +28,10 @@ The project has moved beyond the old "basic backend foundation" phase. The main 
   - male avatar path based on `frontend/public/models/harry.glb`,
   - experimental female/avatar mode path,
   - simple audio visualizer mode.
-- Audio-energy mouth movement mapped to Three.js morph targets in the frontend.
+- Rhubarb mouth cues for male/female avatars, with audio-energy fallback for the visualizer.
 - Memory bank model, caregiver CRUD routes, and caregiver page UI.
-- Groq-based prototype LLM/STT path with streamed Edge TTS output.
-- OpenAI fast path with OpenAI STT/LLM and streamed OpenAI TTS output.
+- Groq-based prototype LLM/STT path with avatar-specific Edge TTS output.
+- OpenAI fast path with OpenAI STT/LLM and avatar-specific OpenAI TTS output.
 
 ### Still Rough
 
@@ -54,10 +54,11 @@ For recorded microphone input:
 3. `sttService.js` sends the audio to Groq Whisper (`whisper-large-v3-turbo` by default).
 4. `sessionOrchestratorService.js` uses the transcript, session script state, recent messages, and memory entries.
 5. `llmService.js` calls Groq chat completions (`llama-3.3-70b-versatile` by default).
-6. `sessionController.js` creates a short-lived speech stream token.
-7. `ttsService.js` streams speech with `msedge-tts` when the frontend opens the returned audio URL.
-8. The backend returns `assistantText`, slide state, streaming audio URL, memory used, and suggested memory updates.
-9. The frontend plays the streamed audio and drives avatar mouth movement from audio energy.
+6. `sessionController.js` chooses the voice from the selected avatar mode.
+7. Male/female avatars synthesize an audio file with `msedge-tts`, then `rhubarbService.js` generates mouth cues.
+8. The audio visualizer skips Rhubarb and uses a short-lived streaming speech token.
+9. The backend returns `assistantText`, slide state, audio URL, lip-sync metadata, memory used, and suggested memory updates.
+10. The frontend plays the audio and drives the avatar from Rhubarb cues, or from audio energy for the visualizer.
 
 For typed input, the flow skips STT and starts at `POST /api/sessions/:id/respond`.
 
@@ -70,9 +71,10 @@ For recorded microphone input:
 3. `sttService.js` sends the audio to OpenAI transcription (`gpt-4o-mini-transcribe` by default).
 4. `sessionOrchestratorService.js` uses the transcript, session script state, recent messages, and memory entries.
 5. `llmService.js` calls the OpenAI Responses API for answer adequacy and a brief adaptive acknowledgement.
-6. `sessionController.js` creates a short-lived speech stream token.
-7. `ttsService.js` streams OpenAI TTS when the frontend opens the returned audio URL.
-8. The frontend plays the streamed audio and drives avatar mouth movement from audio energy.
+6. `sessionController.js` chooses the voice from the selected avatar mode.
+7. Male/female avatars synthesize an OpenAI TTS audio file, then `rhubarbService.js` generates mouth cues.
+8. The audio visualizer skips Rhubarb and uses a short-lived streaming OpenAI TTS token.
+9. The frontend plays the audio and drives the avatar from Rhubarb cues, or from audio energy for the visualizer.
 
 ## Session Orchestration
 
@@ -250,12 +252,17 @@ Backend variables from `backend/.env.example`:
 - `OPENAI_TRANSCRIBE_MODEL`
 - `OPENAI_TTS_MODEL`
 - `OPENAI_TTS_VOICE`
+- `OPENAI_TTS_MALE_VOICE`
+- `OPENAI_TTS_FEMALE_VOICE`
 - `OPENAI_TTS_INSTRUCTIONS`
+- `RHUBARB_PATH`
 - `GROQ_API_KEY`
 - `GROQ_MODEL`
 - `GROQ_WHISPER_MODEL`
 - `PIPELINE_MODE`
 - `TTS_VOICE`
+- `EDGE_TTS_MALE_VOICE`
+- `EDGE_TTS_FEMALE_VOICE`
 
 Frontend variables:
 
@@ -273,7 +280,7 @@ Main files:
 - `frontend/src/pages/SessionPage.jsx`
 - `backend/src/services/avatarService.js`
 
-The current lip-sync path uses audio energy from the playing response audio to drive mouth movement. The female avatar path is experimental because prior inspected assets did not expose the same reliable viseme targets. The visualizer mode is useful as a low-risk fallback when avatar rigging is not the focus.
+The current lip-sync path uses Rhubarb JSON mouth cues for the male and female avatars. The audio visualizer intentionally skips Rhubarb and uses audio energy from the playing response audio. The female avatar also has a subtle idle/speech bob, but the asset path is still experimental because prior inspected assets did not expose the same reliable viseme targets as Harry.
 
 Dev URL helpers:
 

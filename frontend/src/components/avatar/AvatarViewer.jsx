@@ -23,6 +23,7 @@ const AVATAR_CONFIGS = {
     camera: { position: [0, 0, 1.2], fov: 25 },
     headGazeOffset: { pitchUp: -0.015, turnRight: 0.01 },
     headMotion: 0.42,
+    bodyBob: { idle: 0.012, speech: 0.026, speed: 1.7 },
     prepareMaterials: true,
     boneWorldRotationOffsets: [
       { name: "LeftArm", axis: [0, 0, 1], angle: -0.95 },
@@ -160,6 +161,7 @@ function applyWorldBoneRotationOffset(bone, axis, angle) {
 
 function RiggedAvatarScene({ config, lipSyncFrameRef, sourceScene }) {
   const scene = useMemo(() => SkeletonUtils.clone(sourceScene), [sourceScene]);
+  const root = useRef(null);
   const morphMeshes = useRef([]);
   const headBone = useRef(null);
   const baseHeadRotation = useRef(null);
@@ -286,6 +288,14 @@ function RiggedAvatarScene({ config, lipSyncFrameRef, sourceScene }) {
     consonantPulse.current = THREE.MathUtils.damp(consonantPulse.current, 0, 7.5, delta);
     previousConsonant.current = consonantStrength;
 
+    if (root.current && config.bodyBob) {
+      const bob = Math.sin(time * config.bodyBob.speed) * config.bodyBob.idle;
+      const speechBob = Math.sin(time * config.bodyBob.speed * 2.2 + 0.4)
+        * config.bodyBob.speech
+        * speechActivity.current;
+      root.current.position.y = config.position[1] + bob + speechBob;
+    }
+
     [...VISEME_TARGETS, ...MOUTH_TARGETS].forEach((targetName) => {
       mouthInfluences[targetName] = 0;
     });
@@ -335,7 +345,11 @@ function RiggedAvatarScene({ config, lipSyncFrameRef, sourceScene }) {
     }
   });
 
-  return <primitive object={scene} position={config.position} scale={config.scale} />;
+  return (
+    <group ref={root} position={config.position} scale={config.scale}>
+      <primitive object={scene} />
+    </group>
+  );
 }
 
 function GltfAvatarModel({ avatarMode, lipSyncFrameRef }) {

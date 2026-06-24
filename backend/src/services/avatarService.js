@@ -10,6 +10,7 @@ export const buildAvatarResponse = ({
   text,
   audioUrl = null,
   visemes = null,
+  rhubarbJson = null,
   lipsyncEngine = null,
 }) => ({
   placement: 'bottom-right',
@@ -19,9 +20,10 @@ export const buildAvatarResponse = ({
     url: audioUrl,
   },
   lipsync: {
-    engine: lipsyncEngine || 'audio-energy',
-    status: audioUrl ? 'ready' : 'waiting_for_audio',
+    engine: lipsyncEngine || (rhubarbJson ? 'rhubarb' : 'audio-energy'),
+    status: rhubarbJson || audioUrl ? 'ready' : 'waiting_for_audio',
     visemes: visemes || DEFAULT_VISEME_MAP,
+    ...(rhubarbJson && { rhubarbJson }),
   },
   text,
 });

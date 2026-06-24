@@ -10,12 +10,18 @@ const cleanupExpiredStreams = () => {
   }
 };
 
-export const createSpeechStreamToken = ({ text, provider = 'openai', lipsync = 'audio-energy' }) => {
+export const createSpeechStreamToken = ({
+  text,
+  provider = 'openai',
+  voice = null,
+  lipsync = 'audio-energy',
+}) => {
   cleanupExpiredStreams();
   const token = uuidv4();
   speechStreams.set(token, {
     text,
     provider,
+    voice,
     lipsync,
     expiresAt: Date.now() + STREAM_TTL_MS,
   });

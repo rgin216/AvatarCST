@@ -1,7 +1,7 @@
 // Default pipeline used when a session does not explicitly choose one.
 //
-//   free                  -> Groq Whisper -> Groq LLM -> streaming edge-tts -> audio energy lipsync
-//   openai-fast-scripted -> OpenAI transcription -> OpenAI text model -> streaming OpenAI TTS -> audio energy lipsync
+//   free                 -> Groq Whisper -> Groq LLM -> edge-tts -> Rhubarb for avatars / energy for visualizer
+//   openai-fast-scripted -> OpenAI transcription -> OpenAI text model -> OpenAI TTS -> Rhubarb for avatars / energy for visualizer
 export const PIPELINE_MODE = process.env.PIPELINE_MODE ?? 'free';
 
 export const SESSION_PIPELINE_MODES = ['free', 'openai-fast-scripted'];
