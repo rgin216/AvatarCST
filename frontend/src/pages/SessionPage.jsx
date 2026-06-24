@@ -73,6 +73,7 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
   const mediaStreamRef = useRef(null);
   const recordingChunksRef = useRef([]);
   const realtimeTranscriptionRef = useRef(null);
+  const realtimeStartIdRef = useRef(0);
   const voicePlaceholderIdRef = useRef(null);
 
   useEffect(() => {
@@ -285,7 +286,7 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
     if (voicePlaceholderIdRef.current == null) return;
     const placeholderId = voicePlaceholderIdRef.current;
     setMessages((items) =>
-      items.map((msg) => (msg._id === placeholderId ? { ...msg, text: text || "..." } : msg))
+      items.map((msg) => (msg._id === placeholderId ? { ...msg, text: text || "Listening..." } : msg))
     );
   }
 
@@ -299,6 +300,7 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
     session.dc?.close?.();
     session.pc?.close?.();
     realtimeTranscriptionRef.current = null;
+    mediaStreamRef.current = null;
   }
 
   function getRealtimeTranscriptFromEvent(event) {
@@ -379,30 +381,58 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
   }
 
   async function startRealtimeTranscriptionRecording() {
+    const startId = realtimeStartIdRef.current + 1;
+    realtimeStartIdRef.current = startId;
     const placeholderId = Date.now();
     voicePlaceholderIdRef.current = placeholderId;
-    setMessages((items) => [...items, { from: "user", text: "...", _id: placeholderId }]);
+    setIsRecording(true);
+    setMessages((items) => [...items, { from: "user", text: "Listening...", _id: placeholderId }]);
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      await connectRealtimeTranscription(stream);
+      if (realtimeStartIdRef.current !== startId) {
+        stream.getTracks().forEach((track) => track.stop());
+        return;
+      }
       mediaStreamRef.current = stream;
+      await connectRealtimeTranscription(stream);
+      if (realtimeStartIdRef.current !== startId) {
+        cleanupRealtimeTranscription();
+        return;
+      }
+      updateVoicePlaceholder("Listening...");
       setIsRecording(true);
     } catch (err) {
       console.error("Failed to start realtime transcription:", err);
       cleanupRealtimeTranscription();
-      voicePlaceholderIdRef.current = null;
-      setMessages((items) => items.filter((msg) => msg._id !== placeholderId));
-      await startRecording();
+      mediaStreamRef.current = null;
+      if (realtimeStartIdRef.current === startId) {
+        setIsRecording(false);
+        voicePlaceholderIdRef.current = null;
+        setMessages((items) => items.filter((msg) => msg._id !== placeholderId));
+        await startRecording();
+      }
     }
   }
 
   async function stopRealtimeTranscriptionRecording() {
+    realtimeStartIdRef.current += 1;
     const session = realtimeTranscriptionRef.current;
-    if (!session) return;
+    if (!session) {
+      mediaStreamRef.current?.getTracks().forEach((track) => track.stop());
+      mediaStreamRef.current = null;
+      setIsRecording(false);
+      if (voicePlaceholderIdRef.current != null) {
+        const placeholderId = voicePlaceholderIdRef.current;
+        voicePlaceholderIdRef.current = null;
+        setMessages((items) => items.filter((msg) => msg._id !== placeholderId));
+      }
+      return;
+    }
 
     setIsRecording(false);
     setTyping(true);
+    updateVoicePlaceholder(session.transcript.trim() || "Transcribing...");
 
     try {
       const completionPromise = new Promise((resolve) => {
@@ -432,6 +462,7 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
 
   async function startRecording() {
     try {
+      setIsRecording(true);
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
         ? "audio/webm;codecs=opus"
@@ -456,6 +487,7 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
       mediaStreamRef.current = stream;
       setIsRecording(true);
     } catch (err) {
+      setIsRecording(false);
       console.error("Failed to start recording:", err);
     }
   }
@@ -473,7 +505,7 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
     // Add a placeholder that will be replaced with the real transcript on response
     const placeholderId = Date.now();
     voicePlaceholderIdRef.current = placeholderId;
-    setMessages((items) => [...items, { from: "user", text: "...", _id: placeholderId }]);
+    setMessages((items) => [...items, { from: "user", text: "Transcribing...", _id: placeholderId }]);
     setTyping(true);
 
     try {
