@@ -11,6 +11,7 @@ import {
   respondToSession,
   respondAudioToSession,
   createRealtimeSession,
+  createRealtimeTranscriptionSession,
   getPipelineInfo,
   streamSpeechToken,
 } from '../controllers/sessionController.js';
@@ -28,6 +29,7 @@ router.patch('/:id/end', endSession);
 router.post('/:id/respond', respondToSession);
 router.post('/:id/respond-audio', upload.single('audio'), respondAudioToSession);
 router.post('/:id/realtime-session', createRealtimeSession);
+router.post('/:id/transcription-session', createRealtimeTranscriptionSession);
 router.post('/:id/messages', addMessage);
 router.get('/:id/messages', getMessages);
 
