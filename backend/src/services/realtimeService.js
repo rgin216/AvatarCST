@@ -23,22 +23,6 @@ export const createRealtimeSessionConfig = ({ session, user, memoryEntries, slid
   },
 });
 
-export const createRealtimeTranscriptionSessionConfig = () => ({
-  session: {
-    type: 'transcription',
-    audio: {
-      input: {
-        transcription: {
-          model: process.env.OPENAI_REALTIME_TRANSCRIBE_MODEL || 'gpt-realtime-whisper',
-          language: 'en',
-          delay: process.env.OPENAI_REALTIME_TRANSCRIBE_DELAY || 'low',
-        },
-        turn_detection: null,
-      },
-    },
-  },
-});
-
 export const mintRealtimeClientSecret = async (context) => {
   if (!process.env.OPENAI_API_KEY) {
     const err = new Error('OPENAI_API_KEY is required to create a realtime session');
@@ -77,51 +61,6 @@ export const mintRealtimeClientSecret = async (context) => {
   if (!response.ok) {
     const detail = await response.text();
     const err = new Error(`Failed to create realtime session: ${detail}`);
-    err.status = response.status;
-    throw err;
-  }
-
-  return response.json();
-};
-
-export const mintRealtimeTranscriptionClientSecret = async () => {
-  if (!process.env.OPENAI_API_KEY) {
-    const err = new Error('OPENAI_API_KEY is required to create a realtime transcription session');
-    err.status = 503;
-    throw err;
-  }
-
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), REALTIME_SECRET_TIMEOUT_MS);
-  let response;
-
-  try {
-    response = await fetch('https://api.openai.com/v1/realtime/client_secrets', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(createRealtimeTranscriptionSessionConfig()),
-      signal: controller.signal,
-    });
-  } catch (originalError) {
-    const isTimeout = originalError?.name === 'AbortError';
-    const err = new Error(
-      isTimeout
-        ? `Timed out creating realtime transcription session after ${REALTIME_SECRET_TIMEOUT_MS}ms`
-        : `Network failure creating realtime transcription session${originalError?.status ? ` (${originalError.status})` : ''}`
-    );
-    err.status = isTimeout ? 504 : 502;
-    err.cause = originalError;
-    throw err;
-  } finally {
-    clearTimeout(timeout);
-  }
-
-  if (!response.ok) {
-    const detail = await response.text();
-    const err = new Error(`Failed to create realtime transcription session: ${detail}`);
     err.status = response.status;
     throw err;
   }

@@ -72,8 +72,6 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
   const mediaRecorderRef = useRef(null);
   const mediaStreamRef = useRef(null);
   const recordingChunksRef = useRef([]);
-  const realtimeTranscriptionRef = useRef(null);
-  const realtimeStartIdRef = useRef(0);
   const voicePlaceholderIdRef = useRef(null);
 
   useEffect(() => {
@@ -106,7 +104,6 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
     }
     mediaStreamRef.current?.getTracks().forEach((t) => t.stop());
     mediaStreamRef.current = null;
-    cleanupRealtimeTranscription();
   }, []);
 
   function applyTurn(turn) {
@@ -282,184 +279,6 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
 
   // --- Mic recording (free pipeline) ---
 
-  function updateVoicePlaceholder(text) {
-    if (voicePlaceholderIdRef.current == null) return;
-    const placeholderId = voicePlaceholderIdRef.current;
-    setMessages((items) =>
-      items.map((msg) => (msg._id === placeholderId ? { ...msg, text: text || "Listening..." } : msg))
-    );
-  }
-
-  function cleanupRealtimeTranscription() {
-    const session = realtimeTranscriptionRef.current;
-    if (!session) return;
-
-    if (session.completionTimer) clearTimeout(session.completionTimer);
-    session.stream?.getTracks().forEach((track) => track.stop());
-    session.pc?.getSenders?.().forEach((sender) => sender.track?.stop());
-    session.dc?.close?.();
-    session.pc?.close?.();
-    realtimeTranscriptionRef.current = null;
-    mediaStreamRef.current = null;
-  }
-
-  function getRealtimeTranscriptFromEvent(event) {
-    return event.transcript || event.delta || event.text || "";
-  }
-
-  async function connectRealtimeTranscription(stream) {
-    const { data } = await api.post(`/sessions/${sessionId}/transcription-session`);
-    const ephemeralKey = data?.clientSecret?.value;
-    if (!ephemeralKey) throw new Error("Realtime transcription token was not returned");
-
-    const pc = new RTCPeerConnection();
-    const dc = pc.createDataChannel("oai-events");
-    const transcriptState = {
-      pc,
-      dc,
-      stream,
-      transcript: "",
-      completedTranscript: "",
-      completionTimer: null,
-      resolveCompletion: null,
-    };
-
-    realtimeTranscriptionRef.current = transcriptState;
-
-    dc.addEventListener("message", (messageEvent) => {
-      let event;
-      try {
-        event = JSON.parse(messageEvent.data);
-      } catch {
-        return;
-      }
-
-      if (event.type === "conversation.item.input_audio_transcription.delta") {
-        transcriptState.transcript += getRealtimeTranscriptFromEvent(event);
-        updateVoicePlaceholder(transcriptState.transcript.trim());
-      }
-
-      if (event.type === "conversation.item.input_audio_transcription.completed") {
-        transcriptState.completedTranscript = getRealtimeTranscriptFromEvent(event).trim();
-        updateVoicePlaceholder(transcriptState.completedTranscript);
-        transcriptState.resolveCompletion?.(transcriptState.completedTranscript);
-      }
-    });
-
-    stream.getTracks().forEach((track) => pc.addTrack(track, stream));
-
-    const offer = await pc.createOffer();
-    await pc.setLocalDescription(offer);
-
-    const sdpResponse = await fetch("https://api.openai.com/v1/realtime/calls", {
-      method: "POST",
-      body: offer.sdp,
-      headers: {
-        Authorization: `Bearer ${ephemeralKey}`,
-        "Content-Type": "application/sdp",
-      },
-    });
-
-    if (!sdpResponse.ok) {
-      throw new Error(`Realtime transcription connection failed: ${sdpResponse.status}`);
-    }
-
-    await pc.setRemoteDescription({
-      type: "answer",
-      sdp: await sdpResponse.text(),
-    });
-
-    if (dc.readyState !== "open") {
-      await new Promise((resolve, reject) => {
-        const timer = setTimeout(() => reject(new Error("Realtime transcription channel did not open")), 5000);
-        dc.addEventListener("open", () => {
-          clearTimeout(timer);
-          resolve();
-        }, { once: true });
-      });
-    }
-  }
-
-  async function startRealtimeTranscriptionRecording() {
-    const startId = realtimeStartIdRef.current + 1;
-    realtimeStartIdRef.current = startId;
-    const placeholderId = Date.now();
-    voicePlaceholderIdRef.current = placeholderId;
-    setIsRecording(true);
-    setMessages((items) => [...items, { from: "user", text: "Listening...", _id: placeholderId }]);
-
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      if (realtimeStartIdRef.current !== startId) {
-        stream.getTracks().forEach((track) => track.stop());
-        return;
-      }
-      mediaStreamRef.current = stream;
-      await connectRealtimeTranscription(stream);
-      if (realtimeStartIdRef.current !== startId) {
-        cleanupRealtimeTranscription();
-        return;
-      }
-      updateVoicePlaceholder("Listening...");
-      setIsRecording(true);
-    } catch (err) {
-      console.error("Failed to start realtime transcription:", err);
-      cleanupRealtimeTranscription();
-      mediaStreamRef.current = null;
-      if (realtimeStartIdRef.current === startId) {
-        setIsRecording(false);
-        voicePlaceholderIdRef.current = null;
-        setMessages((items) => items.filter((msg) => msg._id !== placeholderId));
-        await startRecording();
-      }
-    }
-  }
-
-  async function stopRealtimeTranscriptionRecording() {
-    realtimeStartIdRef.current += 1;
-    const session = realtimeTranscriptionRef.current;
-    if (!session) {
-      mediaStreamRef.current?.getTracks().forEach((track) => track.stop());
-      mediaStreamRef.current = null;
-      setIsRecording(false);
-      if (voicePlaceholderIdRef.current != null) {
-        const placeholderId = voicePlaceholderIdRef.current;
-        voicePlaceholderIdRef.current = null;
-        setMessages((items) => items.filter((msg) => msg._id !== placeholderId));
-      }
-      return;
-    }
-
-    setIsRecording(false);
-    setTyping(true);
-    updateVoicePlaceholder(session.transcript.trim() || "Transcribing...");
-
-    try {
-      const completionPromise = new Promise((resolve) => {
-        session.resolveCompletion = resolve;
-        session.completionTimer = setTimeout(() => resolve(session.transcript.trim()), 2500);
-      });
-
-      if (session.dc?.readyState === "open") {
-        session.dc.send(JSON.stringify({ type: "input_audio_buffer.commit" }));
-      }
-
-      session.stream?.getTracks().forEach((track) => track.stop());
-      const transcript = ((await completionPromise) || session.transcript || "").trim();
-      cleanupRealtimeTranscription();
-      await sendTranscriptToBackend(transcript);
-    } catch (err) {
-      console.error("Failed to complete realtime transcription:", err);
-      cleanupRealtimeTranscription();
-      setMessages((items) => [
-        ...items,
-        { from: "avatar", text: "I could not hear that clearly. Please try again or type your response." },
-      ]);
-    } finally {
-      setTyping(false);
-    }
-  }
-
   async function startRecording() {
     try {
       setIsRecording(true);
@@ -528,30 +347,7 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
     }
   }
 
-  async function sendTranscriptToBackend(transcript) {
-    const content = transcript.trim();
-    if (!content) {
-      applyTurn({ transcript: "" });
-      setMessages((items) => [
-        ...items,
-        { from: "avatar", text: "I could not hear that clearly. Please try again or type your response." },
-      ]);
-      return;
-    }
-
-    const { data } = await api.post(`/sessions/${sessionId}/respond`, { content });
-    applyTurn({ ...data, transcript: content });
-  }
-
   function handleMicClick() {
-    if (pipelineMode === "openai-fast-scripted") {
-      if (isRecording) {
-        stopRealtimeTranscriptionRecording();
-      } else {
-        startRealtimeTranscriptionRecording();
-      }
-      return;
-    }
     if (isRecording) {
       stopRecording();
     } else {
@@ -688,7 +484,7 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
           className={`mic-btn${isRecording ? " mic-btn-active" : ""}`}
           aria-label={isRecording ? "Stop recording" : "Start microphone"}
           disabled={typing && !isRecording}
-          title={pipelineMode === "openai-fast-scripted" ? "Realtime transcription with script-locked responses" : undefined}
+          title={pipelineMode === "openai-fast-scripted" ? "Recorded transcription with streaming scripted responses" : undefined}
         >
           {isRecording ? (
             // Stop square

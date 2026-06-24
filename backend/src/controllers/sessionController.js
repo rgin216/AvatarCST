@@ -7,7 +7,6 @@ import {
   createRealtimeSessionForTurn,
   respondToSessionTurn,
 } from '../services/sessionOrchestratorService.js';
-import { mintRealtimeTranscriptionClientSecret } from '../services/realtimeService.js';
 import { transcribeAudio } from '../services/sttService.js';
 import { pipeSpeechStream, synthesizeSpeech } from '../services/ttsService.js';
 import { generateLipSync } from '../services/rhubarbService.js';
@@ -241,19 +240,6 @@ export const getPipelineInfo = (_req, res) => {
     availableModes: SESSION_PIPELINE_MODES,
   };
   res.json(info);
-};
-
-export const createRealtimeTranscriptionSession = async (_req, res, next) => {
-  try {
-    const clientSecret = await mintRealtimeTranscriptionClientSecret();
-    res.status(201).json({
-      model: process.env.OPENAI_REALTIME_TRANSCRIBE_MODEL || 'gpt-realtime-whisper',
-      delay: process.env.OPENAI_REALTIME_TRANSCRIBE_DELAY || 'low',
-      clientSecret,
-    });
-  } catch (err) {
-    next(err);
-  }
 };
 
 export const respondAudioToSession = async (req, res, next) => {
