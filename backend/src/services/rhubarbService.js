@@ -22,6 +22,7 @@ function resolveRhubarbPath() {
   return VENDORED_RHUBARB_PATH;
 }
 
+// Convert audio file to 16-bit mono WAV at 24kHz, the format Rhubarb requires.
 function convertToWav(inputPath, outputPath) {
   return new Promise((resolve, reject) => {
     ffmpeg(inputPath)

@@ -36,7 +36,7 @@ The project has moved beyond the old "basic backend foundation" phase. The main 
 ### Still Rough
 
 - Memory is stored, reviewed, and injected, but retrieval is currently broad and simple: the orchestrator loads approved memory entries and passes a small slice back as `memoryUsed`. There is no semantic search or scoring yet.
-- `suggestedMemoryUpdates` is heuristic only, based on simple regexes in `sessionOrchestratorService.js`, and is now saved as pending caregiver-review memory.
+- `suggestedMemoryUpdates` is heuristic only, based on simple regexes in `sessionOrchestratorService.js`, and is saved as pending caregiver-review memory.
 - The current voice paths still wait for a recorded browser audio blob before transcription starts; they are lower-latency response paths, not live full-duplex voice.
 - The two sessions are useful test scripts, not polished clinical content.
 - Docs other than this file may still be stale; prefer source files over README text when they disagree.
@@ -78,7 +78,7 @@ For recorded microphone input:
 
 ## Session Orchestration
 
-The canonical turn endpoint is:
+The canonical turn endpoints are:
 
 ```text
 POST /api/sessions/:id/respond
@@ -184,10 +184,12 @@ Mounted in `backend/src/app.js`:
 - `/api/sessions`
 - `/api/summaries`
 - `/api/memory`
+- `/generated-audio`
 
 Useful session endpoints:
 
 - `GET /api/sessions/pipeline`
+- `GET /api/sessions/speech-stream/:token`
 - `POST /api/sessions`
 - `GET /api/sessions/user/:userId`
 - `DELETE /api/sessions/user/:userId`
@@ -196,7 +198,6 @@ Useful session endpoints:
 - `PATCH /api/sessions/:id/end`
 - `POST /api/sessions/:id/respond`
 - `POST /api/sessions/:id/respond-audio`
-- `GET /api/sessions/speech-stream/:token`
 - `POST /api/sessions/:id/messages`
 - `GET /api/sessions/:id/messages`
 
@@ -269,6 +270,8 @@ Frontend variables:
 - `VITE_API_URL`
 - Optional fixed demo user ID if using seeded data: `VITE_DEMO_USER_ID`
 
+`backend/package.json` runs `scripts/install-rhubarb.js` on `npm install`. The script downloads the latest platform-specific Rhubarb release into `backend/vendor/rhubarb/bin`; that folder is git-ignored. Set `RHUBARB_SKIP_INSTALL=1` to skip the download, `REQUIRE_RHUBARB=1` to make install fail if Rhubarb cannot be fetched, or `RHUBARB_PATH` to point at a manually installed binary.
+
 Never commit real `.env` files or API keys.
 
 ## Avatar and Lip Sync
@@ -278,6 +281,7 @@ Main files:
 - `frontend/src/components/avatar/AvatarViewer.jsx`
 - `frontend/src/utils/lipSync.js`
 - `frontend/src/pages/SessionPage.jsx`
+- `backend/src/services/rhubarbService.js`
 - `backend/src/services/avatarService.js`
 
 The current lip-sync path uses Rhubarb JSON mouth cues for the male and female avatars. The audio visualizer intentionally skips Rhubarb and uses audio energy from the playing response audio. The female avatar also has a subtle idle/speech bob, but the asset path is still experimental because prior inspected assets did not expose the same reliable viseme targets as Harry.
