@@ -82,7 +82,7 @@ function requestBuffer(url, headers = {}, redirectCount = 0) {
 function getPinnedAsset() {
   const asset = pinnedAssets[process.platform];
   if (!asset) {
-    throw new Error(`No pinned Rhubarb asset/checksum is configured for platform: ${process.platform}`);
+    return null;
   }
   return {
     ...asset,
@@ -187,6 +187,14 @@ async function main() {
     return;
   }
 
+  const asset = getPinnedAsset();
+  if (!asset) {
+    finishWarning(
+      `Automatic Rhubarb install is only configured for Windows. Install Rhubarb manually on ${process.platform} or set RHUBARB_PATH.`
+    );
+    return;
+  }
+
   try {
     await fs.access(BIN_PATH);
     await fs.access(RESOURCE_DIR);
@@ -200,7 +208,6 @@ async function main() {
     await fs.mkdir(INSTALL_ROOT, { recursive: true });
     await cleanOldTempFiles();
 
-    const asset = getPinnedAsset();
     console.log(`[rhubarb-install] Downloading ${asset.name}`);
     const zip = await requestBuffer(asset.downloadUrl, { Accept: 'application/octet-stream' });
     verifyChecksum(zip, asset.sha256, asset.name);

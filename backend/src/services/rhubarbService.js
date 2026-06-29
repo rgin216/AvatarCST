@@ -22,6 +22,10 @@ function resolveRhubarbPath() {
   return VENDORED_RHUBARB_PATH;
 }
 
+function canUseRhubarbPath(rhubarbPath) {
+  return Boolean(process.env.RHUBARB_PATH) || fs.existsSync(rhubarbPath);
+}
+
 // Convert audio file to 16-bit mono WAV at 24kHz, the format Rhubarb requires.
 function convertToWav(inputPath, outputPath) {
   return new Promise((resolve, reject) => {
@@ -39,7 +43,7 @@ function convertToWav(inputPath, outputPath) {
 export async function generateLipSync(audioFilePath) {
   const rhubarbPath = resolveRhubarbPath();
 
-  if (!fs.existsSync(rhubarbPath)) {
+  if (!canUseRhubarbPath(rhubarbPath)) {
     console.warn(`[rhubarb] Binary not found at: ${rhubarbPath}`);
     return null;
   }

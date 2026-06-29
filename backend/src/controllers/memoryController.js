@@ -6,10 +6,10 @@ const VALID_CATEGORIES = ['preference', 'personal', 'session_insight', 'caregive
 
 const buildMemoryEntry = (body = {}) => ({
   category: VALID_CATEGORIES.includes(body.category) ? body.category : 'personal',
-  content: body.content?.trim(),
+  content: typeof body.content === 'string' ? body.content.trim() : undefined,
   addedBy: body.addedBy === 'system' ? 'system' : 'caregiver',
   status: body.status === 'pending' ? 'pending' : 'approved',
-  reason: body.reason?.trim() || undefined,
+  reason: typeof body.reason === 'string' ? body.reason.trim() || undefined : undefined,
   reviewedAt: body.status === 'pending' ? undefined : new Date(),
   reviewedBy: body.status === 'pending' ? undefined : 'caregiver',
 });
@@ -30,6 +30,10 @@ export const addMemoryEntry = async (req, res, next) => {
   try {
     const entry = buildMemoryEntry(req.body);
     if (!entry.content) return res.status(400).json({ error: 'Memory content is required' });
+
+    if (!isValidObjectId(req.params.userId)) {
+      return res.status(400).json({ error: 'Malformed userId' });
+    }
 
     const memory = await Memory.findOneAndUpdate(
       { userId: req.params.userId },

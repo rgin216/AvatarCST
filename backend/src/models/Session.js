@@ -1,4 +1,5 @@
 import { Schema, model } from 'mongoose';
+import { DEFAULT_PIPELINE_MODE } from '../config/pipeline.js';
 
 const sessionSchema = new Schema({
   userId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
@@ -8,7 +9,7 @@ const sessionSchema = new Schema({
   pipelineMode: {
     type: String,
     enum: ['free', 'openai-fast-scripted'],
-    default: 'free',
+    default: DEFAULT_PIPELINE_MODE,
   },
   scriptId: { type: String, default: 'cst_intro_reminiscence' },
   scriptStepIndex: { type: Number, default: 0, min: 0 },

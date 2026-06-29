@@ -49,15 +49,16 @@ const extractJsonObject = (text = '') => {
 const parseAdaptiveTurn = (text = '') => {
   const parsed = extractJsonObject(text);
   if (parsed) {
+    const explicitAnswerQuality = parseAnswerQuality(text);
     return {
-      answered: typeof parsed.answered === 'boolean' ? parsed.answered : true,
+      answered: typeof parsed.answered === 'boolean' ? parsed.answered : explicitAnswerQuality === true,
       response: typeof parsed?.response === 'string' ? parsed.response.trim() : '',
     };
   }
 
   const explicitAnswerQuality = parseAnswerQuality(text);
   return {
-    answered: explicitAnswerQuality || !/\banswered\s*["']?\s*:\s*false\b/i.test(text),
+    answered: explicitAnswerQuality === true,
     response: text
       .replace(/```(?:json)?[\s\S]*?```/gi, '')
       .replace(/\{[\s\S]*$/, '')
@@ -372,11 +373,16 @@ export const respondToSessionTurn = async ({ sessionId, content }) => {
   };
   await session.save();
 
-  const suggestedMemoryUpdates = await savePendingMemorySuggestions({
-    userId: session.userId,
-    sessionId: session._id,
-    suggestions: inferMemorySuggestions(userContent),
-  });
+  let suggestedMemoryUpdates = [];
+  try {
+    suggestedMemoryUpdates = await savePendingMemorySuggestions({
+      userId: session.userId,
+      sessionId: session._id,
+      suggestions: inferMemorySuggestions(userContent),
+    });
+  } catch (err) {
+    console.warn('[memory] Skipping suggested memory updates:', err.message);
+  }
 
   return {
     sessionId: session._id,

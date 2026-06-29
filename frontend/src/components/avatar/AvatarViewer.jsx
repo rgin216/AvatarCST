@@ -456,7 +456,7 @@ function VoiceCore({ energyRef }) {
 
   return (
     <mesh ref={mesh}>
-      <icosahedronGeometry args={[0.48, 32]} />
+      <icosahedronGeometry args={[0.48, 8]} />
       <shaderMaterial
         ref={material}
         blending={THREE.AdditiveBlending}

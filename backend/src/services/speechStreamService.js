@@ -32,6 +32,6 @@ export const getSpeechStream = (token) => {
   cleanupExpiredStreams();
   const entry = speechStreams.get(token);
   if (!entry) return null;
-  entry.expiresAt = Date.now() + STREAM_TTL_MS;
+  speechStreams.delete(token);
   return entry;
 };
