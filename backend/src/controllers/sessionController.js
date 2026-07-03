@@ -147,11 +147,12 @@ function createStreamedAudioForTurn(assistantText, pipelineMode, avatarMode) {
 
 async function createRhubarbAudioForTurn(assistantText, pipelineMode, avatarMode, timings) {
   const speechOptions = getSpeechOptions(pipelineMode, avatarMode);
-  const audioFileName = `${uuidv4()}.mp3`;
+  const responseFormat = speechOptions.provider === 'openai' ? 'wav' : 'mp3';
+  const audioFileName = `${uuidv4()}.${responseFormat}`;
   const audioOutputPath = path.join(GENERATED_AUDIO_DIR, audioFileName);
   await timeAsync(
     'ttsMs',
-    () => synthesizeSpeech(assistantText, audioOutputPath, speechOptions),
+    () => synthesizeSpeech(assistantText, audioOutputPath, { ...speechOptions, responseFormat }),
     timings
   );
   const rhubarbJson = await timeAsync('rhubarbMs', () => generateLipSync(audioOutputPath), timings);

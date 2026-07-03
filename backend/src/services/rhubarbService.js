@@ -49,18 +49,14 @@ export async function generateLipSync(audioFilePath) {
   }
 
   let inputPath = audioFilePath;
-  let tempWavPath = null;
-  const ext = audioFilePath.split('.').pop()?.toLowerCase();
+  const tempWavPath = audioFilePath.replace(/\.[^.]+$/, '.rhubarb-input.wav');
 
-  if (ext !== 'wav' && ext !== 'aiff') {
-    tempWavPath = audioFilePath.replace(/\.[^.]+$/, '.rhubarb-input.wav');
-    try {
-      await convertToWav(audioFilePath, tempWavPath);
-      inputPath = tempWavPath;
-    } catch (err) {
-      console.error('[rhubarb] WAV conversion failed:', err.message);
-      return null;
-    }
+  try {
+    await convertToWav(audioFilePath, tempWavPath);
+    inputPath = tempWavPath;
+  } catch (err) {
+    console.error('[rhubarb] WAV conversion failed:', err.message);
+    return null;
   }
 
   const jsonOutputPath = audioFilePath.replace(/\.[^.]+$/, '.rhubarb.json');

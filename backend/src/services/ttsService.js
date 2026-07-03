@@ -9,7 +9,7 @@ const EDGE_MALE_VOICE = process.env.EDGE_TTS_MALE_VOICE
   || process.env.TTS_VOICE
   || 'en-NZ-MitchellNeural';
 const EDGE_FEMALE_VOICE = process.env.EDGE_TTS_FEMALE_VOICE || 'en-NZ-MollyNeural';
-const OPENAI_MALE_VOICE = process.env.OPENAI_TTS_MALE_VOICE || 'ash';
+const OPENAI_MALE_VOICE = process.env.OPENAI_TTS_MALE_VOICE || 'alloy';
 const OPENAI_FEMALE_VOICE = process.env.OPENAI_TTS_FEMALE_VOICE
   || process.env.OPENAI_TTS_VOICE
   || 'marin';
@@ -65,8 +65,17 @@ async function fetchOpenAISpeech(text, options = {}) {
 
 async function synthesizeOpenAISpeech(text, outputPath, options = {}) {
   const response = await fetchOpenAISpeech(text, options);
-  const buffer = Buffer.from(await response.arrayBuffer());
-  await fs.promises.writeFile(outputPath, buffer);
+  const tempOutputPath = `${outputPath}.part`;
+
+  try {
+    await pipeline(Readable.fromWeb(response.body), fs.createWriteStream(tempOutputPath, { flags: 'wx' }));
+    const { size } = await fs.promises.stat(tempOutputPath);
+    if (size === 0) throw new Error('OpenAI TTS returned an empty audio file');
+    await fs.promises.rename(tempOutputPath, outputPath);
+  } catch (err) {
+    await fs.promises.rm(tempOutputPath, { force: true }).catch(() => {});
+    throw err;
+  }
 }
 
 export async function synthesizeSpeech(text, outputPath, options = {}) {
