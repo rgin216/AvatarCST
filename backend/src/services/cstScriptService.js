@@ -22,14 +22,14 @@ const scripts = {
       id: 'ai_introduction',
       turns: 1,
       deckSlide: 3,
-      title: 'Your Virtual CST Facilitator',
-      subtitle: 'Meet Aria',
+      title: 'How We Will Chat',
+      subtitle: 'What to expect',
       prompt: 'Does that sound alright?',
       bullets: ['Good company', 'Interesting questions', 'No tests'],
       visualHint: 'Source deck: facilitator introduction',
       accent: '#00AEEF',
       reply: ({ name }) =>
-        `Thank you for sharing that, ${name}. A little about me: my role is simply to keep us company, ask some interesting questions, and share a bit of fun conversation. I am not here to test you, and there are no right or wrong answers. Does that sound alright?`,
+        `Thank you for sharing that, ${name}. In these sessions, we will keep each other company, try some interesting questions, and enjoy a bit of fun conversation. There are no tests here, and no right or wrong answers. Does that sound alright?`,
     },
     {
       id: 'getting_to_know_you_name',

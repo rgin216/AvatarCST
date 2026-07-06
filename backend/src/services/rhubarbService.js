@@ -22,7 +22,11 @@ function resolveRhubarbPath() {
   return VENDORED_RHUBARB_PATH;
 }
 
-// Convert audio file to 16-bit mono WAV at 24kHz — the format Rhubarb requires.
+function canUseRhubarbPath(rhubarbPath) {
+  return Boolean(process.env.RHUBARB_PATH) || fs.existsSync(rhubarbPath);
+}
+
+// Convert audio file to 16-bit mono WAV at 24kHz, the format Rhubarb requires.
 function convertToWav(inputPath, outputPath) {
   return new Promise((resolve, reject) => {
     ffmpeg(inputPath)
@@ -36,30 +40,23 @@ function convertToWav(inputPath, outputPath) {
   });
 }
 
-// Returns Rhubarb JSON ({ metadata, mouthCues }) or null if Rhubarb is unavailable/fails.
-// The caller is responsible for using placeholder visemes when null is returned.
 export async function generateLipSync(audioFilePath) {
   const rhubarbPath = resolveRhubarbPath();
 
-  if (!fs.existsSync(rhubarbPath)) {
+  if (!canUseRhubarbPath(rhubarbPath)) {
     console.warn(`[rhubarb] Binary not found at: ${rhubarbPath}`);
     return null;
   }
 
-  // Rhubarb on Windows only supports WAV — convert if the source is MP3/WebM
   let inputPath = audioFilePath;
-  let tempWavPath = null;
-  const ext = audioFilePath.split('.').pop()?.toLowerCase();
+  const tempWavPath = audioFilePath.replace(/\.[^.]+$/, '.rhubarb-input.wav');
 
-  if (ext !== 'wav' && ext !== 'aiff') {
-    tempWavPath = audioFilePath.replace(/\.[^.]+$/, '.rhubarb-input.wav');
-    try {
-      await convertToWav(audioFilePath, tempWavPath);
-      inputPath = tempWavPath;
-    } catch (err) {
-      console.error('[rhubarb] WAV conversion failed:', err.message);
-      return null;
-    }
+  try {
+    await convertToWav(audioFilePath, tempWavPath);
+    inputPath = tempWavPath;
+  } catch (err) {
+    console.error('[rhubarb] WAV conversion failed:', err.message);
+    return null;
   }
 
   const jsonOutputPath = audioFilePath.replace(/\.[^.]+$/, '.rhubarb.json');
@@ -83,6 +80,7 @@ export async function generateLipSync(audioFilePath) {
         resolve(null);
         return;
       }
+
       try {
         const json = JSON.parse(fs.readFileSync(jsonOutputPath, 'utf-8'));
         unlinkSilent(jsonOutputPath);

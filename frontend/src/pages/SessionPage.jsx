@@ -47,7 +47,7 @@ const LIP_SYNC_SETTINGS = {
   leadSeconds: 0.055,
 };
 
-export default function SessionPage({ sessionId, onEnd, userName }) {
+export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: initialPipelineMode = "free" }) {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [isRecording, setIsRecording] = useState(false);
@@ -55,9 +55,10 @@ export default function SessionPage({ sessionId, onEnd, userName }) {
   const [elapsed, setElapsed] = useState(0);
   const [slide, setSlide] = useState(defaultSlide);
   const [avatarMode, setAvatarMode] = useState(getInitialAvatarMode);
-  const timelineRef = useRef(null);
   const [pendingPlay, setPendingPlay] = useState(false);
-  const [pipelineMode, setPipelineMode] = useState("free");
+  const pipelineMode = initialPipelineMode || "free";
+  const timelineRef = useRef(null);
+  const avatarModeRef = useRef(avatarMode);
 
   const booted = useRef(false);
   const scrollRef = useRef(null);
@@ -74,12 +75,10 @@ export default function SessionPage({ sessionId, onEnd, userName }) {
   const recordingChunksRef = useRef([]);
   const voicePlaceholderIdRef = useRef(null);
 
-  // Fetch pipeline mode from backend on mount
   useEffect(() => {
-    api.get("/sessions/pipeline").then(({ data }) => {
-      if (data?.mode) setPipelineMode(data.mode);
-    }).catch(() => {});
-  }, []);
+    avatarModeRef.current = avatarMode;
+    if (avatarMode === "visualizer") timelineRef.current = null;
+  }, [avatarMode]);
 
   useEffect(() => {
     startTime.current = Date.now();
@@ -134,19 +133,18 @@ export default function SessionPage({ sessionId, onEnd, userName }) {
     // Real audio from free pipeline — load and auto-play
     if (turn.avatar?.audio?.url) {
       const audioUrl = getBackendBase() + turn.avatar.audio.url;
-      playLiveAudio(audioUrl, turn.avatar?.lipsync?.rhubarbJson ?? null);
+      const useRhubarb = avatarModeRef.current !== "visualizer";
+      playLiveAudio(audioUrl, useRhubarb ? turn.avatar?.lipsync?.rhubarbJson : null);
     }
   }
 
-  async function playLiveAudio(audioUrl, rhubarbJson) {
+  async function playLiveAudio(audioUrl, rhubarbJson = null) {
     const audio = audioRef.current;
     if (!audio) return;
 
     audio.pause();
     audio.src = audioUrl;
     audio.load();
-
-    // Update ref synchronously so the animation loop reads it on the very first frame
     timelineRef.current = rhubarbJson
       ? rhubarbJsonToTimeline(rhubarbJson, { minCueSeconds: LIP_SYNC_SETTINGS.minCueSeconds })
       : null;
@@ -173,7 +171,10 @@ export default function SessionPage({ sessionId, onEnd, userName }) {
     const startTurn = async () => {
       setTyping(true);
       try {
-        const { data } = await api.post(`/sessions/${sessionId}/respond`, { content: "" });
+        const { data } = await api.post(`/sessions/${sessionId}/respond`, {
+          content: "",
+          avatarMode: avatarModeRef.current,
+        });
         applyTurn(data);
       } catch (err) {
         console.error("Failed to start orchestrated session", err);
@@ -231,16 +232,31 @@ export default function SessionPage({ sessionId, onEnd, userName }) {
   function publishLipSyncFrame(isPlaying) {
     const audio = audioRef.current;
     const currentTimeline = timelineRef.current;
-    if (!audio || !currentTimeline || !isPlaying) {
+    if (!audio || !isPlaying) {
       lipSyncFrameRef.current = createEmptyLipSyncFrame();
       return;
     }
-    const frame = getRhubarbMorphStateAtTime(
-      currentTimeline,
-      audio.currentTime + LIP_SYNC_SETTINGS.leadSeconds,
-      { intensity: LIP_SYNC_SETTINGS.intensity, blendWindow: LIP_SYNC_SETTINGS.blendWindow },
-    );
-    lipSyncFrameRef.current = { ...frame, speechEnergy: getSpeechEnergy() };
+
+    if (currentTimeline) {
+      const frame = getRhubarbMorphStateAtTime(
+        currentTimeline,
+        audio.currentTime + LIP_SYNC_SETTINGS.leadSeconds,
+        { intensity: LIP_SYNC_SETTINGS.intensity, blendWindow: LIP_SYNC_SETTINGS.blendWindow },
+      );
+      lipSyncFrameRef.current = { ...frame, speechEnergy: getSpeechEnergy() };
+      return;
+    }
+
+    const energy = getSpeechEnergy();
+    lipSyncFrameRef.current = {
+      visemes: {
+        viseme_aa: energy * 0.28,
+        mouthOpen: energy * 0.72,
+      },
+      jawOpen: energy * 0.45,
+      speechEnergy: energy,
+      active: energy > 0.015,
+    };
   }
 
   function tickLipSync() {
@@ -269,6 +285,7 @@ export default function SessionPage({ sessionId, onEnd, userName }) {
 
   async function startRecording() {
     try {
+      setIsRecording(true);
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
         ? "audio/webm;codecs=opus"
@@ -293,6 +310,7 @@ export default function SessionPage({ sessionId, onEnd, userName }) {
       mediaStreamRef.current = stream;
       setIsRecording(true);
     } catch (err) {
+      setIsRecording(false);
       console.error("Failed to start recording:", err);
     }
   }
@@ -310,12 +328,13 @@ export default function SessionPage({ sessionId, onEnd, userName }) {
     // Add a placeholder that will be replaced with the real transcript on response
     const placeholderId = Date.now();
     voicePlaceholderIdRef.current = placeholderId;
-    setMessages((items) => [...items, { from: "user", text: "...", _id: placeholderId }]);
+    setMessages((items) => [...items, { from: "user", text: "Transcribing...", _id: placeholderId }]);
     setTyping(true);
 
     try {
       const formData = new FormData();
       formData.append("audio", blob, "recording.webm");
+      formData.append("avatarMode", avatarModeRef.current);
 
       const { data } = await api.post(`/sessions/${sessionId}/respond-audio`, formData, {
         headers: { "Content-Type": "multipart/form-data" },
@@ -334,11 +353,6 @@ export default function SessionPage({ sessionId, onEnd, userName }) {
   }
 
   function handleMicClick() {
-    if (pipelineMode === "realtime") {
-      // Realtime pipeline will be wired up here — uses OpenAI Realtime mini via WebRTC
-      console.info("Realtime pipeline not yet configured. Set PIPELINE_MODE=free to use voice input.");
-      return;
-    }
     if (isRecording) {
       stopRecording();
     } else {
@@ -357,7 +371,10 @@ export default function SessionPage({ sessionId, onEnd, userName }) {
     setTyping(true);
 
     try {
-      const { data } = await api.post(`/sessions/${sessionId}/respond`, { content });
+      const { data } = await api.post(`/sessions/${sessionId}/respond`, {
+        content,
+        avatarMode: avatarModeRef.current,
+      });
       applyTurn(data);
     } catch (err) {
       console.error("Failed to get assistant response", err);
@@ -412,19 +429,26 @@ export default function SessionPage({ sessionId, onEnd, userName }) {
           </div>
         </section>
 
-        <aside className="session-transcript" ref={scrollRef}>
-          {messages.map((message, index) => (
-            <div key={`${message.from}-${index}`} className={`session-bubble ${message.from}`}>
-              {message.text}
-            </div>
-          ))}
-          {typing && (
-            <div className="session-bubble avatar">
-              <span className="typing-dot" />
-              <span className="typing-dot" />
-              <span className="typing-dot" />
-            </div>
-          )}
+        <aside className="session-side-panel" aria-label="Session conversation">
+          <div className="session-focus-panel">
+            <span>Now discussing</span>
+            <strong>{slide.title}</strong>
+            {slide.prompt && <p>{slide.prompt}</p>}
+          </div>
+          <div className="session-transcript" ref={scrollRef} aria-live="polite">
+            {messages.map((message, index) => (
+              <div key={`${message.from}-${index}`} className={`session-bubble ${message.from}`}>
+                {message.text}
+              </div>
+            ))}
+            {typing && (
+              <div className="session-bubble avatar">
+                <span className="typing-dot" />
+                <span className="typing-dot" />
+                <span className="typing-dot" />
+              </div>
+            )}
+          </div>
         </aside>
 
         <section className="avatar-dock" aria-label="Aria avatar">
@@ -475,7 +499,7 @@ export default function SessionPage({ sessionId, onEnd, userName }) {
           className={`mic-btn${isRecording ? " mic-btn-active" : ""}`}
           aria-label={isRecording ? "Stop recording" : "Start microphone"}
           disabled={typing && !isRecording}
-          title={pipelineMode === "realtime" ? "Realtime mode — set PIPELINE_MODE=free to use mic" : undefined}
+          title={pipelineMode === "openai-fast-scripted" ? "Recorded transcription with streaming scripted responses" : undefined}
         >
           {isRecording ? (
             // Stop square

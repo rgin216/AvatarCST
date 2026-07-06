@@ -10,7 +10,7 @@ AvatarCST is a prototype iCST (individual Cognitive Stimulation Therapy) facilit
 - The avatar output should eventually be low-latency speech with lip-syncable mouth movement.
 - The system should use a patient memory bank so Aria can personalize sessions without making the user feel tested.
 
-The project has moved beyond the old "basic backend foundation" phase. The main work now is polishing the scripted slide-led session flow, hardening memory save/query behavior, and making the audio pipeline switch cleanly between the free prototype path and OpenAI Realtime mini.
+The project has moved beyond the old "basic backend foundation" phase. The main work now is polishing the scripted slide-led session flow, hardening memory save/query behavior, and keeping the audio pipeline cleanly split between the free prototype path and the lower-latency OpenAI fast path.
 
 ## Current State
 
@@ -28,17 +28,16 @@ The project has moved beyond the old "basic backend foundation" phase. The main 
   - male avatar path based on `frontend/public/models/harry.glb`,
   - experimental female/avatar mode path,
   - simple audio visualizer mode.
-- Rhubarb JSON mouth cues mapped to Three.js morph targets in the frontend.
+- Rhubarb mouth cues for male/female avatars, with audio-energy fallback for the visualizer.
 - Memory bank model, caregiver CRUD routes, and caregiver page UI.
-- Groq-based prototype LLM/STT path and Edge TTS output.
-- A partial OpenAI Realtime mini session-secret endpoint.
+- Groq-based prototype LLM/STT path with avatar-specific Edge TTS output.
+- OpenAI fast path with OpenAI STT/LLM and avatar-specific OpenAI TTS output.
 
 ### Still Rough
 
 - Memory is stored, reviewed, and injected, but retrieval is currently broad and simple: the orchestrator loads approved memory entries and passes a small slice back as `memoryUsed`. There is no semantic search or scoring yet.
-- `suggestedMemoryUpdates` is heuristic only, based on simple regexes in `sessionOrchestratorService.js`, and is now saved as pending caregiver-review memory.
-- Realtime mode is not fully wired in the frontend. The backend can mint a realtime client secret, but `SessionPage.jsx` currently disables the mic action when `PIPELINE_MODE=realtime`.
-- The current free pipeline still creates a full backend turn before returning audio, so it is not genuinely real-time.
+- `suggestedMemoryUpdates` is heuristic only, based on simple regexes in `sessionOrchestratorService.js`, and is saved as pending caregiver-review memory.
+- The current voice paths still wait for a recorded browser audio blob before transcription starts; they are lower-latency response paths, not live full-duplex voice.
 - The two sessions are useful test scripts, not polished clinical content.
 - Docs other than this file may still be stale; prefer source files over README text when they disagree.
 
@@ -46,7 +45,7 @@ The project has moved beyond the old "basic backend foundation" phase. The main 
 
 Pipeline mode is controlled by `PIPELINE_MODE` in `backend/src/config/pipeline.js` and `backend/.env.example`.
 
-### `PIPELINE_MODE=free` (current working prototype)
+### `PIPELINE_MODE=free` (free prototype)
 
 For recorded microphone input:
 
@@ -55,33 +54,31 @@ For recorded microphone input:
 3. `sttService.js` sends the audio to Groq Whisper (`whisper-large-v3-turbo` by default).
 4. `sessionOrchestratorService.js` uses the transcript, session script state, recent messages, and memory entries.
 5. `llmService.js` calls Groq chat completions (`llama-3.3-70b-versatile` by default).
-6. `ttsService.js` synthesizes speech with `msedge-tts`.
-7. `rhubarbService.js` generates Rhubarb mouth cues for the produced audio file. It uses `RHUBARB_PATH` if set, otherwise it looks for the auto-installed binary under `backend/vendor/rhubarb/bin`.
-8. The backend returns `assistantText`, slide state, audio URL, Rhubarb JSON, memory used, and suggested memory updates.
-9. The frontend plays the audio and drives avatar mouth movement from the Rhubarb timeline plus audio energy.
+6. `sessionController.js` chooses the voice from the selected avatar mode.
+7. Male/female avatars synthesize an audio file with `msedge-tts`, then `rhubarbService.js` generates mouth cues.
+8. The audio visualizer skips Rhubarb and uses a short-lived streaming speech token.
+9. The backend returns `assistantText`, slide state, audio URL, lip-sync metadata, memory used, and suggested memory updates.
+10. The frontend plays the audio and drives the avatar from Rhubarb cues, or from audio energy for the visualizer.
 
 For typed input, the flow skips STT and starts at `POST /api/sessions/:id/respond`.
 
-### `PIPELINE_MODE=realtime` (planned official path)
+### `PIPELINE_MODE=openai-fast-scripted` (lower-latency paid path)
 
-The intended target is:
+For recorded microphone input:
 
-`patient audio -> OpenAI Realtime mini (STT + LLM + TTS) -> avatar audio playback + Rhubarb/lip-sync or realtime mouth animation`
-
-Current backend support:
-
-- `POST /api/sessions/:id/realtime-session` calls `createRealtimeSessionForTurn`.
-- `realtimeService.js` posts to `https://api.openai.com/v1/realtime/client_secrets`.
-- It builds session instructions from the same CST prompt, slide, script, memory, and recent message context.
-
-Current frontend gap:
-
-- The frontend detects `PIPELINE_MODE=realtime` via `GET /api/sessions/pipeline`.
-- The mic button currently logs that realtime is not configured and does not start a WebRTC session.
+1. Frontend records browser audio with `MediaRecorder`.
+2. `SessionPage.jsx` posts the audio blob to `POST /api/sessions/:id/respond-audio`.
+3. `sttService.js` sends the audio to OpenAI transcription (`gpt-4o-mini-transcribe` by default).
+4. `sessionOrchestratorService.js` uses the transcript, session script state, recent messages, and memory entries.
+5. `llmService.js` calls the OpenAI Responses API for answer adequacy and a brief adaptive acknowledgement.
+6. `sessionController.js` chooses the voice from the selected avatar mode.
+7. Male/female avatars synthesize an OpenAI TTS audio file, then `rhubarbService.js` generates mouth cues.
+8. The audio visualizer skips Rhubarb and uses a short-lived streaming OpenAI TTS token.
+9. The frontend plays the audio and drives the avatar from Rhubarb cues, or from audio energy for the visualizer.
 
 ## Session Orchestration
 
-The canonical turn endpoint is:
+The canonical turn endpoints are:
 
 ```text
 POST /api/sessions/:id/respond
@@ -192,6 +189,7 @@ Mounted in `backend/src/app.js`:
 Useful session endpoints:
 
 - `GET /api/sessions/pipeline`
+- `GET /api/sessions/speech-stream/:token`
 - `POST /api/sessions`
 - `GET /api/sessions/user/:userId`
 - `DELETE /api/sessions/user/:userId`
@@ -200,7 +198,6 @@ Useful session endpoints:
 - `PATCH /api/sessions/:id/end`
 - `POST /api/sessions/:id/respond`
 - `POST /api/sessions/:id/respond-audio`
-- `POST /api/sessions/:id/realtime-session`
 - `POST /api/sessions/:id/messages`
 - `GET /api/sessions/:id/messages`
 
@@ -251,14 +248,22 @@ Backend variables from `backend/.env.example`:
 - `MONGO_URI`
 - `NODE_ENV`
 - `OPENAI_API_KEY`
-- `OPENAI_REALTIME_MODEL`
-- `OPENAI_REALTIME_VOICE`
+- `OPENAI_TEXT_MODEL`
+- `OPENAI_FAST_TEXT_MODEL`
+- `OPENAI_TRANSCRIBE_MODEL`
+- `OPENAI_TTS_MODEL`
+- `OPENAI_TTS_VOICE`
+- `OPENAI_TTS_MALE_VOICE`
+- `OPENAI_TTS_FEMALE_VOICE`
+- `OPENAI_TTS_INSTRUCTIONS`
 - `RHUBARB_PATH`
 - `GROQ_API_KEY`
 - `GROQ_MODEL`
 - `GROQ_WHISPER_MODEL`
 - `PIPELINE_MODE`
 - `TTS_VOICE`
+- `EDGE_TTS_MALE_VOICE`
+- `EDGE_TTS_FEMALE_VOICE`
 
 Frontend variables:
 
@@ -279,7 +284,7 @@ Main files:
 - `backend/src/services/rhubarbService.js`
 - `backend/src/services/avatarService.js`
 
-The proven lip-sync path is the Harry/male avatar with Rhubarb mouth cues mapped to morph targets. The female avatar path is experimental because prior inspected assets did not expose the same reliable viseme targets. The visualizer mode is useful as a low-risk fallback when avatar rigging is not the focus.
+The current lip-sync path uses Rhubarb JSON mouth cues for the male and female avatars. The audio visualizer intentionally skips Rhubarb and uses audio energy from the playing response audio. The female avatar also has a subtle idle/speech bob, but the asset path is still experimental because prior inspected assets did not expose the same reliable viseme targets as Harry.
 
 Dev URL helpers:
 
@@ -306,10 +311,10 @@ The proposed order sounds right:
    - Add reviewable memory suggestions.
    - Add focused tests.
 
-2. Realtime mini integration.
-   - Wire the frontend WebRTC/client-secret flow.
-   - Decide how to keep Rhubarb/lip sync compatible with realtime audio, or use an interim audio-energy mouth animation.
-   - Keep the free Groq/Edge/Rhubarb path as a fallback.
+2. Latency and voice polish.
+   - Keep measuring the recorded-audio bottleneck separately from LLM and TTS latency.
+   - Improve perceived responsiveness with shorter recordings, clearer recording states, and faster first-audio playback.
+   - Keep the free Groq/Edge path and OpenAI fast path behaviorally aligned.
 
 3. Session polish.
    - Improve the two test sessions' scripts.

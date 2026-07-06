@@ -6,11 +6,10 @@ import { buildAvatarResponse } from './avatarService.js';
 import { getScriptStep, renderScriptFollowUp, renderScriptReply } from './cstScriptService.js';
 import {
   buildCstAdaptiveResponseInstructions,
-  buildCstAnswerQualityInstructions,
-  buildCstRealtimeInstructions,
+  buildCstAdaptiveTurnInstructions,
 } from './promptService.js';
-import { mintRealtimeClientSecret } from './realtimeService.js';
 import { generateResponse } from './llmService.js';
+import { isOpenAIFastScriptedPipeline, usesOpenAITextPipeline } from '../config/pipeline.js';
 
 const RECENT_MESSAGE_LIMIT = 20;
 const MAX_UNANSWERED_ATTEMPTS = 3;
@@ -29,6 +28,43 @@ const parseAnswerQuality = (text = '') => {
   if (/\banswered\s*["']?\s*:\s*true\b/i.test(text)) return true;
   if (/\banswered\s*["']?\s*:\s*false\b/i.test(text)) return false;
   return false;
+};
+
+const extractJsonObject = (text = '') => {
+  const trimmed = text.trim();
+  if (!trimmed) return null;
+
+  const fencedMatch = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  const candidate = fencedMatch?.[1]?.trim() || trimmed;
+  const objectMatch = candidate.match(/\{[\s\S]*\}/);
+  if (!objectMatch) return null;
+
+  try {
+    return JSON.parse(objectMatch[0]);
+  } catch {
+    return null;
+  }
+};
+
+const parseAdaptiveTurn = (text = '') => {
+  const parsed = extractJsonObject(text);
+  if (parsed) {
+    const explicitAnswerQuality = parseAnswerQuality(text);
+    return {
+      answered: typeof parsed.answered === 'boolean' ? parsed.answered : explicitAnswerQuality === true,
+      response: typeof parsed?.response === 'string' ? parsed.response.trim() : '',
+    };
+  }
+
+  const explicitAnswerQuality = parseAnswerQuality(text);
+  return {
+    answered: explicitAnswerQuality === true,
+    response: text
+      .replace(/```(?:json)?[\s\S]*?```/gi, '')
+      .replace(/\{[\s\S]*$/, '')
+      .replace(/^(response:|aria says:?|as aria,?)\s*/i, '')
+      .trim(),
+  };
 };
 
 const getAskedScriptLine = (step, currentTurnIndex, context) =>
@@ -53,6 +89,9 @@ const assertCanUseSession = (session, action) => {
   err.status = 409;
   throw err;
 };
+
+const getLlmProviderForSession = (session) =>
+  usesOpenAITextPipeline(session.pipelineMode) ? 'openai' : 'groq';
 
 const getMemoryEntries = async (userId) => {
   const memory = await Memory.findOne({ userId }).lean();
@@ -218,6 +257,8 @@ export const respondToSessionTurn = async ({ sessionId, content }) => {
   const currentTurnIndex = session.scriptStepTurnIndex || 0;
   const effectiveTurnIndex = currentTurnIndex || (hasPriorAssistantTurn(recentMessages) ? 1 : 0);
   const currentRetryCount = session.scriptStepRetryCount || 0;
+  const llmProvider = getLlmProviderForSession(session);
+  const useFastScriptedTurn = isOpenAIFastScriptedPipeline(session.pipelineMode);
 
   let userMessage = null;
   if (userContent) {
@@ -230,21 +271,31 @@ export const respondToSessionTurn = async ({ sessionId, content }) => {
   const expectedQuestion = getAskedScriptLine(step, effectiveTurnIndex, scriptContext);
 
   let answeredCurrentQuestion = true;
+  let adaptiveText = '';
   if (userContent && hasDeliveredQuestion) {
-    const qualityPrompt = buildCstAnswerQualityInstructions({
+    const adaptiveTurnPrompt = buildCstAdaptiveTurnInstructions({
+      user,
+      memoryEntries,
       slide,
       recentMessages,
       scriptId: session.scriptId,
       expectedQuestion,
     });
-    const qualityText = await generateResponse(
+    const adaptiveTurnText = await generateResponse(
       [
-        { role: 'system', content: qualityPrompt },
+        { role: 'system', content: adaptiveTurnPrompt },
         { role: 'user', content: userContent },
       ],
-      { temperature: 0, maxTokens: 20 }
+      {
+        provider: llmProvider,
+        temperature: 0.25,
+        maxTokens: 80,
+        model: useFastScriptedTurn ? process.env.OPENAI_FAST_TEXT_MODEL : undefined,
+      }
     );
-    answeredCurrentQuestion = parseAnswerQuality(qualityText);
+    const adaptiveTurn = parseAdaptiveTurn(adaptiveTurnText);
+    answeredCurrentQuestion = adaptiveTurn.answered;
+    adaptiveText = adaptiveTurn.response;
   }
 
   const unansweredAttemptCount =
@@ -265,7 +316,7 @@ export const respondToSessionTurn = async ({ sessionId, content }) => {
     : 'answered';
 
   let assistantText = scriptedNextLine;
-  if (userContent) {
+  if (userContent && !adaptiveText) {
     const systemPrompt = buildCstAdaptiveResponseInstructions({
       user,
       memoryEntries,
@@ -280,14 +331,22 @@ export const respondToSessionTurn = async ({ sessionId, content }) => {
       { role: 'system', content: systemPrompt },
       { role: 'user', content: userContent },
     ];
-    const adaptiveText = await generateResponse(llmMessages, { temperature: 0.4, maxTokens: 60 });
+    adaptiveText = await generateResponse(llmMessages, {
+      provider: llmProvider,
+      temperature: 0.4,
+      maxTokens: 60,
+      model: useFastScriptedTurn ? process.env.OPENAI_FAST_TEXT_MODEL : undefined,
+    });
+  }
+
+  if (userContent) {
     assistantText = joinSpeechParts(adaptiveText, scriptedNextLine);
   }
 
   const assistantMessage = await Message.create({ sessionId, role: 'assistant', content: assistantText });
   const nextStepIndex = shouldAdvance ? boundedIndex + 1 : boundedIndex;
   const nextTurnIndex = !hasUserContent
-    ? currentTurnIndex
+    ? Math.max(currentTurnIndex, 1)
     : shouldRepeatQuestion
     ? currentTurnIndex
     : shouldAdvance
@@ -301,14 +360,6 @@ export const respondToSessionTurn = async ({ sessionId, content }) => {
     : 0;
   session.scriptStepIndex = nextStepIndex;
   const displaySlide = shouldAdvance ? nextSlide : slide;
-  const displayNextSlide =
-    nextStepIndex >= totalSteps - 1
-      ? null
-      : toSlide({
-          step: getScriptStep(session.scriptId, nextStepIndex + 1).step,
-          index: nextStepIndex + 1,
-          total: totalSteps,
-        });
   session.presentationState = {
     slideIndex: displaySlide.index,
     deckSlide: displaySlide.deckSlide,
@@ -322,16 +373,22 @@ export const respondToSessionTurn = async ({ sessionId, content }) => {
   };
   await session.save();
 
-  const suggestedMemoryUpdates = await savePendingMemorySuggestions({
-    userId: session.userId,
-    sessionId: session._id,
-    suggestions: inferMemorySuggestions(userContent),
-  });
+  let suggestedMemoryUpdates = [];
+  try {
+    suggestedMemoryUpdates = await savePendingMemorySuggestions({
+      userId: session.userId,
+      sessionId: session._id,
+      suggestions: inferMemorySuggestions(userContent),
+    });
+  } catch (err) {
+    console.warn('[memory] Skipping suggested memory updates:', err.message);
+  }
 
   return {
     sessionId: session._id,
     sessionStatus: session.status,
     scriptId: session.scriptId,
+    pipelineMode: session.pipelineMode,
     scriptStep: {
       id: step.id,
       index: boundedIndex,
@@ -340,22 +397,11 @@ export const respondToSessionTurn = async ({ sessionId, content }) => {
       retryCount: session.scriptStepRetryCount,
       answeredCurrentQuestion,
       forcedProgress: shouldForceProgress,
+      progressionSource: useFastScriptedTurn ? 'llm-assisted-fast-script' : 'llm-assisted',
       isFinalStep,
       total: totalSteps,
     },
     slide: displaySlide,
-    prompt: {
-      model: process.env.OPENAI_REALTIME_MODEL || 'gpt-realtime-mini',
-      instructions: buildCstRealtimeInstructions({
-        user,
-        memoryEntries,
-        slide: displaySlide,
-        nextSlide: displayNextSlide,
-        recentMessages,
-        scriptId: session.scriptId,
-        stepTurnIndex: session.scriptStepTurnIndex,
-      }),
-    },
     assistantText,
     avatar: buildAvatarResponse({ text: assistantText }),
     messages: {
@@ -368,18 +414,5 @@ export const respondToSessionTurn = async ({ sessionId, content }) => {
       content: entry.content,
     })),
     suggestedMemoryUpdates,
-  };
-};
-
-export const createRealtimeSessionForTurn = async (sessionId) => {
-  const context = await getSessionTurnContext(sessionId);
-  assertCanUseSession(context.session, 'create realtime session');
-  const secret = await mintRealtimeClientSecret(context);
-  return {
-    sessionId,
-    slide: context.slide,
-    model: process.env.OPENAI_REALTIME_MODEL || 'gpt-realtime-mini',
-    voice: process.env.OPENAI_REALTIME_VOICE || 'marin',
-    clientSecret: secret,
   };
 };

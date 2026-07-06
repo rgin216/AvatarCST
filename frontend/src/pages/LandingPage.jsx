@@ -11,7 +11,20 @@ const activities = [
   { icon: "🗞️", label: "Current Events", desc: "Chat about the world" },
 ];
 
-export default function LandingPage({ onStart, onCaregiver, userName, userId, sessionOptions = [] }) {
+const pipelineOptions = [
+  { id: "free", label: "Free", detail: "Groq + streamed Edge TTS" },
+  { id: "openai-fast-scripted", label: "OpenAI fast", detail: "Script-locked streaming" },
+];
+
+export default function LandingPage({
+  onStart,
+  onCaregiver,
+  userName,
+  userId,
+  sessionOptions = [],
+  pipelineMode = "free",
+  onPipelineModeChange = () => {},
+}) {
   const isDesktop = useIsDesktop();
   const [lastSession, setLastSession] = useState(null);
 
@@ -102,6 +115,34 @@ export default function LandingPage({ onStart, onCaregiver, userName, userId, se
           </div>
 
           <div className="fade-up delay-4">
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ fontSize: 14, fontWeight: 600, color: theme.textLight, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 10 }}>Voice mode</div>
+              <div style={{ display: "grid", gridTemplateColumns: isDesktop ? "1fr 1fr" : "1fr", gap: 10 }}>
+                {pipelineOptions.map((option) => {
+                  const active = pipelineMode === option.id;
+                  return (
+                    <button
+                      key={option.id}
+                      type="button"
+                      onClick={() => onPipelineModeChange(option.id)}
+                      aria-pressed={active}
+                      style={{
+                        border: active ? `2px solid ${theme.sage}` : "1px solid rgba(139,107,90,0.18)",
+                        background: active ? `${theme.sage}22` : theme.white,
+                        borderRadius: 14,
+                        padding: "12px 14px",
+                        textAlign: "left",
+                        color: theme.text,
+                        cursor: "pointer",
+                      }}
+                    >
+                      <span style={{ display: "block", fontSize: 15, fontWeight: 700 }}>{option.label}</span>
+                      <small style={{ color: theme.textLight }}>{option.detail}</small>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
             <div style={{ display: "grid", gap: 10 }}>
               {(sessionOptions.length ? sessionOptions : [{ id: "cst_intro_reminiscence", label: "Session 1", title: "Introduction & Welcome", theme: "Introduction" }]).map((session) => (
                 <button

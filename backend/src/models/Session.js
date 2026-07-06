@@ -1,10 +1,16 @@
 import { Schema, model } from 'mongoose';
+import { DEFAULT_PIPELINE_MODE } from '../config/pipeline.js';
 
 const sessionSchema = new Schema({
   userId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
   title: { type: String },
   theme: { type: String },
   status: { type: String, enum: ['pending', 'active', 'completed', 'abandoned'], default: 'pending' },
+  pipelineMode: {
+    type: String,
+    enum: ['free', 'openai-fast-scripted'],
+    default: DEFAULT_PIPELINE_MODE,
+  },
   scriptId: { type: String, default: 'cst_intro_reminiscence' },
   scriptStepIndex: { type: Number, default: 0, min: 0 },
   scriptStepTurnIndex: { type: Number, default: 0, min: 0 },
