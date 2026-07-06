@@ -56,7 +56,7 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
   const [slide, setSlide] = useState(defaultSlide);
   const [avatarMode, setAvatarMode] = useState(getInitialAvatarMode);
   const [pendingPlay, setPendingPlay] = useState(false);
-  const [pipelineMode, setPipelineMode] = useState(initialPipelineMode);
+  const pipelineMode = initialPipelineMode || "free";
   const timelineRef = useRef(null);
   const avatarModeRef = useRef(avatarMode);
 
@@ -74,10 +74,6 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
   const mediaStreamRef = useRef(null);
   const recordingChunksRef = useRef([]);
   const voicePlaceholderIdRef = useRef(null);
-
-  useEffect(() => {
-    setPipelineMode(initialPipelineMode || "free");
-  }, [initialPipelineMode]);
 
   useEffect(() => {
     avatarModeRef.current = avatarMode;
@@ -433,19 +429,26 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
           </div>
         </section>
 
-        <aside className="session-transcript" ref={scrollRef}>
-          {messages.map((message, index) => (
-            <div key={`${message.from}-${index}`} className={`session-bubble ${message.from}`}>
-              {message.text}
-            </div>
-          ))}
-          {typing && (
-            <div className="session-bubble avatar">
-              <span className="typing-dot" />
-              <span className="typing-dot" />
-              <span className="typing-dot" />
-            </div>
-          )}
+        <aside className="session-side-panel" aria-label="Session conversation">
+          <div className="session-focus-panel">
+            <span>Now discussing</span>
+            <strong>{slide.title}</strong>
+            {slide.prompt && <p>{slide.prompt}</p>}
+          </div>
+          <div className="session-transcript" ref={scrollRef} aria-live="polite">
+            {messages.map((message, index) => (
+              <div key={`${message.from}-${index}`} className={`session-bubble ${message.from}`}>
+                {message.text}
+              </div>
+            ))}
+            {typing && (
+              <div className="session-bubble avatar">
+                <span className="typing-dot" />
+                <span className="typing-dot" />
+                <span className="typing-dot" />
+              </div>
+            )}
+          </div>
         </aside>
 
         <section className="avatar-dock" aria-label="Aria avatar">
