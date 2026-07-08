@@ -1,11 +1,16 @@
-import { readFileSync } from 'fs';
+import { existsSync, readFileSync } from 'fs';
 import { fileURLToPath } from 'url';
-import { dirname, join } from 'path';
+import { dirname, join, resolve } from 'path';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+const BACKEND_ROOT = resolve(__dirname, '../..');
+const REPO_ROOT = resolve(BACKEND_ROOT, '..');
+const CONTEXT_ROOT = existsSync(join(BACKEND_ROOT, 'context'))
+  ? join(BACKEND_ROOT, 'context')
+  : join(REPO_ROOT, 'context');
 
 const BASE_INSTRUCTIONS = readFileSync(
-  join(__dirname, '../../../context/vCST_Initial_Prompt.md'),
+  join(CONTEXT_ROOT, 'vCST_Initial_Prompt.md'),
   'utf8'
 ).trim();
 
@@ -16,14 +21,14 @@ const BASE_INSTRUCTIONS = readFileSync(
 //   3. The fallback is cst_intro_reminiscence if no match is found
 const SESSION_SCRIPTS = {
   cst_intro_reminiscence: readFileSync(
-    join(__dirname, '../../../context/vCST_Session1_AI_Script.md'),
+    join(CONTEXT_ROOT, 'vCST_Session1_AI_Script.md'),
     'utf8'
   )
     .split(/\r?\n---\r?\n/)
     .map((s) => s.trim())
     .filter(Boolean),
   cst_childhood: readFileSync(
-    join(__dirname, '../../../context/vCST_Session2_AI_Script.md'),
+    join(CONTEXT_ROOT, 'vCST_Session2_AI_Script.md'),
     'utf8'
   )
     .split(/\r?\n---\r?\n/)
