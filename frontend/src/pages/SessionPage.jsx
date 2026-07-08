@@ -143,6 +143,7 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
     if (!audio) return;
 
     audio.pause();
+    audio.crossOrigin = "anonymous";
     audio.src = audioUrl;
     audio.load();
     timelineRef.current = rhubarbJson
