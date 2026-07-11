@@ -10,14 +10,14 @@ import theme from "../utils/theme";
 
 const defaultSlide = {
   index: 0,
-  total: 14,
+  total: 8,
   deckSlide: 1,
   imageUrl: "/slides/session1/slide-01.jpg",
-  title: "Virtual Cognitive Stimulation Therapy",
+  title: "AI-supported Individual Cognitive Stimulation Therapy",
   subtitle: "Session 1: Introduction & Welcome",
   prompt: "How are you feeling right now?",
-  bullets: ["Welcome", "No preparation needed", "Nothing you can get wrong"],
-  visualHint: "Source deck: NZ01. Welcome.pptx, slide 1",
+  bullets: ["Introduction & Welcome", "AI-supported CST", "University of Auckland"],
+  visualHint: "Source deck: NZ01. Welcome, slide 1",
   accent: "#00AEEF",
 };
 

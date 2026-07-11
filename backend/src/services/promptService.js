@@ -1,13 +1,10 @@
-import { existsSync, readFileSync } from 'fs';
+import { readFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join, resolve } from 'path';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const BACKEND_ROOT = resolve(__dirname, '../..');
-const REPO_ROOT = resolve(BACKEND_ROOT, '..');
-const CONTEXT_ROOT = existsSync(join(BACKEND_ROOT, 'context'))
-  ? join(BACKEND_ROOT, 'context')
-  : join(REPO_ROOT, 'context');
+const CONTEXT_ROOT = join(BACKEND_ROOT, 'context');
 
 const BASE_INSTRUCTIONS = readFileSync(
   join(CONTEXT_ROOT, 'vCST_Initial_Prompt.md'),
@@ -16,7 +13,7 @@ const BASE_INSTRUCTIONS = readFileSync(
 
 // Map scriptId -> array of per-step script sections (split on '---' dividers).
 // To add a new session:
-//   1. Drop the script MD file in context/ with steps separated by '---' lines
+//   1. Drop the script MD file in backend/context/ with steps separated by '---' lines
 //   2. Add an entry here using the same scriptId set on the Session document
 //   3. The fallback is cst_intro_reminiscence if no match is found
 const SESSION_SCRIPTS = {
@@ -207,47 +204,4 @@ Use answered=false when the message:
 # Output
 Return only compact JSON:
 {"answered":true,"response":"That sounds lovely."}`;
-};
-
-export const buildCstAnswerQualityInstructions = ({
-  slide,
-  recentMessages,
-  scriptId,
-  expectedQuestion = '',
-}) => {
-  const currentStepScript = getCurrentStepScript(scriptId, slide);
-
-  return `You decide whether the person's latest message is a reasonable answer attempt for the CST facilitator's current question.
-
-# Current Step Script
-<current_step_script>
-${currentStepScript}
-</current_step_script>
-
-# Current PPT Slide
-Title: ${slide.title}
-Prompt: ${slide.prompt}
-
-# Question They Were Asked
-${quoteData(expectedQuestion || slide.prompt)}
-
-# Recent Conversation
-<transcript_data>
-${formatRecentMessages(recentMessages)}
-</transcript_data>
-
-# Decision Rules
-Return answered=true when the message:
-- Directly answers the question, even briefly.
-- Gives a related memory, opinion, feeling, place, name, song, weather, or preference.
-- Says they do not know, cannot remember, or are unsure on an orientation or memory-recall question.
-- Politely declines an optional activity.
-
-Return answered=false when the message:
-- Is empty, random text, unrelated, or only asks something unrelated.
-- Clearly ignores the current question.
-- Is a filler such as "ok", "yes", "no", "maybe", or "continue" when the question needs specific content.
-
-# Output
-Return only compact JSON: {"answered":true} or {"answered":false}`;
 };

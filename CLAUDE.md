@@ -121,8 +121,8 @@ The session state fields that matter most are:
 Script data is currently split across two layers:
 
 - `backend/src/services/cstScriptService.js` contains executable session steps used by the app.
-- `context/vCST_Session1_AI_Script.md` and `context/vCST_Session2_AI_Script.md` hold fuller source script text and adaptation guidance.
-- `context/vCST_Initial_Prompt.md` defines Aria's tone and CST facilitation principles.
+- `backend/context/vCST_Session1_AI_Script.md` and `backend/context/vCST_Session2_AI_Script.md` hold fuller source script text and adaptation guidance.
+- `backend/context/vCST_Initial_Prompt.md` defines Aria's tone and CST facilitation principles.
 
 Slide images live in:
 
