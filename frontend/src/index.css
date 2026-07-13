@@ -48,6 +48,20 @@ body {
   0%, 100% { opacity: 1; }
   50%       { opacity: 0.4; }
 }
+@keyframes spinButtonGlow {
+  0%, 100% {
+    box-shadow:
+      0 8px 18px rgba(0, 0, 0, 0.26),
+      0 0 0 8px rgba(248, 230, 163, 0.24),
+      0 0 24px rgba(255, 224, 92, 0.72);
+  }
+  50% {
+    box-shadow:
+      0 8px 18px rgba(0, 0, 0, 0.26),
+      0 0 0 13px rgba(248, 230, 163, 0.32),
+      0 0 42px rgba(255, 224, 92, 1);
+  }
+}
 
 /* ── Utility animation classes ── */
 .fade-up          { animation: fadeUp 0.6s ease both; }
@@ -215,6 +229,47 @@ body {
   font-size: 13px;
 }
 
+.session-skip-control {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  margin-right: 12px;
+  padding: 5px 7px;
+  border: 1px solid rgba(122, 92, 74, 0.18);
+  border-radius: 8px;
+  background: rgba(255, 250, 245, 0.72);
+  color: #7A5C4A;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.session-skip-control input {
+  width: 54px;
+  border: 1px solid rgba(244, 200, 176, 0.9);
+  border-radius: 7px;
+  padding: 5px 6px;
+  background: #FDF6EE;
+  color: #3D2B1F;
+  font: 800 12px Nunito, sans-serif;
+}
+
+.session-skip-control button {
+  border: none;
+  border-radius: 7px;
+  padding: 6px 9px;
+  background: #7A9DAD;
+  color: #FFFAF5;
+  cursor: pointer;
+  font: 900 12px Nunito, sans-serif;
+}
+
+.session-skip-control input:disabled,
+.session-skip-control button:disabled {
+  cursor: default;
+  opacity: 0.58;
+}
+
 .session-end-button {
   background: #FDE8E8;
   border: none;
@@ -242,6 +297,7 @@ body {
 .ppt-slide {
   grid-area: slide;
   position: relative;
+  container-type: size;
   min-height: 0;
   overflow: hidden;
   border-radius: 8px;
@@ -284,6 +340,129 @@ body {
   border-radius: 8px;
   background: rgba(13, 18, 42, 0.42);
   backdrop-filter: blur(8px);
+}
+
+.ppt-slide.has-slide-interaction {
+  background:
+    radial-gradient(circle at 50% 52%, rgba(255, 250, 245, 0.14), transparent 36%),
+    linear-gradient(180deg, #7E6A93 0%, #BFA7D2 48%, #7D688F 100%);
+}
+
+.ppt-slide.has-slide-interaction .ppt-slide-content,
+.ppt-slide.has-slide-interaction .ppt-slide-visual {
+  display: none;
+}
+
+.slide-wheel-overlay {
+  position: absolute;
+  left: 50.2%;
+  top: 52%;
+  z-index: 2;
+  width: min(82%, 82vh, 1080px);
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+  transform: translate(-50%, -50%);
+}
+
+@supports (width: 1cqw) {
+  .slide-wheel-overlay {
+    width: min(88cqw, 88cqh, 1080px);
+  }
+}
+
+.slide-wheel-pointer {
+  position: absolute;
+  top: 50%;
+  right: -10.5%;
+  z-index: 4;
+  width: 0;
+  height: 0;
+  border-top: 28px solid transparent;
+  border-bottom: 28px solid transparent;
+  border-right: 58px solid #05B653;
+  transform: translateY(-50%);
+  filter:
+    drop-shadow(0 4px 4px rgba(0, 0, 0, 0.24))
+    drop-shadow(0 0 10px rgba(5, 182, 83, 0.42));
+}
+
+.slide-wheel {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1;
+  border: clamp(8px, 0.8vw, 14px) solid #202064;
+  border-radius: 50%;
+  box-shadow: 0 18px 36px rgba(0, 0, 0, 0.26);
+  transform: rotate(var(--wheel-rotation, 0deg));
+  transition: transform 1.35s cubic-bezier(0.16, 0.72, 0.12, 1);
+}
+
+.slide-wheel::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background:
+    repeating-conic-gradient(
+      from 0deg,
+      rgba(255, 255, 255, 0.9) 0deg 0.7deg,
+      transparent 0.7deg 18deg
+    );
+  pointer-events: none;
+}
+
+.slide-wheel-label {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 0;
+  height: 0;
+  transform: rotate(var(--label-angle)) translateY(max(-360px, -29cqw));
+  transform-origin: 0 0;
+  pointer-events: none;
+}
+
+.slide-wheel-label > span {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  width: clamp(116px, 9.6vw, 178px);
+  color: #111827;
+  font: 900 clamp(13px, 1.55vw, 24px) Nunito, sans-serif;
+  line-height: 1.08;
+  text-align: center;
+  transform: translate(-50%, -50%) rotate(270deg);
+  transform-origin: center;
+  overflow-wrap: anywhere;
+}
+
+.slide-wheel-spin {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 5;
+  width: 18%;
+  min-width: 96px;
+  aspect-ratio: 1;
+  border: clamp(4px, 0.42vw, 7px) solid #202064;
+  border-radius: 50%;
+  background: #F8E6A3;
+  color: #202064;
+  cursor: pointer;
+  font: 900 clamp(18px, 2vw, 30px) Nunito, sans-serif;
+  transform: translate(-50%, -50%) rotate(var(--wheel-spin-rotation, 0deg));
+  box-shadow:
+    0 8px 18px rgba(0, 0, 0, 0.26),
+    0 0 0 8px rgba(248, 230, 163, 0.24),
+    0 0 26px rgba(255, 224, 92, 0.85);
+  animation: spinButtonGlow 1.45s ease-in-out infinite;
+}
+
+.slide-wheel-spin:disabled {
+  cursor: default;
+  animation: none;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.26);
 }
 
 .ppt-slide-progress {
@@ -608,6 +787,27 @@ body {
 
   .ppt-slide {
     min-height: 230px;
+  }
+
+  .slide-wheel-overlay {
+    width: min(92%, 330px);
+  }
+
+  .slide-wheel-pointer {
+    right: -13%;
+    border-top-width: 16px;
+    border-bottom-width: 16px;
+    border-right-width: 34px;
+  }
+
+  .slide-wheel-label > span {
+    width: 68px;
+    font-size: 9px;
+  }
+
+  .slide-wheel-spin {
+    min-width: 54px;
+    font-size: 13px;
   }
 
   .ppt-slide-content {

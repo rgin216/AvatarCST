@@ -122,12 +122,12 @@ const scripts = {
       deckSlide: 1,
       title: 'AI-supported Individual Cognitive Stimulation Therapy',
       subtitle: 'Session 2: Getting to Know You (Childhood)',
-      prompt: 'How are you doing today?',
+      prompt: 'Welcome back',
       bullets: ['Session 2', 'Getting to Know You', 'Childhood'],
       visualHint: 'Source deck: NZ02. Getting to Know You (Childhood), slide 1',
       accent: '#00AEEF',
       reply: ({ name }) =>
-        `Welcome back, ${name}. It is lovely to see you again. Today our theme is getting to know you, especially memories from childhood. How are you doing today?`,
+        `Welcome back, ${name}. It is lovely to see you again. Today our theme is getting to know you, especially memories from childhood. When you are ready, we will begin with a quick check-in. Respond with "I'm ready" when you are ready to start.`,
     },
     {
       id: 'childhood_check_in',
@@ -345,16 +345,44 @@ const scripts = {
     },
     {
       id: 'childhood_spin_question',
-      turns: 1,
+      turns: 2,
       deckSlide: 18,
       title: 'Question Wheel',
       subtitle: 'Spin',
-      prompt: 'A question from the wheel',
+      prompt: 'Spin the wheel',
       bullets: ['Favourite things', 'Places', 'Memories', 'Family', 'School'],
       visualHint: 'Source deck: NZ02. Getting to Know You (Childhood), slide 18',
       accent: '#A8C5A0',
+      interaction: {
+        type: 'questionWheel',
+        options: [
+          { label: 'Favorite Sports Team', question: 'Do you have a favourite sports team, or a sport you enjoy watching?' },
+          { label: 'Favorite Sport', question: 'What is a favourite sport you enjoy watching or playing?' },
+          { label: 'Tell us about your career', question: 'Can you tell me a little about your career or the work you have done?' },
+          { label: 'Where did you grow up?', question: 'Where did you grow up?' },
+          { label: 'Beach, Mountain or Lake', question: 'Would you choose the beach, the mountains, or a lake?' },
+          { label: 'Where were you born?', question: 'Where were you born?' },
+          { label: 'Morning or Night?', question: 'Are you more of a morning person or a night person?' },
+          { label: 'What do you do to relax?', question: 'What do you like to do to relax?' },
+          { label: 'Favorite Book?', question: 'Do you have a favourite book, or a book you remember enjoying?' },
+          { label: 'Chocolate or Vanilla?', question: 'Would you choose chocolate or vanilla?' },
+          { label: 'First Car?', question: 'Do you remember your first car, or a car you especially liked?' },
+          { label: 'What motivates you?', question: 'What helps motivate you?' },
+          { label: 'Best place visited?', question: 'What is one of the best places you have visited?' },
+          { label: 'Who do you admire?', question: 'Who is someone you admire?' },
+          { label: 'Favorite Movie', question: 'Do you have a favourite movie?' },
+          { label: 'Favorite Food', question: 'What is one of your favourite foods?' },
+          { label: 'Favorite Trip', question: 'Do you remember a favourite trip or holiday?' },
+          { label: 'Favorite Music', question: 'What kind of music do you especially enjoy?' },
+          { label: 'Favorite TV Show', question: 'Do you have a favourite TV show?' },
+          { label: 'Favorite Season', question: 'Which season is your favourite?' },
+        ],
+      },
       reply: () =>
-        'Let us imagine the wheel has landed on favourite sports team. Do you have a favourite sports team, or a sport you enjoy watching?',
+        'Now we have a question wheel. Press spin the wheel, and I will ask the question it lands on.',
+      followUps: [
+        ({ wheelQuestion }) => wheelQuestion || 'What question did the wheel land on?',
+      ],
     },
     {
       id: 'childhood_summary_song',
@@ -366,8 +394,8 @@ const scripts = {
       bullets: ['Summarise today', 'Theme song'],
       visualHint: 'Source deck: NZ02. Getting to Know You (Childhood), slide 19',
       accent: '#F4C8B0',
-      reply: () =>
-        'Finally, let us look back over what we have done today. We checked in, talked about your favourite song, got our bearings, and shared some childhood memories. What is one part of today that you would like to remember?',
+      reply: ({ sessionSummary }) =>
+        `Finally, let us look back over what we have done today. ${sessionSummary || 'We shared a few moments from today together.'} What is one part of today that you would like to remember?`,
     },
     {
       id: 'childhood_closing',

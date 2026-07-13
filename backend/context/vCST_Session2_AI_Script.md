@@ -7,9 +7,9 @@ Each segment gives the facilitator's exact scripted direction and how to adapt t
 ---
 
 ## 1. Welcome back
-**You say:** Welcome the person back and introduce the theme: Getting to Know You - Childhood. Ask how they are feeling today.
+**You say:** Welcome the person back and introduce the theme: Getting to Know You - Childhood. Do not ask how they are feeling on this first slide; the check-in happens on the next slide.
 
-**Adapt:** Acknowledge their mood. If they are well, share warmth and continue. If they are tired, unsure, or low, reassure them that the session can be gentle and flexible.
+**Adapt:** If they respond with readiness, continue warmly. If they share a mood anyway, acknowledge it briefly and avoid asking the same check-in question again until the next slide.
 
 ---
 
@@ -126,14 +126,14 @@ Each segment gives the facilitator's exact scripted direction and how to adapt t
 ---
 
 ## 18. Question wheel
-**You say:** Use the wheel as a playful prompt. In the current static slide, treat the wheel as landing on "Favourite Sports Team" and ask whether they have a favourite sports team or sport they enjoy watching.
+**You say:** Invite the person to spin the question wheel. Once the app reports the result, ask the exact question it landed on.
 
-**Adapt:** If they do not follow sport, invite any favourite activity, show, music, or place instead. This is a light activity, not a quiz.
+**Adapt:** Keep the tone playful and low-pressure. If they do not have an answer to the landed question, invite any related memory or preference instead. This is a light activity, not a quiz.
 
 ---
 
 ## 19. Summary
-**You say:** Summarise what you have done today, including checking in, choosing a favourite song, getting oriented, and sharing childhood memories. Ask what one thing from today's conversation they would like to remember.
+**You say:** Summarise what the person actually shared in this session. Mention a few concrete details from the conversation rather than a generic list of slide topics. Ask what one part of today's conversation they would like to remember.
 
 **Adapt:** Summarise one or two highlights from the session warmly. If they cannot choose, offer a highlight you noticed.
 

@@ -27,6 +27,7 @@ const avatarModes = [
   { id: "visualizer", label: "Audio visual" },
 ];
 const avatarModeIds = new Set(avatarModes.map((mode) => mode.id));
+const wheelColors = ["#7A9DAD", "#F47C20", "#A8C5A0", "#4472C4", "#F4C8B0"];
 
 function getInitialAvatarMode() {
   if (!import.meta.env.DEV) return "male";
@@ -56,7 +57,12 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
   const [slide, setSlide] = useState(defaultSlide);
   const [avatarMode, setAvatarMode] = useState(getInitialAvatarMode);
   const [pendingPlay, setPendingPlay] = useState(false);
+  const [wheelResult, setWheelResult] = useState(null);
+  const [wheelSpinning, setWheelSpinning] = useState(false);
+  const [wheelRotation, setWheelRotation] = useState(0);
+  const [skipSlideInput, setSkipSlideInput] = useState("");
   const pipelineMode = initialPipelineMode || "free";
+  const showDevSkip = import.meta.env.DEV;
   const timelineRef = useRef(null);
   const avatarModeRef = useRef(avatarMode);
 
@@ -74,6 +80,19 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
   const mediaStreamRef = useRef(null);
   const recordingChunksRef = useRef([]);
   const voicePlaceholderIdRef = useRef(null);
+  const wheelTimeoutRef = useRef(null);
+  const wheelOptions = slide.interaction?.type === "questionWheel" ? slide.interaction.options || [] : [];
+  const hasWheelInteraction = wheelOptions.length > 0;
+  const wheelSliceDegrees = wheelOptions.length ? 360 / wheelOptions.length : 0;
+  const wheelGradient = wheelOptions.length
+    ? wheelOptions
+        .map((_, index) => {
+          const start = (index / wheelOptions.length) * 360;
+          const end = ((index + 1) / wheelOptions.length) * 360;
+          return `${wheelColors[index % wheelColors.length]} ${start}deg ${end}deg`;
+        })
+        .join(", ")
+    : "";
 
   useEffect(() => {
     avatarModeRef.current = avatarMode;
@@ -94,6 +113,16 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
 
   useEffect(() => () => {
     if (animationRef.current) cancelAnimationFrame(animationRef.current);
+  }, []);
+
+  useEffect(() => {
+    setWheelResult(null);
+    setWheelSpinning(false);
+    if (wheelTimeoutRef.current) clearTimeout(wheelTimeoutRef.current);
+  }, [slide.id]);
+
+  useEffect(() => () => {
+    if (wheelTimeoutRef.current) clearTimeout(wheelTimeoutRef.current);
   }, []);
 
   useEffect(() => () => {
@@ -391,6 +420,86 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
     }
   }
 
+  async function sendQuestionWheelResult(result) {
+    if (!result || typing) return;
+
+    setMessages((items) => [...items, { from: "user", text: `The wheel landed on ${result.label}.` }]);
+    setTyping(true);
+
+    try {
+      const { data } = await api.post(`/sessions/${sessionId}/respond`, {
+        content: `[[question-wheel:${JSON.stringify(result)}]]`,
+        avatarMode: avatarModeRef.current,
+      });
+      applyTurn(data);
+    } catch (err) {
+      console.error("Failed to send wheel result", err);
+      setMessages((items) => [
+        ...items,
+        {
+          from: "avatar",
+          text: "I could not spin the wheel just now. Please choose any question you like from the wheel.",
+        },
+      ]);
+    } finally {
+      setTyping(false);
+    }
+  }
+
+  function handleWheelSpin() {
+    if (typing || wheelSpinning || wheelResult || wheelOptions.length === 0) return;
+
+    const selectedIndex = Math.floor(Math.random() * wheelOptions.length);
+    const selected = wheelOptions[selectedIndex];
+    const sliceDegrees = 360 / wheelOptions.length;
+    const pointerAlignedRotation = 360 - (selectedIndex * sliceDegrees + sliceDegrees / 2);
+
+    setWheelResult(null);
+    setWheelSpinning(true);
+    setWheelRotation((current) => current + 1080 + pointerAlignedRotation);
+
+    wheelTimeoutRef.current = setTimeout(() => {
+      setWheelResult(selected);
+      setWheelSpinning(false);
+      sendQuestionWheelResult(selected);
+    }, 1400);
+  }
+
+  async function handleSkipToSlide() {
+    const requestedSlide = Number.parseInt(skipSlideInput, 10);
+    const totalSlides = slide.total || 1;
+    if (!sessionId || Number.isNaN(requestedSlide) || typing) return;
+
+    const targetSlide = Math.min(Math.max(requestedSlide, 1), totalSlides);
+    setTyping(true);
+
+    try {
+      await api.patch(`/sessions/${sessionId}`, {
+        scriptStepIndex: targetSlide - 1,
+        scriptStepTurnIndex: 0,
+        scriptStepRetryCount: 0,
+        interactionState: {},
+      });
+      setMessages((items) => [
+        ...items,
+        { from: "avatar", text: `Skipped to slide ${targetSlide} for testing.` },
+      ]);
+      const { data } = await api.post(`/sessions/${sessionId}/respond`, {
+        content: "",
+        avatarMode: avatarModeRef.current,
+      });
+      applyTurn(data);
+    } catch (err) {
+      console.error("Failed to skip slide", err);
+      setMessages((items) => [
+        ...items,
+        { from: "avatar", text: "I could not skip to that slide just now." },
+      ]);
+    } finally {
+      setTyping(false);
+    }
+  }
+
   return (
     <div className="session-stage">
       <header className="session-topbar">
@@ -399,21 +508,73 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
           <span>Session in progress</span>
         </div>
         <div className="session-meta">Reminiscence / {formatElapsed(elapsed)}</div>
+        {showDevSkip && (
+          <div className="session-skip-control" aria-label="Skip to slide for testing">
+            <span>Skip</span>
+            <input
+              type="number"
+              min="1"
+              max={slide.total || 1}
+              value={skipSlideInput}
+              onChange={(event) => setSkipSlideInput(event.target.value)}
+              onKeyDown={(event) => event.key === "Enter" && handleSkipToSlide()}
+              placeholder="Slide"
+              disabled={typing}
+            />
+            <button type="button" onClick={handleSkipToSlide} disabled={typing}>
+              Go
+            </button>
+          </div>
+        )}
         <button onClick={onEnd} className="session-end-button">End</button>
       </header>
 
       <main className="session-slide-shell">
         <section
-          className={`ppt-slide${slide.imageUrl ? " has-slide-image" : ""}`}
+          className={`ppt-slide${slide.imageUrl && !hasWheelInteraction ? " has-slide-image" : ""}${hasWheelInteraction ? " has-slide-interaction" : ""}`}
           style={{
             "--slide-accent": slide.accent || theme.blush,
-            backgroundImage: slide.imageUrl ? `url(${slide.imageUrl})` : undefined,
+            backgroundImage: slide.imageUrl && !hasWheelInteraction ? `url(${slide.imageUrl})` : undefined,
           }}
         >
           <div className="ppt-slide-progress">
             Session step {slide.index + 1} / {slide.total}
             {slide.deckSlide ? ` / Deck slide ${slide.deckSlide}` : ""}
           </div>
+          {hasWheelInteraction && (
+            <div className="slide-wheel-overlay">
+              <div className="slide-wheel-pointer" aria-hidden="true" />
+              <div
+                className="slide-wheel"
+                style={{
+                  "--wheel-rotation": `${wheelRotation}deg`,
+                  "--wheel-spin-rotation": `${-wheelRotation}deg`,
+                  background: `conic-gradient(${wheelGradient})`,
+                }}
+              >
+                {wheelOptions.map((option, index) => (
+                  <span
+                    key={option.label}
+                    className="slide-wheel-label"
+                    style={{
+                      "--label-angle": `${index * wheelSliceDegrees + wheelSliceDegrees / 2}deg`,
+                    }}
+                  >
+                    <span>{option.label}</span>
+                  </span>
+                ))}
+                <button
+                  type="button"
+                  className="slide-wheel-spin"
+                  onClick={handleWheelSpin}
+                  disabled={typing || wheelSpinning || Boolean(wheelResult)}
+                  aria-label={wheelResult ? `Wheel landed on ${wheelResult.label}` : "Spin the question wheel"}
+                >
+                  Spin
+                </button>
+              </div>
+            </div>
+          )}
           <div className="ppt-slide-content">
             <p className="ppt-slide-kicker">{slide.subtitle}</p>
             <h1>{slide.title}</h1>
