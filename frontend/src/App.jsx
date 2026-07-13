@@ -53,6 +53,7 @@ export default function App() {
 
   const handleStartSession = async (sessionOption = TEST_SESSIONS[0]) => {
     if (!userId) return;
+    setSessionId(null);
     try {
       const { data } = await api.post("/sessions", {
         userId,
@@ -77,7 +78,7 @@ export default function App() {
         console.error("Failed to end session", err);
       }
     }
-    setSessionId(null);
+    // Keep sessionId alive so EndPage can fetch the summary; cleared on next session start.
     setScreen(SCREENS.END);
   };
 
@@ -103,7 +104,7 @@ export default function App() {
           pipelineMode={sessionPipelineMode}
         />
       )}
-      {screen === SCREENS.END && <EndPage onHome={() => setScreen(SCREENS.LANDING)} userName={userName} />}
+      {screen === SCREENS.END && <EndPage onHome={() => setScreen(SCREENS.LANDING)} userName={userName} sessionId={sessionId} userId={userId} />}
       {screen === SCREENS.CAREGIVER && (
         <CaregiverPage userId={userId} onBack={() => setScreen(SCREENS.LANDING)} userName={userName} />
       )}
