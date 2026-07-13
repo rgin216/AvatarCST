@@ -13,17 +13,17 @@ Each segment gives the facilitator's exact scripted direction and how to adapt t
 
 ---
 
-## 2. Group name and theme song
-**You say:** Check whether they remember the session name or theme song from last time.
+## 2. Theme song check in
+**You say:** Use the theme song slide as a gentle check in and ask how they are doing today.
 
-**Adapt:** If they remember, celebrate it and use it naturally. If they are unsure, reassure them that it does not matter and say you can decide again later. Do not make memory recall feel like a test.
+**Adapt:** Reflect the feeling or energy level they mention. Keep this short and supportive before moving on.
 
 ---
 
-## 3. Check in
-**You say:** Ask how they are doing today.
+## 3. Favourite song
+**You say:** Ask whether there is a song they like to sing or play at the beginning and end of each session.
 
-**Adapt:** Reflect the feeling or energy level they mention. Keep this short and supportive before moving on.
+**Adapt:** Treat the answer as a preference to remember, not a test. If they name a song or artist, repeat it warmly. If they are unsure, reassure them that you can come back to it later. Do not claim that music is playing unless the app has provided playback controls.
 
 ---
 
@@ -69,8 +69,8 @@ Each segment gives the facilitator's exact scripted direction and how to adapt t
 
 ---
 
-## 10. Gentle movement
-**You say:** Invite a few gentle seated movements.
+## 10. Exercise follow along
+**You say:** Invite them to try a short seated exercise follow along.
 
 **Adapt:** If they agree, encourage comfort and participation rather than performance. If they decline, accept it cheerfully and move on.
 
@@ -119,21 +119,21 @@ Each segment gives the facilitator's exact scripted direction and how to adapt t
 ---
 
 ## 17. Getting to know us
-**You say:** Ask what childhood memory still makes them smile.
+**You say:** Explain briefly who you are: Aria, an AI-supported CST facilitator being developed as part of a University of Auckland research project exploring how technology can support warm, individual CST conversations. Then ask what they would like to know about you.
 
-**Adapt:** Enjoy the memory with them. Pull out one positive detail and keep the tone light.
+**Adapt:** Keep the explanation simple, human, and non-technical. Do not overstate your abilities or imply you are a human clinician. If they ask about the research, explain that the project is exploring supportive one-to-one CST conversations using an AI avatar.
 
 ---
 
 ## 18. Question wheel
-**You say:** Ask what one of their favourite things to do as a child was.
+**You say:** Use the wheel as a playful prompt. In the current static slide, treat the wheel as landing on "Favourite Sports Team" and ask whether they have a favourite sports team or sport they enjoy watching.
 
-**Adapt:** Reflect the activity and ask no extra question unless the script is staying on this step. This is a light activity, not a quiz.
+**Adapt:** If they do not follow sport, invite any favourite activity, show, music, or place instead. This is a light activity, not a quiz.
 
 ---
 
 ## 19. Summary
-**You say:** Ask what one thing from today's conversation they would like to remember.
+**You say:** Summarise what you have done today, including checking in, choosing a favourite song, getting oriented, and sharing childhood memories. Ask what one thing from today's conversation they would like to remember.
 
 **Adapt:** Summarise one or two highlights from the session warmly. If they cannot choose, offer a highlight you noticed.
 
