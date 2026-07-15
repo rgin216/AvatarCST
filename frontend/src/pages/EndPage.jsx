@@ -28,12 +28,14 @@ export default function EndPage({ onHome, userName, sessionId }) {
       if (cancelled) return;
       try {
         const { data } = await api.get(`/summaries/session/${sessionId}`);
-        if (!cancelled && data.keyTalkingPoints?.length > 0) {
-          setSummary(data);
-          setSummaryLoading(false);
+        if (!cancelled) { setSummary(data); setSummaryLoading(false); }
+        return;
+      } catch (err) {
+        if (err.response?.status !== 404) {
+          if (!cancelled) setSummaryLoading(false);
           return;
         }
-      } catch {}
+      }
       attempts++;
       if (!cancelled && attempts < MAX_ATTEMPTS) {
         setTimeout(fetchSummary, 2000);

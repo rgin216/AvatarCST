@@ -44,7 +44,7 @@ export const generateSessionSummary = async (req, res, next) => {
     const summary = await Summary.findOneAndUpdate(
       { sessionId: req.params.sessionId },
       { sessionId: req.params.sessionId, userId: session.userId, keyTalkingPoints, emotionalTone, engagementLevel, sessionScore },
-      { upsert: true, new: true }
+      { upsert: true, new: true, runValidators: true }
     );
 
     res.json(summary);
