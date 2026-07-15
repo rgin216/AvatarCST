@@ -94,10 +94,10 @@ export const endSession = async (req, res, next) => {
     const userId = session.userId;
     const pipelineMode = session.pipelineMode;
     Message.find({ sessionId }).sort({ createdAt: 1 }).then((messages) =>
-      generateSummary(messages, pipelineMode).then((keyTalkingPoints) =>
+      generateSummary(messages, pipelineMode).then(({ keyTalkingPoints, emotionalTone, engagementLevel, sessionScore }) =>
         Summary.findOneAndUpdate(
           { sessionId },
-          { sessionId, userId, keyTalkingPoints },
+          { sessionId, userId, keyTalkingPoints, emotionalTone, engagementLevel, sessionScore },
           { upsert: true }
         )
       )

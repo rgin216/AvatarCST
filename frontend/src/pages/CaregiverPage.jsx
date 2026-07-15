@@ -171,18 +171,28 @@ export default function CaregiverPage({ userId, onBack, userName }) {
         <div className="fade-up">
           <div style={{ background: theme.white, borderRadius: 20, padding: "20px", marginBottom: 16, boxShadow: "0 4px 20px rgba(0,0,0,0.05)" }}>
             <div style={{ fontSize: 13, fontWeight: 700, color: theme.textLight, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 12 }}>Latest Session</div>
-            <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
-              {[
-                { label: "Emotional State", value: "Positive 😊", color: "#A8C5A0" },
-                { label: "Engagement", value: "High ⭐", color: "#F4C8B0" },
-                { label: "Cognitive Score", value: "78 / 100", color: "#B8CDD8" },
-              ].map(s => (
-                <div key={s.label} style={{ flex: "1 1 120px", background: s.color + "33", borderRadius: 14, padding: "14px" }}>
-                  <div style={{ fontSize: 11, color: theme.textLight, marginBottom: 4 }}>{s.label}</div>
-                  <div style={{ fontSize: 15, fontWeight: 700, color: theme.text }}>{s.value}</div>
+            {loadingSummary && <div style={{ fontSize: 14, color: theme.textLight }}>Loading...</div>}
+            {!loadingSummary && !latestSummary && <div style={{ fontSize: 14, color: theme.textLight }}>No session data yet.</div>}
+            {!loadingSummary && latestSummary && (() => {
+              const TONE = { positive: "Positive", mixed: "Mixed", neutral: "Calm", low: "Low" };
+              const LEVEL = { high: "High", medium: "Medium", low: "Low" };
+              const SCORE = { high: "High", medium: "Medium", low: "Low" };
+              const stats = [
+                { label: "Mood", value: TONE[latestSummary.emotionalTone] || "—", color: "#A8C5A0" },
+                { label: "Engagement", value: LEVEL[latestSummary.engagementLevel] || "—", color: "#F4C8B0" },
+                { label: "Session Score", value: SCORE[latestSummary.sessionScore] || "—", color: "#B8CDD8" },
+              ];
+              return (
+                <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
+                  {stats.map(s => (
+                    <div key={s.label} style={{ flex: "1 1 120px", background: s.color + "33", borderRadius: 14, padding: "14px" }}>
+                      <div style={{ fontSize: 11, color: theme.textLight, marginBottom: 4 }}>{s.label}</div>
+                      <div style={{ fontSize: 15, fontWeight: 700, color: theme.text }}>{s.value}</div>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
+              );
+            })()}
           </div>
           <div style={{ background: theme.white, borderRadius: 20, padding: "20px", marginBottom: 16, boxShadow: "0 4px 20px rgba(0,0,0,0.05)" }}>
             <div style={{ fontSize: 13, fontWeight: 700, color: theme.textLight, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 14 }}>Important Talking Points</div>

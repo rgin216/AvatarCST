@@ -4,17 +4,19 @@ import theme from "../utils/theme";
 import useIsDesktop from "../hooks/useIsDesktop";
 import EmojiButton from "../components/ui/EmojiButton";
 
+const TONE_LABELS = { positive: "Happy", mixed: "Mixed", neutral: "Calm", low: "Low" };
+const LEVEL_LABELS = { high: "High", medium: "Medium", low: "Low" };
+
 export default function EndPage({ onHome, userName, sessionId }) {
   const isDesktop = useIsDesktop();
   const [summary, setSummary] = useState(null);
   const [summaryLoading, setSummaryLoading] = useState(true);
+  const [sessionData, setSessionData] = useState(null);
 
-  const stats = [
-    { label: "Duration", value: "18 mins", icon: "⏱️" },
-    { label: "Topics Covered", value: "4", icon: "💬" },
-    { label: "Engagement", value: "High", icon: "⭐" },
-    { label: "Mood", value: "Happy", icon: "😊" },
-  ];
+  useEffect(() => {
+    if (!sessionId) return;
+    api.get(`/sessions/${sessionId}`).then(({ data }) => setSessionData(data)).catch(() => {});
+  }, [sessionId]);
 
   useEffect(() => {
     if (!sessionId) { setSummaryLoading(false); return; }
@@ -45,6 +47,18 @@ export default function EndPage({ onHome, userName, sessionId }) {
   }, [sessionId]);
 
   const highlights = summary?.keyTalkingPoints || [];
+
+  const durationMins = sessionData?.startedAt && sessionData?.endedAt
+    ? Math.round((new Date(sessionData.endedAt) - new Date(sessionData.startedAt)) / 60000)
+    : null;
+  const topicsCovered = sessionData?.scriptStepIndex ?? null;
+
+  const stats = [
+    { label: "Duration", value: durationMins != null ? `${durationMins} min` : "—", icon: "⏱️" },
+    { label: "Topics Covered", value: topicsCovered != null ? String(topicsCovered) : "—", icon: "💬" },
+    { label: "Engagement", value: summary ? (LEVEL_LABELS[summary.engagementLevel] || "—") : "—", icon: "⭐" },
+    { label: "Mood", value: summary ? (TONE_LABELS[summary.emotionalTone] || "—") : "—", icon: "😊" },
+  ];
 
   return (
     <div style={{ minHeight: "100vh", background: `linear-gradient(160deg, ${theme.cream}, ${theme.sand})`, padding: "48px 28px 40px" }}>
