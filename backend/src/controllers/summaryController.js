@@ -39,11 +39,11 @@ export const generateSessionSummary = async (req, res, next) => {
     if (!session) return res.status(404).json({ error: 'Session not found' });
 
     const messages = await Message.find({ sessionId: req.params.sessionId }).sort({ createdAt: 1 });
-    const keyTalkingPoints = await generateSummary(messages, session.pipelineMode);
+    const { keyTalkingPoints, emotionalTone, engagementLevel, sessionScore } = await generateSummary(messages, session.pipelineMode);
 
     const summary = await Summary.findOneAndUpdate(
       { sessionId: req.params.sessionId },
-      { sessionId: req.params.sessionId, userId: session.userId, keyTalkingPoints },
+      { sessionId: req.params.sessionId, userId: session.userId, keyTalkingPoints, emotionalTone, engagementLevel, sessionScore },
       { upsert: true, new: true }
     );
 
