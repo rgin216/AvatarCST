@@ -31,6 +31,7 @@ export default function CaregiverPage({ userId, onBack, userName }) {
   const [sessionMessages, setSessionMessages] = useState({});
   const [sessionSummaries, setSessionSummaries] = useState({});
   const [expandedSummaryId, setExpandedSummaryId] = useState(null);
+  const [savingPoints, setSavingPoints] = useState(new Set());
   const [latestSummary, setLatestSummary] = useState(null);
   const [loadingSummary, setLoadingSummary] = useState(false);
 
@@ -146,7 +147,8 @@ export default function CaregiverPage({ userId, onBack, userName }) {
   const isPointSaved = (point) => memories.some((m) => m.content === point && m.status !== 'rejected');
 
   const addPointToMemory = async (point) => {
-    if (!userId || isPointSaved(point)) return;
+    if (!userId || isPointSaved(point) || savingPoints.has(point)) return;
+    setSavingPoints((prev) => new Set(prev).add(point));
     try {
       const { data } = await api.post(`/memory/${userId}/entries`, {
         category: 'session_insight',
@@ -156,6 +158,8 @@ export default function CaregiverPage({ userId, onBack, userName }) {
       setMemories(data.entries || []);
     } catch (err) {
       console.error('Failed to add memory', err);
+    } finally {
+      setSavingPoints((prev) => { const next = new Set(prev); next.delete(point); return next; });
     }
   };
 
@@ -311,12 +315,15 @@ export default function CaregiverPage({ userId, onBack, userName }) {
                       {s.theme && <div style={{ fontSize: 13, color: theme.textLight }}>🗣 {s.theme}</div>}
                     </div>
                     {s.status === "completed" && (
-                      <button
+                      <div
+                        role="button"
+                        tabIndex={0}
                         onClick={(e) => { e.stopPropagation(); toggleSummary(s._id); }}
+                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); toggleSummary(s._id); } }}
                         style={{ background: "none", border: `1.5px solid ${theme.blush}`, borderRadius: 10, padding: "4px 12px", fontSize: 12, fontWeight: 600, color: theme.mistDark, cursor: "pointer", fontFamily: "'Nunito', sans-serif" }}
                       >
                         {expandedSummaryId === s._id ? "Hide summary" : "View summary"}
-                      </button>
+                      </div>
                     )}
                   </div>
                 </button>

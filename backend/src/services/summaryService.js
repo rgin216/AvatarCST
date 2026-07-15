@@ -14,14 +14,26 @@ Example: {"keyTalkingPoints":["Recalled a seaside holiday from childhood."],"emo
 
 const FALLBACK = { keyTalkingPoints: [], emotionalTone: null, engagementLevel: null, sessionScore: null };
 
+const VALID_TONE = new Set(['positive', 'mixed', 'neutral', 'low']);
+const VALID_LEVEL = new Set(['high', 'medium', 'low']);
+
+const MAX_TRANSCRIPT_CHARS = 12_000;
+
+const boundTranscript = (transcript) => {
+  if (transcript.length <= MAX_TRANSCRIPT_CHARS) return transcript;
+  const half = Math.floor(MAX_TRANSCRIPT_CHARS / 2);
+  return transcript.slice(0, half) + '\n...[transcript truncated]...\n' + transcript.slice(-half);
+};
+
 export const generateSummary = async (messages, pipelineMode) => {
-  const transcript = messages
+  const full = messages
     .filter((m) => m.role === 'user' || m.role === 'assistant')
     .map((m) => `${m.role === 'user' ? 'Patient' : 'Aria'}: ${m.content}`)
     .join('\n');
 
-  if (!transcript.trim()) return FALLBACK;
+  if (!full.trim()) return FALLBACK;
 
+  const transcript = boundTranscript(full);
   const provider = isOpenAIFastScriptedPipeline(pipelineMode) ? 'openai' : 'groq';
 
   const llmMessages = [
@@ -37,9 +49,9 @@ export const generateSummary = async (messages, pipelineMode) => {
     const parsed = JSON.parse(match[0]);
     return {
       keyTalkingPoints: Array.isArray(parsed.keyTalkingPoints) ? parsed.keyTalkingPoints : [],
-      emotionalTone: parsed.emotionalTone || null,
-      engagementLevel: parsed.engagementLevel || null,
-      sessionScore: parsed.sessionScore || null,
+      emotionalTone: VALID_TONE.has(parsed.emotionalTone) ? parsed.emotionalTone : null,
+      engagementLevel: VALID_LEVEL.has(parsed.engagementLevel) ? parsed.engagementLevel : null,
+      sessionScore: VALID_LEVEL.has(parsed.sessionScore) ? parsed.sessionScore : null,
     };
   } catch {
     return FALLBACK;

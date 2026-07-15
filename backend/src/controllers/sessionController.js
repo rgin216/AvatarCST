@@ -98,7 +98,7 @@ export const endSession = async (req, res, next) => {
         Summary.findOneAndUpdate(
           { sessionId },
           { sessionId, userId, keyTalkingPoints, emotionalTone, engagementLevel, sessionScore },
-          { upsert: true }
+          { upsert: true, runValidators: true }
         )
       )
     ).catch((err) => console.error('[summary] background generation failed:', err));
