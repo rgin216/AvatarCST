@@ -1,4 +1,7 @@
 import Summary from '../models/Summary.js';
+import Session from '../models/Session.js';
+import Message from '../models/Message.js';
+import { generateSummary } from '../services/summaryService.js';
 
 export const createSummary = async (req, res, next) => {
   try {
@@ -25,6 +28,26 @@ export const getUserSummaries = async (req, res, next) => {
       .populate('sessionId', 'title theme startedAt endedAt')
       .sort({ createdAt: -1 });
     res.json(summaries);
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const generateSessionSummary = async (req, res, next) => {
+  try {
+    const session = await Session.findById(req.params.sessionId);
+    if (!session) return res.status(404).json({ error: 'Session not found' });
+
+    const messages = await Message.find({ sessionId: req.params.sessionId }).sort({ createdAt: 1 });
+    const { keyTalkingPoints, emotionalTone, engagementLevel, sessionScore } = await generateSummary(messages, session.pipelineMode);
+
+    const summary = await Summary.findOneAndUpdate(
+      { sessionId: req.params.sessionId },
+      { sessionId: req.params.sessionId, userId: session.userId, keyTalkingPoints, emotionalTone, engagementLevel, sessionScore },
+      { upsert: true, new: true, runValidators: true }
+    );
+
+    res.json(summary);
   } catch (err) {
     next(err);
   }

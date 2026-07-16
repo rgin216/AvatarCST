@@ -1,14 +1,65 @@
+import { useState, useEffect } from "react";
+import api from "../services/api.js";
 import theme from "../utils/theme";
 import useIsDesktop from "../hooks/useIsDesktop";
 import EmojiButton from "../components/ui/EmojiButton";
 
-export default function EndPage({ onHome, userName }) {
+const TONE_LABELS = { positive: "Happy", mixed: "Mixed", neutral: "Calm", low: "Low" };
+const LEVEL_LABELS = { high: "High", medium: "Medium", low: "Low" };
+
+export default function EndPage({ onHome, userName, sessionId }) {
   const isDesktop = useIsDesktop();
+  const [summary, setSummary] = useState(null);
+  const [summaryLoading, setSummaryLoading] = useState(true);
+  const [sessionData, setSessionData] = useState(null);
+
+  useEffect(() => {
+    if (!sessionId) return;
+    api.get(`/sessions/${sessionId}`).then(({ data }) => setSessionData(data)).catch(() => {});
+  }, [sessionId]);
+
+  useEffect(() => {
+    if (!sessionId) { setSummaryLoading(false); return; }
+    let cancelled = false;
+    let attempts = 0;
+    const MAX_ATTEMPTS = 8;
+
+    const fetchSummary = async () => {
+      if (cancelled) return;
+      try {
+        const { data } = await api.get(`/summaries/session/${sessionId}`);
+        if (!cancelled) { setSummary(data); setSummaryLoading(false); }
+        return;
+      } catch (err) {
+        if (err.response?.status !== 404) {
+          if (!cancelled) setSummaryLoading(false);
+          return;
+        }
+      }
+      attempts++;
+      if (!cancelled && attempts < MAX_ATTEMPTS) {
+        setTimeout(fetchSummary, 2000);
+      } else if (!cancelled) {
+        setSummaryLoading(false);
+      }
+    };
+
+    fetchSummary();
+    return () => { cancelled = true; };
+  }, [sessionId]);
+
+  const highlights = summary?.keyTalkingPoints || [];
+
+  const durationMins = sessionData?.startedAt && sessionData?.endedAt
+    ? Math.round((new Date(sessionData.endedAt) - new Date(sessionData.startedAt)) / 60000)
+    : null;
+  const topicsCovered = sessionData?.scriptStepIndex ?? null;
+
   const stats = [
-    { label: "Duration", value: "18 mins", icon: "⏱️" },
-    { label: "Topics Covered", value: "4", icon: "💬" },
-    { label: "Engagement", value: "High", icon: "⭐" },
-    { label: "Mood", value: "Happy", icon: "😊" },
+    { label: "Duration", value: durationMins != null ? `${durationMins} min` : "—", icon: "⏱️" },
+    { label: "Topics Covered", value: topicsCovered != null ? String(topicsCovered) : "—", icon: "💬" },
+    { label: "Engagement", value: summary ? (LEVEL_LABELS[summary.engagementLevel] || "—") : "—", icon: "⭐" },
+    { label: "Mood", value: summary ? (TONE_LABELS[summary.emotionalTone] || "—") : "—", icon: "😊" },
   ];
 
   return (
@@ -32,7 +83,13 @@ export default function EndPage({ onHome, userName }) {
 
         <div className="fade-up delay-2" style={{ background: theme.white, borderRadius: 20, padding: "20px 22px", marginBottom: 28 }}>
           <div style={{ fontSize: 14, fontWeight: 700, color: theme.textLight, marginBottom: 14, textTransform: "uppercase", letterSpacing: "0.06em" }}>Session Highlights</div>
-          {["Discussed childhood memories from the garden 🌼", "Completed 3 word association rounds", "Shared a favourite song from the 1960s 🎵"].map((h, i, arr) => (
+          {summaryLoading && (
+            <div style={{ fontSize: 14, color: theme.textLight, padding: "8px 0" }}>Generating highlights...</div>
+          )}
+          {!summaryLoading && highlights.length === 0 && (
+            <div style={{ fontSize: 14, color: theme.textLight, padding: "8px 0" }}>No highlights available for this session.</div>
+          )}
+          {!summaryLoading && highlights.map((h, i, arr) => (
             <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 10, marginBottom: i < arr.length - 1 ? 12 : 0, fontSize: 15, color: theme.text, lineHeight: 1.5 }}>
               <span style={{ color: theme.sageDark, fontWeight: 700, marginTop: 1 }}>✓</span>{h}
             </div>

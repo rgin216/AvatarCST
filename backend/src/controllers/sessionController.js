@@ -21,6 +21,8 @@ import {
   SESSION_PIPELINE_MODES,
   usesOpenAITextPipeline,
 } from '../config/pipeline.js';
+import { generateSummary } from '../services/summaryService.js';
+import Summary from '../models/Summary.js';
 
 const nowMs = () => Number(process.hrtime.bigint() / 1_000_000n);
 const AVATAR_MODES = new Set(['male', 'female', 'visualizer']);
@@ -86,6 +88,20 @@ export const endSession = async (req, res, next) => {
     );
     if (!session) return res.status(404).json({ error: 'Session not found' });
     res.json(session);
+
+    // Fire-and-forget: generate summary in background after responding
+    const sessionId = session._id;
+    const userId = session.userId;
+    const pipelineMode = session.pipelineMode;
+    Message.find({ sessionId }).sort({ createdAt: 1 }).then((messages) =>
+      generateSummary(messages, pipelineMode).then(({ keyTalkingPoints, emotionalTone, engagementLevel, sessionScore }) =>
+        Summary.findOneAndUpdate(
+          { sessionId },
+          { sessionId, userId, keyTalkingPoints, emotionalTone, engagementLevel, sessionScore },
+          { upsert: true, runValidators: true }
+        )
+      )
+    ).catch((err) => console.error('[summary] background generation failed:', err));
   } catch (err) {
     next(err);
   }

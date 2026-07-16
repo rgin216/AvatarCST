@@ -29,6 +29,11 @@ export default function CaregiverPage({ userId, onBack, userName }) {
   const [newMemoryCategory, setNewMemoryCategory] = useState("personal");
   const [expandedSessionId, setExpandedSessionId] = useState(null);
   const [sessionMessages, setSessionMessages] = useState({});
+  const [sessionSummaries, setSessionSummaries] = useState({});
+  const [expandedSummaryId, setExpandedSummaryId] = useState(null);
+  const [savingPoints, setSavingPoints] = useState(new Set());
+  const [latestSummary, setLatestSummary] = useState(null);
+  const [loadingSummary, setLoadingSummary] = useState(false);
 
   const tabs = [
     { id: "summary", label: "Summary" },
@@ -42,8 +47,12 @@ export default function CaregiverPage({ userId, onBack, userName }) {
     setSessions([]);
     setExpandedSessionId(null);
     setSessionMessages({});
+    setSessionSummaries({});
+    setExpandedSummaryId(null);
+    setLatestSummary(null);
     setLoadingMemory(true);
     setLoadingHistory(true);
+    setLoadingSummary(true);
     api.get(`/memory/${userId}`)
       .then(({ data }) => setMemories(data.entries || []))
       .catch(() => {})
@@ -53,6 +62,11 @@ export default function CaregiverPage({ userId, onBack, userName }) {
       .then(({ data }) => setSessions(data))
       .catch(() => {})
       .finally(() => setLoadingHistory(false));
+
+    api.get(`/summaries/user/${userId}`)
+      .then(({ data }) => setLatestSummary(data[0] || null))
+      .catch(() => {})
+      .finally(() => setLoadingSummary(false));
   }, [userId]);
 
   const addMemory = async () => {
@@ -117,6 +131,38 @@ export default function CaregiverPage({ userId, onBack, userName }) {
     }
   };
 
+  const toggleSummary = async (sessionId) => {
+    if (expandedSummaryId === sessionId) { setExpandedSummaryId(null); return; }
+    setExpandedSummaryId(sessionId);
+    if (sessionSummaries[sessionId] !== undefined) return;
+    setSessionSummaries(prev => ({ ...prev, [sessionId]: 'loading' }));
+    try {
+      const { data } = await api.get(`/summaries/session/${sessionId}`);
+      setSessionSummaries(prev => ({ ...prev, [sessionId]: data }));
+    } catch {
+      setSessionSummaries(prev => ({ ...prev, [sessionId]: null }));
+    }
+  };
+
+  const isPointSaved = (point) => memories.some((m) => m.content === point && m.status !== 'rejected');
+
+  const addPointToMemory = async (point) => {
+    if (!userId || isPointSaved(point) || savingPoints.has(point)) return;
+    setSavingPoints((prev) => new Set(prev).add(point));
+    try {
+      const { data } = await api.post(`/memory/${userId}/entries`, {
+        category: 'session_insight',
+        content: point,
+        addedBy: 'session',
+      });
+      setMemories(data.entries || []);
+    } catch (err) {
+      console.error('Failed to add memory', err);
+    } finally {
+      setSavingPoints((prev) => { const next = new Set(prev); next.delete(point); return next; });
+    }
+  };
+
   const formatDuration = (session) => {
     if (!session.startedAt || !session.endedAt) return "—";
     const mins = Math.round((new Date(session.endedAt) - new Date(session.startedAt)) / 60000);
@@ -129,30 +175,51 @@ export default function CaregiverPage({ userId, onBack, userName }) {
         <div className="fade-up">
           <div style={{ background: theme.white, borderRadius: 20, padding: "20px", marginBottom: 16, boxShadow: "0 4px 20px rgba(0,0,0,0.05)" }}>
             <div style={{ fontSize: 13, fontWeight: 700, color: theme.textLight, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 12 }}>Latest Session</div>
-            <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
-              {[
-                { label: "Emotional State", value: "Positive 😊", color: "#A8C5A0" },
-                { label: "Engagement", value: "High ⭐", color: "#F4C8B0" },
-                { label: "Cognitive Score", value: "78 / 100", color: "#B8CDD8" },
-              ].map(s => (
-                <div key={s.label} style={{ flex: "1 1 120px", background: s.color + "33", borderRadius: 14, padding: "14px" }}>
-                  <div style={{ fontSize: 11, color: theme.textLight, marginBottom: 4 }}>{s.label}</div>
-                  <div style={{ fontSize: 15, fontWeight: 700, color: theme.text }}>{s.value}</div>
+            {loadingSummary && <div style={{ fontSize: 14, color: theme.textLight }}>Loading...</div>}
+            {!loadingSummary && !latestSummary && <div style={{ fontSize: 14, color: theme.textLight }}>No session data yet.</div>}
+            {!loadingSummary && latestSummary && (() => {
+              const TONE = { positive: "Positive", mixed: "Mixed", neutral: "Calm", low: "Low" };
+              const LEVEL = { high: "High", medium: "Medium", low: "Low" };
+              const SCORE = { high: "High", medium: "Medium", low: "Low" };
+              const stats = [
+                { label: "Mood", value: TONE[latestSummary.emotionalTone] || "—", color: "#A8C5A0" },
+                { label: "Engagement", value: LEVEL[latestSummary.engagementLevel] || "—", color: "#F4C8B0" },
+                { label: "Session Score", value: SCORE[latestSummary.sessionScore] || "—", color: "#B8CDD8" },
+              ];
+              return (
+                <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
+                  {stats.map(s => (
+                    <div key={s.label} style={{ flex: "1 1 120px", background: s.color + "33", borderRadius: 14, padding: "14px" }}>
+                      <div style={{ fontSize: 11, color: theme.textLight, marginBottom: 4 }}>{s.label}</div>
+                      <div style={{ fontSize: 15, fontWeight: 700, color: theme.text }}>{s.value}</div>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
+              );
+            })()}
           </div>
           <div style={{ background: theme.white, borderRadius: 20, padding: "20px", marginBottom: 16, boxShadow: "0 4px 20px rgba(0,0,0,0.05)" }}>
             <div style={{ fontSize: 13, fontWeight: 700, color: theme.textLight, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 14 }}>Important Talking Points</div>
-            {["Mentioned missing her late husband's garden", "Expressed interest in visiting Christchurch again", "Recalled visiting the beach in summer 1972"].map((p, i, arr) => (
-              <div key={i} style={{ display: "flex", gap: 10, marginBottom: i < arr.length - 1 ? 12 : 0, fontSize: 15, color: theme.text, lineHeight: 1.5 }}>
-                <span style={{ color: theme.mistDark, fontWeight: 700 }}>•</span> {p}
+            {loadingSummary && (
+              <div style={{ fontSize: 14, color: theme.textLight }}>Generating summary...</div>
+            )}
+            {!loadingSummary && (!latestSummary || !latestSummary.keyTalkingPoints?.length) && (
+              <div style={{ fontSize: 14, color: theme.textLight }}>No summary yet. Complete a session to see talking points here.</div>
+            )}
+            {!loadingSummary && latestSummary?.keyTalkingPoints?.map((p, i, arr) => (
+              <div key={i} style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 10, marginBottom: i < arr.length - 1 ? 12 : 0 }}>
+                <div style={{ display: "flex", gap: 10, flex: 1, fontSize: 15, color: theme.text, lineHeight: 1.5 }}>
+                  <span style={{ color: theme.mistDark, fontWeight: 700 }}>•</span> {p}
+                </div>
+                <button
+                  onClick={() => addPointToMemory(p)}
+                  disabled={isPointSaved(p)}
+                  style={{ flexShrink: 0, background: isPointSaved(p) ? theme.sage + "44" : "none", border: `1.5px solid ${isPointSaved(p) ? theme.sageDark : theme.blush}`, borderRadius: 10, padding: "4px 10px", fontSize: 12, fontWeight: 600, color: isPointSaved(p) ? theme.sageDark : theme.textLight, cursor: isPointSaved(p) ? "default" : "pointer", fontFamily: "'Nunito', sans-serif", whiteSpace: "nowrap" }}
+                >
+                  {isPointSaved(p) ? "✓ Saved" : "+ Memory"}
+                </button>
               </div>
             ))}
-          </div>
-          <div style={{ background: "#FFF3E8", borderRadius: 16, padding: "16px 18px", borderLeft: `4px solid ${theme.blush}` }}>
-            <div style={{ fontSize: 14, fontWeight: 700, color: theme.warm, marginBottom: 4 }}>⚠ Note for caregiver</div>
-            <div style={{ fontSize: 14, color: theme.textLight, lineHeight: 1.5 }}>{userName} appeared briefly sad when discussing her late husband. Consider checking in on her mood today.</div>
           </div>
         </div>
       )}
@@ -242,11 +309,50 @@ export default function CaregiverPage({ userId, onBack, userName }) {
                       <span style={{ fontSize: 12, color: theme.textLight }}>{isExpanded ? "▲" : "▼"}</span>
                     </div>
                   </div>
-                  <div style={{ display: "flex", gap: 16 }}>
-                    <div style={{ fontSize: 13, color: theme.textLight }}>⏱ {formatDuration(s)}</div>
-                    {s.theme && <div style={{ fontSize: 13, color: theme.textLight }}>🗣 {s.theme}</div>}
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                    <div style={{ display: "flex", gap: 16 }}>
+                      <div style={{ fontSize: 13, color: theme.textLight }}>⏱ {formatDuration(s)}</div>
+                      {s.theme && <div style={{ fontSize: 13, color: theme.textLight }}>🗣 {s.theme}</div>}
+                    </div>
+                    {s.status === "completed" && (
+                      <div
+                        role="button"
+                        tabIndex={0}
+                        onClick={(e) => { e.stopPropagation(); toggleSummary(s._id); }}
+                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); toggleSummary(s._id); } }}
+                        style={{ background: "none", border: `1.5px solid ${theme.blush}`, borderRadius: 10, padding: "4px 12px", fontSize: 12, fontWeight: 600, color: theme.mistDark, cursor: "pointer", fontFamily: "'Nunito', sans-serif" }}
+                      >
+                        {expandedSummaryId === s._id ? "Hide summary" : "View summary"}
+                      </div>
+                    )}
                   </div>
                 </button>
+
+                {expandedSummaryId === s._id && (() => {
+                  const sum = sessionSummaries[s._id];
+                  const points = sum && sum !== 'loading' ? (sum.keyTalkingPoints || []) : [];
+                  return (
+                    <div style={{ borderTop: `1px solid ${theme.blush}44`, padding: "16px 18px", background: "#FFF8F2" }}>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: theme.textLight, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 10 }}>Session Summary</div>
+                      {sum === 'loading' && <div style={{ fontSize: 13, color: theme.textLight }}>Loading summary...</div>}
+                      {sum !== 'loading' && points.length === 0 && <div style={{ fontSize: 13, color: theme.textLight }}>No summary available for this session.</div>}
+                      {points.map((p, i, arr) => (
+                        <div key={i} style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 10, marginBottom: i < arr.length - 1 ? 10 : 0 }}>
+                          <div style={{ display: "flex", gap: 8, flex: 1, fontSize: 14, color: theme.text, lineHeight: 1.5 }}>
+                            <span style={{ color: theme.mistDark, fontWeight: 700 }}>•</span> {p}
+                          </div>
+                          <button
+                            onClick={() => addPointToMemory(p)}
+                            disabled={isPointSaved(p)}
+                            style={{ flexShrink: 0, background: isPointSaved(p) ? theme.sage + "44" : "none", border: `1.5px solid ${isPointSaved(p) ? theme.sageDark : theme.blush}`, borderRadius: 10, padding: "3px 10px", fontSize: 11, fontWeight: 600, color: isPointSaved(p) ? theme.sageDark : theme.textLight, cursor: isPointSaved(p) ? "default" : "pointer", fontFamily: "'Nunito', sans-serif", whiteSpace: "nowrap" }}
+                          >
+                            {isPointSaved(p) ? "✓ Saved" : "+ Memory"}
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })()}
 
                 {isExpanded && (
                   <div style={{ borderTop: `1px solid ${theme.blush}44`, padding: "16px 18px", background: theme.cream }}>
