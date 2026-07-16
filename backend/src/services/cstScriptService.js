@@ -240,11 +240,16 @@ const scripts = {
       title: 'Exercises',
       subtitle: 'Gentle follow along',
       prompt: 'Would you like to try a short seated exercise?',
-      bullets: ['Click to start', 'Seated movement', 'Comfort first'],
+      bullets: ['Sit safely on a chair', 'Press play when ready', 'Only do what feels comfortable'],
       visualHint: 'Source deck: NZ02. Getting to Know You (Childhood), slide 10',
       accent: '#4472C4',
+      interaction: {
+        type: 'youtubeShort',
+        videoId: 'xVdKRNiAmqI',
+        videoUrl: 'https://www.youtube.com/shorts/xVdKRNiAmqI',
+      },
       reply: () =>
-        'This slide is a short seated exercise. Would you like to try following along for a moment? Only do what feels comfortable.',
+        'Next is a short seated exercise. Before starting, please make sure you are seated comfortably and safely on a sturdy chair. When you are ready, press the play button, and only do movements that feel comfortable for you.',
     },
     {
       id: 'childhood_birthplace',

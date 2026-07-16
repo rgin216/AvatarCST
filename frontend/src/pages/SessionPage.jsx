@@ -83,6 +83,8 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
   const wheelTimeoutRef = useRef(null);
   const wheelOptions = slide.interaction?.type === "questionWheel" ? slide.interaction.options || [] : [];
   const hasWheelInteraction = wheelOptions.length > 0;
+  const exerciseVideo = slide.interaction?.type === "youtubeShort" ? slide.interaction : null;
+  const hasSlideInteraction = hasWheelInteraction || Boolean(exerciseVideo);
   const wheelSliceDegrees = wheelOptions.length ? 360 / wheelOptions.length : 0;
   const wheelGradient = wheelOptions.length
     ? wheelOptions
@@ -452,11 +454,17 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
     const selectedIndex = Math.floor(Math.random() * wheelOptions.length);
     const selected = wheelOptions[selectedIndex];
     const sliceDegrees = 360 / wheelOptions.length;
-    const pointerAlignedRotation = 360 - (selectedIndex * sliceDegrees + sliceDegrees / 2);
+    const selectedCenterAngle = selectedIndex * sliceDegrees + sliceDegrees / 2;
+    const rightPointerAngle = 90;
 
     setWheelResult(null);
     setWheelSpinning(true);
-    setWheelRotation((current) => current + 1080 + pointerAlignedRotation);
+    setWheelRotation((current) => {
+      const currentNormalized = ((current % 360) + 360) % 360;
+      const targetRotation = ((rightPointerAngle - selectedCenterAngle) % 360 + 360) % 360;
+      const rotationDelta = (targetRotation - currentNormalized + 360) % 360;
+      return current + 1080 + rotationDelta;
+    });
 
     wheelTimeoutRef.current = setTimeout(() => {
       setWheelResult(selected);
@@ -531,10 +539,10 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
 
       <main className="session-slide-shell">
         <section
-          className={`ppt-slide${slide.imageUrl && !hasWheelInteraction ? " has-slide-image" : ""}${hasWheelInteraction ? " has-slide-interaction" : ""}`}
+          className={`ppt-slide${slide.imageUrl && !hasSlideInteraction ? " has-slide-image" : ""}${hasSlideInteraction ? " has-slide-interaction" : ""}${exerciseVideo ? " has-video-interaction" : ""}`}
           style={{
             "--slide-accent": slide.accent || theme.blush,
-            backgroundImage: slide.imageUrl && !hasWheelInteraction ? `url(${slide.imageUrl})` : undefined,
+            backgroundImage: slide.imageUrl && !hasSlideInteraction ? `url(${slide.imageUrl})` : undefined,
           }}
         >
           <div className="ppt-slide-progress">
@@ -572,6 +580,26 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
                 >
                   Spin
                 </button>
+              </div>
+            </div>
+          )}
+          {exerciseVideo && (
+            <div className="slide-video-overlay">
+              <div className="slide-video-ready">
+                <p className="slide-video-eyebrow">Seated exercise</p>
+                <h1>Ready to move?</h1>
+                <p>Please sit comfortably and safely on a sturdy chair before starting.</p>
+                <small>Only do movements that feel comfortable.</small>
+              </div>
+              <div className="slide-video-frame-shell">
+                <iframe
+                  className="slide-video-frame"
+                  src={`https://www.youtube-nocookie.com/embed/${exerciseVideo.videoId}?playsinline=1&rel=0`}
+                  title="Seated exercise follow-along video"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                  referrerPolicy="strict-origin-when-cross-origin"
+                  allowFullScreen
+                />
               </div>
             </div>
           )}

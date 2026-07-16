@@ -70,7 +70,7 @@ Each segment gives the facilitator's exact scripted direction and how to adapt t
 ---
 
 ## 10. Exercise follow along
-**You say:** Invite them to try a short seated exercise follow along.
+**You say:** Invite them to try the short seated exercise. Before it starts, ask them to make sure they are seated comfortably and safely on a sturdy chair. Tell them to press the play button when ready and to only do movements that feel comfortable.
 
 **Adapt:** If they agree, encourage comfort and participation rather than performance. If they decline, accept it cheerfully and move on.
 
