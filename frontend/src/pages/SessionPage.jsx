@@ -57,8 +57,9 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
   const [slide, setSlide] = useState(defaultSlide);
   const [avatarMode, setAvatarMode] = useState(getInitialAvatarMode);
   const [pendingPlay, setPendingPlay] = useState(false);
-  const [wheelResult, setWheelResult] = useState(null);
+  const [questionWheel, setQuestionWheel] = useState(null);
   const [wheelSpinning, setWheelSpinning] = useState(false);
+  const [wheelResultPending, setWheelResultPending] = useState(false);
   const [wheelRotation, setWheelRotation] = useState(0);
   const [skipSlideInput, setSkipSlideInput] = useState("");
   const pipelineMode = initialPipelineMode || "free";
@@ -81,10 +82,14 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
   const recordingChunksRef = useRef([]);
   const voicePlaceholderIdRef = useRef(null);
   const wheelTimeoutRef = useRef(null);
+  const wheelResultPendingRef = useRef(false);
+  const slideIdRef = useRef(defaultSlide.id);
   const wheelOptions = slide.interaction?.type === "questionWheel" ? slide.interaction.options || [] : [];
   const hasWheelInteraction = wheelOptions.length > 0;
   const exerciseVideo = slide.interaction?.type === "youtubeShort" ? slide.interaction : null;
   const hasSlideInteraction = hasWheelInteraction || Boolean(exerciseVideo);
+  const landedWheelResult = questionWheel?.status === "landed" ? questionWheel : null;
+  const sessionInputDisabled = typing || wheelResultPending;
   const wheelSliceDegrees = wheelOptions.length ? 360 / wheelOptions.length : 0;
   const wheelGradient = wheelOptions.length
     ? wheelOptions
@@ -117,12 +122,6 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
     if (animationRef.current) cancelAnimationFrame(animationRef.current);
   }, []);
 
-  useEffect(() => {
-    setWheelResult(null);
-    setWheelSpinning(false);
-    if (wheelTimeoutRef.current) clearTimeout(wheelTimeoutRef.current);
-  }, [slide.id]);
-
   useEffect(() => () => {
     if (wheelTimeoutRef.current) clearTimeout(wheelTimeoutRef.current);
   }, []);
@@ -141,7 +140,15 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
 
   function applyTurn(turn) {
     const slideData = turn.slide || defaultSlide;
+    if (slideData.id !== slideIdRef.current) {
+      slideIdRef.current = slideData.id;
+      setWheelSpinning(false);
+      wheelResultPendingRef.current = false;
+      setWheelResultPending(false);
+      if (wheelTimeoutRef.current) clearTimeout(wheelTimeoutRef.current);
+    }
     setSlide(slideData);
+    setQuestionWheel(turn.questionWheel || null);
 
     if (turn.assistantText) {
       const debugSuffix = import.meta.env.DEV
@@ -316,6 +323,8 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
   // --- Mic recording (free pipeline) ---
 
   async function startRecording() {
+    if (wheelResultPendingRef.current) return;
+
     try {
       setIsRecording(true);
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -355,7 +364,7 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
   }
 
   async function sendAudioToBackend(blob) {
-    if (typing) return;
+    if (typing || wheelResultPendingRef.current) return;
 
     // Add a placeholder that will be replaced with the real transcript on response
     const placeholderId = Date.now();
@@ -385,6 +394,8 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
   }
 
   function handleMicClick() {
+    if (wheelResultPendingRef.current && !isRecording) return;
+
     if (isRecording) {
       stopRecording();
     } else {
@@ -396,7 +407,7 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
 
   async function sendMessage(text) {
     const content = text.trim();
-    if (!content || typing) return;
+    if (!content || typing || wheelResultPendingRef.current) return;
 
     setMessages((items) => [...items, { from: "user", text: content }]);
     setInput("");
@@ -429,8 +440,9 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
     setTyping(true);
 
     try {
+      const selection = result.id ? { optionId: result.id } : { label: result.label };
       const { data } = await api.post(`/sessions/${sessionId}/respond`, {
-        content: `[[question-wheel:${JSON.stringify(result)}]]`,
+        content: `[[question-wheel:${JSON.stringify(selection)}]]`,
         avatarMode: avatarModeRef.current,
       });
       applyTurn(data);
@@ -445,11 +457,20 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
       ]);
     } finally {
       setTyping(false);
+      wheelResultPendingRef.current = false;
+      setWheelResultPending(false);
     }
   }
 
   function handleWheelSpin() {
-    if (typing || wheelSpinning || wheelResult || wheelOptions.length === 0) return;
+    if (
+      typing ||
+      isRecording ||
+      wheelSpinning ||
+      wheelResultPendingRef.current ||
+      landedWheelResult ||
+      wheelOptions.length === 0
+    ) return;
 
     const selectedIndex = Math.floor(Math.random() * wheelOptions.length);
     const selected = wheelOptions[selectedIndex];
@@ -457,7 +478,8 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
     const selectedCenterAngle = selectedIndex * sliceDegrees + sliceDegrees / 2;
     const rightPointerAngle = 90;
 
-    setWheelResult(null);
+    wheelResultPendingRef.current = true;
+    setWheelResultPending(true);
     setWheelSpinning(true);
     setWheelRotation((current) => {
       const currentNormalized = ((current % 360) + 360) % 360;
@@ -467,7 +489,6 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
     });
 
     wheelTimeoutRef.current = setTimeout(() => {
-      setWheelResult(selected);
       setWheelSpinning(false);
       sendQuestionWheelResult(selected);
     }, 1400);
@@ -527,9 +548,9 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
               onChange={(event) => setSkipSlideInput(event.target.value)}
               onKeyDown={(event) => event.key === "Enter" && handleSkipToSlide()}
               placeholder="Slide"
-              disabled={typing}
+              disabled={sessionInputDisabled}
             />
-            <button type="button" onClick={handleSkipToSlide} disabled={typing}>
+            <button type="button" onClick={handleSkipToSlide} disabled={sessionInputDisabled}>
               Go
             </button>
           </div>
@@ -575,8 +596,8 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
                   type="button"
                   className="slide-wheel-spin"
                   onClick={handleWheelSpin}
-                  disabled={typing || wheelSpinning || Boolean(wheelResult)}
-                  aria-label={wheelResult ? `Wheel landed on ${wheelResult.label}` : "Spin the question wheel"}
+                  disabled={typing || isRecording || wheelSpinning || wheelResultPending || Boolean(landedWheelResult)}
+                  aria-label={landedWheelResult ? `Wheel landed on ${landedWheelResult.label}` : "Spin the question wheel"}
                 >
                   Spin
                 </button>
@@ -589,7 +610,9 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
                 <p className="slide-video-eyebrow">Seated exercise</p>
                 <h1>Ready to move?</h1>
                 <p>Please sit comfortably and safely on a sturdy chair before starting.</p>
-                <small>Only do movements that feel comfortable.</small>
+                <small>
+                  Only do movements that feel comfortable. {exerciseVideo.completionPrompt}
+                </small>
               </div>
               <div className="slide-video-frame-shell">
                 <iframe
@@ -688,7 +711,7 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
           onClick={handleMicClick}
           className={`mic-btn${isRecording ? " mic-btn-active" : ""}`}
           aria-label={isRecording ? "Stop recording" : "Start microphone"}
-          disabled={typing && !isRecording}
+          disabled={sessionInputDisabled && !isRecording}
           title={pipelineMode === "openai-fast-scripted" ? "Recorded transcription with streaming scripted responses" : undefined}
         >
           {isRecording ? (
@@ -710,8 +733,9 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
           onKeyDown={(event) => event.key === "Enter" && sendMessage(input)}
           placeholder="Type your response..."
           className="chat-input"
+          disabled={sessionInputDisabled}
         />
-        <button type="button" onClick={() => sendMessage(input)} className="send-btn" aria-label="Send">
+        <button type="button" onClick={() => sendMessage(input)} className="send-btn" aria-label="Send" disabled={sessionInputDisabled}>
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <line x1="22" y1="2" x2="11" y2="13"/>
             <polygon points="22 2 15 22 11 13 2 9 22 2"/>

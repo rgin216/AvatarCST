@@ -56,6 +56,73 @@ const normalizeAnswer = (content = '') =>
     .replace(/\s+/g, ' ')
     .trim();
 
+const NUMBER_WORD_VALUES = {
+  zero: 0,
+  oh: 0,
+  one: 1,
+  two: 2,
+  three: 3,
+  four: 4,
+  five: 5,
+  six: 6,
+  seven: 7,
+  eight: 8,
+  nine: 9,
+  ten: 10,
+  eleven: 11,
+  twelve: 12,
+  thirteen: 13,
+  fourteen: 14,
+  fifteen: 15,
+  sixteen: 16,
+  seventeen: 17,
+  eighteen: 18,
+  nineteen: 19,
+  twenty: 20,
+  thirty: 30,
+  forty: 40,
+  fifty: 50,
+  sixty: 60,
+  seventy: 70,
+  eighty: 80,
+  ninety: 90,
+};
+
+const parseNumberBelowHundred = (tokens = []) => {
+  if (tokens.length === 1) return NUMBER_WORD_VALUES[tokens[0]] ?? null;
+  if (tokens.length !== 2) return null;
+
+  const tens = NUMBER_WORD_VALUES[tokens[0]];
+  const units = NUMBER_WORD_VALUES[tokens[1]];
+  if (tens == null || units == null) return null;
+  if (tens === 0) return units;
+  if (tens < 20 || tens % 10 !== 0 || units > 9) return null;
+  return tens + units;
+};
+
+const normalizeYearAnswer = (content = '') => {
+  const normalized = normalizeAnswer(content);
+  const numericYear = normalized.match(/(?:^|\s)(\d{4})(?:\s|$)/)?.[1];
+  if (numericYear) return numericYear;
+
+  const ignoredWords = new Set(['and', 'i', 'it', 'is', 'maybe', 'the', 'think', 'year']);
+  const tokens = normalized.split(' ').filter((token) => token && !ignoredWords.has(token));
+  const thousandIndex = tokens.indexOf('thousand');
+  if (thousandIndex > 0) {
+    const thousands = parseNumberBelowHundred(tokens.slice(0, thousandIndex));
+    const remainder = parseNumberBelowHundred(tokens.slice(thousandIndex + 1));
+    if (thousands != null && remainder != null) return String(thousands * 1000 + remainder);
+  }
+
+  for (let splitIndex = 1; splitIndex < tokens.length; splitIndex += 1) {
+    const century = parseNumberBelowHundred(tokens.slice(0, splitIndex));
+    const remainder = parseNumberBelowHundred(tokens.slice(splitIndex));
+    if (century >= 10 && remainder != null) return String(century * 100 + remainder);
+  }
+
+  return '';
+};
+
 const getExpectedOrientationAnswer = (type) => {
   const parts = getNzDateParts();
   if (type === 'weekday') return parts.weekday;
@@ -75,6 +142,9 @@ const isCorrectOrientationAnswer = (content = '', expected = '') => {
   const normalized = normalizeAnswer(content);
   const normalizedExpected = normalizeAnswer(expected);
   if (!normalized || !normalizedExpected) return false;
+  if (/^\d{4}$/.test(normalizedExpected)) {
+    return normalizeYearAnswer(content) === normalizedExpected;
+  }
   if (normalized.includes(normalizedExpected)) return true;
 
   if (normalizedExpected.length >= 3) {
@@ -108,7 +178,7 @@ const evaluateOrientationAnswer = ({ step, content, retryCount }) => {
   if (retryCount === 0) {
     return {
       answered: false,
-      response: `Good try, but it is actually ${expected}. Let's try it again.`,
+      response: 'Good try. Let\'s try that once more.',
     };
   }
 
@@ -167,16 +237,27 @@ const parseAdaptiveTurn = (text = '') => {
   };
 };
 
-const parseQuestionWheelEvent = (content = '') => {
+const isQuestionWheelProtocol = (content = '') => /^\[\[question-wheel:/i.test(content.trim());
+
+const parseQuestionWheelEvent = (content = '', step = null) => {
   const match = content.trim().match(/^\[\[question-wheel:(.+)\]\]$/s);
   if (!match) return null;
 
   try {
     const parsed = JSON.parse(match[1]);
-    if (!parsed?.label || !parsed?.question) return null;
+    const options = step?.interaction?.type === 'questionWheel' ? step.interaction.options || [] : [];
+    const requestedId = String(parsed?.optionId || parsed?.id || '').trim();
+    const requestedLabel = String(parsed?.label || '').trim();
+    const option = options.find((candidate) =>
+      (requestedId && String(candidate.id || '') === requestedId) ||
+      (requestedLabel && candidate.label.toLowerCase() === requestedLabel.toLowerCase())
+    );
+    if (!option?.label || !option?.question) return null;
     return {
-      label: String(parsed.label).trim(),
-      question: String(parsed.question).trim(),
+      status: 'landed',
+      ...(option.id ? { optionId: String(option.id) } : {}),
+      label: option.label,
+      question: option.question,
     };
   } catch {
     return null;
@@ -405,10 +486,17 @@ export const getSessionTurnContext = async (sessionId) => {
 // TODO: wrap writes in a MongoDB transaction when upgrading to Atlas M10+ (replica set required)
 export const respondToSessionTurn = async ({ sessionId, content }) => {
   const userContent = content?.trim();
-  const wheelEvent = parseQuestionWheelEvent(userContent || '');
 
   const context = await getSessionTurnContext(sessionId);
   const { session, user, memoryEntries, recentMessages, step, nextStep, slide, nextSlide, boundedIndex, isFinalStep, totalSteps } = context;
+
+  const hasWheelProtocol = isQuestionWheelProtocol(userContent || '');
+  const wheelEvent = parseQuestionWheelEvent(userContent || '', step);
+  if (hasWheelProtocol && !wheelEvent) {
+    const err = new Error('Invalid question wheel option');
+    err.status = 400;
+    throw err;
+  }
 
   assertCanUseSession(session, 'respond');
 
@@ -423,6 +511,17 @@ export const respondToSessionTurn = async ({ sessionId, content }) => {
   const currentRetryCount = session.scriptStepRetryCount || 0;
   const llmProvider = getLlmProviderForSession(session);
   const useFastScriptedTurn = isOpenAIFastScriptedPipeline(session.pipelineMode);
+  const persistedWheelState = session.interactionState?.questionWheel;
+  const awaitingWheelResult = Boolean(
+    step.interaction?.type === 'questionWheel' &&
+    effectiveTurnIndex > 0 &&
+    persistedWheelState?.status !== 'landed'
+  );
+  if (awaitingWheelResult && userContent && !wheelEvent) {
+    const err = new Error('Spin the question wheel before answering');
+    err.status = 409;
+    throw err;
+  }
 
   let userMessage = null;
   if (userContent) {
@@ -443,20 +542,12 @@ export const respondToSessionTurn = async ({ sessionId, content }) => {
   const storedAnswers = Array.isArray(session.interactionState?.sessionAnswers)
     ? session.interactionState.sessionAnswers
     : [];
-  const sessionAnswers = isRecordableSessionAnswer({ step, content: userContent, wheelEvent })
-    ? [...storedAnswers, toSessionAnswer({ step, content: userContent })]
-    : storedAnswers;
-  scriptContext.sessionSummary = buildSessionSummary(sessionAnswers);
+  let sessionAnswers = storedAnswers;
+  scriptContext.sessionSummary = buildSessionSummary(storedAnswers);
 
   let answeredCurrentQuestion = true;
   let adaptiveText = '';
-  if (isQuestionWheelEvent) {
-    session.interactionState = {
-      ...(session.interactionState || {}),
-      questionWheel: wheelEvent,
-      sessionAnswers,
-    };
-  } else if (userContent && hasDeliveredQuestion) {
+  if (!isQuestionWheelEvent && userContent && hasDeliveredQuestion) {
     const deterministicTurn = evaluateOrientationAnswer({
       step,
       content: userContent,
@@ -486,6 +577,15 @@ export const respondToSessionTurn = async ({ sessionId, content }) => {
     ));
     answeredCurrentQuestion = adaptiveTurn.answered;
     adaptiveText = adaptiveTurn.response;
+  }
+
+  if (
+    hasDeliveredQuestion &&
+    answeredCurrentQuestion &&
+    isRecordableSessionAnswer({ step, content: userContent, wheelEvent })
+  ) {
+    sessionAnswers = [...storedAnswers, toSessionAnswer({ step, content: userContent })];
+    scriptContext.sessionSummary = buildSessionSummary(sessionAnswers);
   }
 
   const unansweredAttemptCount =
@@ -562,14 +662,23 @@ export const respondToSessionTurn = async ({ sessionId, content }) => {
     accent: displaySlide.accent,
     interaction: displaySlide.interaction,
   };
-  if (!isQuestionWheelEvent) {
-    const nextInteractionState = {
-      ...(session.interactionState || {}),
-      sessionAnswers,
-    };
-    if (shouldAdvance) delete nextInteractionState.questionWheel;
-    session.interactionState = nextInteractionState;
+  const nextInteractionState = {
+    ...(session.interactionState || {}),
+    sessionAnswers,
+  };
+  if (isQuestionWheelEvent) {
+    nextInteractionState.questionWheel = wheelEvent;
+  } else if (displaySlide.interaction?.type === 'questionWheel') {
+    nextInteractionState.questionWheel = nextInteractionState.questionWheel?.status === 'landed'
+      ? nextInteractionState.questionWheel
+      : { status: 'pending' };
+  } else {
+    delete nextInteractionState.questionWheel;
   }
+  if (displaySlide.id === 'childhood_summary_song') {
+    delete nextInteractionState.sessionAnswers;
+  }
+  session.interactionState = nextInteractionState;
   await session.save();
 
   let suggestedMemoryUpdates = [];
@@ -577,7 +686,7 @@ export const respondToSessionTurn = async ({ sessionId, content }) => {
     suggestedMemoryUpdates = await savePendingMemorySuggestions({
       userId: session.userId,
       sessionId: session._id,
-      suggestions: inferMemorySuggestions(userContent),
+      suggestions: wheelEvent ? [] : inferMemorySuggestions(userContent),
     });
   } catch (err) {
     console.warn('[memory] Skipping suggested memory updates:', err.message);
@@ -601,6 +710,7 @@ export const respondToSessionTurn = async ({ sessionId, content }) => {
       total: totalSteps,
     },
     slide: displaySlide,
+    questionWheel: session.interactionState?.questionWheel || null,
     assistantText,
     avatar: buildAvatarResponse({ text: assistantText }),
     messages: {

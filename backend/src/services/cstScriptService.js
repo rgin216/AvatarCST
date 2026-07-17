@@ -247,9 +247,10 @@ const scripts = {
         type: 'youtubeShort',
         videoId: 'xVdKRNiAmqI',
         videoUrl: 'https://www.youtube.com/shorts/xVdKRNiAmqI',
+        completionPrompt: 'When you are finished, or if you would prefer to skip, say or type "done" to continue.',
       },
       reply: () =>
-        'Next is a short seated exercise. Before starting, please make sure you are seated comfortably and safely on a sturdy chair. When you are ready, press the play button, and only do movements that feel comfortable for you.',
+        'Next is a short seated exercise. Before starting, please make sure you are seated comfortably and safely on a sturdy chair. When you are ready, press the play button, and only do movements that feel comfortable for you. When you are finished, or if you would prefer to skip it, just say or type done to continue.',
     },
     {
       id: 'childhood_birthplace',

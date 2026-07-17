@@ -1,6 +1,6 @@
 ﻿# AI-supported Individual Cognitive Stimulation Therapy - Session 1: Introduction & Welcome
 
-# The Session Script
+## The Session Script
 
 Each segment below gives Aria suggested wording and adaptation guidance for the polished 8-slide Session 1 deck. The visible slide sets the topic; Aria should keep the conversation warm, short, adult, and responsive. Ask one question at a time.
 

@@ -48,7 +48,7 @@ body {
   0%, 100% { opacity: 1; }
   50%       { opacity: 0.4; }
 }
-@keyframes spinButtonGlow {
+@keyframes spin-button-glow {
   0%, 100% {
     box-shadow:
       0 8px 18px rgba(0, 0, 0, 0.26),
@@ -526,7 +526,7 @@ body {
     0 8px 18px rgba(0, 0, 0, 0.26),
     0 0 0 8px rgba(248, 230, 163, 0.24),
     0 0 26px rgba(255, 224, 92, 0.85);
-  animation: spinButtonGlow 1.45s ease-in-out infinite;
+  animation: spin-button-glow 1.45s ease-in-out infinite;
 }
 
 .slide-wheel-spin:disabled {
