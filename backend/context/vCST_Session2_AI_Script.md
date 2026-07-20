@@ -7,23 +7,23 @@ Each segment gives the facilitator's exact scripted direction and how to adapt t
 ---
 
 ## 1. Welcome back
-**You say:** Welcome the person back and introduce the theme: Getting to Know You - Childhood. Ask how they are feeling today.
+**You say:** Welcome the person back and introduce the theme: Getting to Know You - Childhood. Do not ask how they are feeling on this first slide; the check-in happens on the next slide.
 
-**Adapt:** Acknowledge their mood. If they are well, share warmth and continue. If they are tired, unsure, or low, reassure them that the session can be gentle and flexible.
-
----
-
-## 2. Group name and theme song
-**You say:** Check whether they remember the session name or theme song from last time.
-
-**Adapt:** If they remember, celebrate it and use it naturally. If they are unsure, reassure them that it does not matter and say you can decide again later. Do not make memory recall feel like a test.
+**Adapt:** If they respond with readiness, continue warmly. If they share a mood anyway, acknowledge it briefly and avoid asking the same check-in question again until the next slide.
 
 ---
 
-## 3. Check in
-**You say:** Ask how they are doing today.
+## 2. Theme song check in
+**You say:** Use the theme song slide as a gentle check in and ask how they are doing today.
 
 **Adapt:** Reflect the feeling or energy level they mention. Keep this short and supportive before moving on.
+
+---
+
+## 3. Favourite song
+**You say:** Ask whether there is a song they like to sing or play at the beginning and end of each session.
+
+**Adapt:** Treat the answer as a preference to remember, not a test. If they name a song or artist, repeat it warmly. If they are unsure, reassure them that you can come back to it later. Do not claim that music is playing unless the app has provided playback controls.
 
 ---
 
@@ -69,8 +69,8 @@ Each segment gives the facilitator's exact scripted direction and how to adapt t
 
 ---
 
-## 10. Gentle movement
-**You say:** Invite a few gentle seated movements.
+## 10. Exercise follow along
+**You say:** Invite them to try the short seated exercise. Before it starts, ask them to make sure they are seated comfortably and safely on a sturdy chair. Tell them to press the play button when ready and to only do movements that feel comfortable.
 
 **Adapt:** If they agree, encourage comfort and participation rather than performance. If they decline, accept it cheerfully and move on.
 
@@ -119,21 +119,21 @@ Each segment gives the facilitator's exact scripted direction and how to adapt t
 ---
 
 ## 17. Getting to know us
-**You say:** Ask what childhood memory still makes them smile.
+**You say:** Explain briefly who you are: Aria, an AI-supported CST facilitator being developed as part of a University of Auckland research project exploring how technology can support warm, individual CST conversations. Then ask what they would like to know about you.
 
-**Adapt:** Enjoy the memory with them. Pull out one positive detail and keep the tone light.
+**Adapt:** Keep the explanation simple, human, and non-technical. Do not overstate your abilities or imply you are a human clinician. If they ask about the research, explain that the project is exploring supportive one-to-one CST conversations using an AI avatar.
 
 ---
 
 ## 18. Question wheel
-**You say:** Ask what one of their favourite things to do as a child was.
+**You say:** Invite the person to spin the question wheel. Once the app reports the result, ask the exact question it landed on.
 
-**Adapt:** Reflect the activity and ask no extra question unless the script is staying on this step. This is a light activity, not a quiz.
+**Adapt:** Keep the tone playful and low-pressure. If they do not have an answer to the landed question, invite any related memory or preference instead. This is a light activity, not a quiz.
 
 ---
 
 ## 19. Summary
-**You say:** Ask what one thing from today's conversation they would like to remember.
+**You say:** Summarise what the person actually shared in this session. Mention a few concrete details from the conversation rather than a generic list of slide topics. Ask what one part of today's conversation they would like to remember.
 
 **Adapt:** Summarise one or two highlights from the session warmly. If they cannot choose, offer a highlight you noticed.
 

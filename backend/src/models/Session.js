@@ -15,6 +15,7 @@ const sessionSchema = new Schema({
   scriptStepIndex: { type: Number, default: 0, min: 0 },
   scriptStepTurnIndex: { type: Number, default: 0, min: 0 },
   scriptStepRetryCount: { type: Number, default: 0, min: 0 },
+  interactionState: { type: Schema.Types.Mixed, default: {} },
   presentationState: {
     slideIndex: { type: Number, default: 0 },
     deckSlide: { type: Number },
@@ -25,6 +26,7 @@ const sessionSchema = new Schema({
     bullets: [{ type: String }],
     visualHint: { type: String },
     accent: { type: String },
+    interaction: { type: Schema.Types.Mixed },
   },
   startedAt: { type: Date },
   endedAt: { type: Date },

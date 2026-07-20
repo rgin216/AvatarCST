@@ -10,14 +10,14 @@ import theme from "../utils/theme";
 
 const defaultSlide = {
   index: 0,
-  total: 14,
+  total: 8,
   deckSlide: 1,
   imageUrl: "/slides/session1/slide-01.jpg",
-  title: "Virtual Cognitive Stimulation Therapy",
+  title: "AI-supported Individual Cognitive Stimulation Therapy",
   subtitle: "Session 1: Introduction & Welcome",
   prompt: "How are you feeling right now?",
-  bullets: ["Welcome", "No preparation needed", "Nothing you can get wrong"],
-  visualHint: "Source deck: NZ01. Welcome.pptx, slide 1",
+  bullets: ["Introduction & Welcome", "AI-supported CST", "University of Auckland"],
+  visualHint: "Source deck: NZ01. Welcome, slide 1",
   accent: "#00AEEF",
 };
 
@@ -27,6 +27,7 @@ const avatarModes = [
   { id: "visualizer", label: "Audio visual" },
 ];
 const avatarModeIds = new Set(avatarModes.map((mode) => mode.id));
+const wheelColors = ["#7A9DAD", "#F47C20", "#A8C5A0", "#4472C4", "#F4C8B0"];
 
 function getInitialAvatarMode() {
   if (!import.meta.env.DEV) return "male";
@@ -56,7 +57,13 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
   const [slide, setSlide] = useState(defaultSlide);
   const [avatarMode, setAvatarMode] = useState(getInitialAvatarMode);
   const [pendingPlay, setPendingPlay] = useState(false);
+  const [questionWheel, setQuestionWheel] = useState(null);
+  const [wheelSpinning, setWheelSpinning] = useState(false);
+  const [wheelResultPending, setWheelResultPending] = useState(false);
+  const [wheelRotation, setWheelRotation] = useState(0);
+  const [skipSlideInput, setSkipSlideInput] = useState("");
   const pipelineMode = initialPipelineMode || "free";
+  const showDevSkip = import.meta.env.DEV;
   const timelineRef = useRef(null);
   const avatarModeRef = useRef(avatarMode);
 
@@ -74,6 +81,25 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
   const mediaStreamRef = useRef(null);
   const recordingChunksRef = useRef([]);
   const voicePlaceholderIdRef = useRef(null);
+  const wheelTimeoutRef = useRef(null);
+  const wheelResultPendingRef = useRef(false);
+  const slideIdRef = useRef(defaultSlide.id);
+  const wheelOptions = slide.interaction?.type === "questionWheel" ? slide.interaction.options || [] : [];
+  const hasWheelInteraction = wheelOptions.length > 0;
+  const exerciseVideo = slide.interaction?.type === "youtubeShort" ? slide.interaction : null;
+  const hasSlideInteraction = hasWheelInteraction || Boolean(exerciseVideo);
+  const landedWheelResult = questionWheel?.status === "landed" ? questionWheel : null;
+  const sessionInputDisabled = typing || wheelResultPending;
+  const wheelSliceDegrees = wheelOptions.length ? 360 / wheelOptions.length : 0;
+  const wheelGradient = wheelOptions.length
+    ? wheelOptions
+        .map((_, index) => {
+          const start = (index / wheelOptions.length) * 360;
+          const end = ((index + 1) / wheelOptions.length) * 360;
+          return `${wheelColors[index % wheelColors.length]} ${start}deg ${end}deg`;
+        })
+        .join(", ")
+    : "";
 
   useEffect(() => {
     avatarModeRef.current = avatarMode;
@@ -97,6 +123,10 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
   }, []);
 
   useEffect(() => () => {
+    if (wheelTimeoutRef.current) clearTimeout(wheelTimeoutRef.current);
+  }, []);
+
+  useEffect(() => () => {
     audioContextRef.current?.close();
   }, []);
 
@@ -110,7 +140,15 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
 
   function applyTurn(turn) {
     const slideData = turn.slide || defaultSlide;
+    if (slideData.id !== slideIdRef.current) {
+      slideIdRef.current = slideData.id;
+      setWheelSpinning(false);
+      wheelResultPendingRef.current = false;
+      setWheelResultPending(false);
+      if (wheelTimeoutRef.current) clearTimeout(wheelTimeoutRef.current);
+    }
     setSlide(slideData);
+    setQuestionWheel(turn.questionWheel || null);
 
     if (turn.assistantText) {
       const debugSuffix = import.meta.env.DEV
@@ -285,6 +323,8 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
   // --- Mic recording (free pipeline) ---
 
   async function startRecording() {
+    if (wheelResultPendingRef.current) return;
+
     try {
       setIsRecording(true);
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -324,7 +364,7 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
   }
 
   async function sendAudioToBackend(blob) {
-    if (typing) return;
+    if (typing || wheelResultPendingRef.current) return;
 
     // Add a placeholder that will be replaced with the real transcript on response
     const placeholderId = Date.now();
@@ -354,6 +394,8 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
   }
 
   function handleMicClick() {
+    if (wheelResultPendingRef.current && !isRecording) return;
+
     if (isRecording) {
       stopRecording();
     } else {
@@ -365,7 +407,7 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
 
   async function sendMessage(text) {
     const content = text.trim();
-    if (!content || typing) return;
+    if (!content || typing || wheelResultPendingRef.current) return;
 
     setMessages((items) => [...items, { from: "user", text: content }]);
     setInput("");
@@ -391,6 +433,102 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
     }
   }
 
+  async function sendQuestionWheelResult(result) {
+    if (!result || typing) return;
+
+    setMessages((items) => [...items, { from: "user", text: `The wheel landed on ${result.label}.` }]);
+    setTyping(true);
+
+    try {
+      const selection = result.id ? { optionId: result.id } : { label: result.label };
+      const { data } = await api.post(`/sessions/${sessionId}/respond`, {
+        content: `[[question-wheel:${JSON.stringify(selection)}]]`,
+        avatarMode: avatarModeRef.current,
+      });
+      applyTurn(data);
+    } catch (err) {
+      console.error("Failed to send wheel result", err);
+      setMessages((items) => [
+        ...items,
+        {
+          from: "avatar",
+          text: "I could not spin the wheel just now. Please choose any question you like from the wheel.",
+        },
+      ]);
+    } finally {
+      setTyping(false);
+      wheelResultPendingRef.current = false;
+      setWheelResultPending(false);
+    }
+  }
+
+  function handleWheelSpin() {
+    if (
+      typing ||
+      isRecording ||
+      wheelSpinning ||
+      wheelResultPendingRef.current ||
+      landedWheelResult ||
+      wheelOptions.length === 0
+    ) return;
+
+    const selectedIndex = Math.floor(Math.random() * wheelOptions.length);
+    const selected = wheelOptions[selectedIndex];
+    const sliceDegrees = 360 / wheelOptions.length;
+    const selectedCenterAngle = selectedIndex * sliceDegrees + sliceDegrees / 2;
+    const rightPointerAngle = 90;
+
+    wheelResultPendingRef.current = true;
+    setWheelResultPending(true);
+    setWheelSpinning(true);
+    setWheelRotation((current) => {
+      const currentNormalized = ((current % 360) + 360) % 360;
+      const targetRotation = ((rightPointerAngle - selectedCenterAngle) % 360 + 360) % 360;
+      const rotationDelta = (targetRotation - currentNormalized + 360) % 360;
+      return current + 1080 + rotationDelta;
+    });
+
+    wheelTimeoutRef.current = setTimeout(() => {
+      setWheelSpinning(false);
+      sendQuestionWheelResult(selected);
+    }, 1400);
+  }
+
+  async function handleSkipToSlide() {
+    const requestedSlide = Number.parseInt(skipSlideInput, 10);
+    const totalSlides = slide.total || 1;
+    if (!sessionId || Number.isNaN(requestedSlide) || typing) return;
+
+    const targetSlide = Math.min(Math.max(requestedSlide, 1), totalSlides);
+    setTyping(true);
+
+    try {
+      await api.patch(`/sessions/${sessionId}`, {
+        scriptStepIndex: targetSlide - 1,
+        scriptStepTurnIndex: 0,
+        scriptStepRetryCount: 0,
+        interactionState: {},
+      });
+      setMessages((items) => [
+        ...items,
+        { from: "avatar", text: `Skipped to slide ${targetSlide} for testing.` },
+      ]);
+      const { data } = await api.post(`/sessions/${sessionId}/respond`, {
+        content: "",
+        avatarMode: avatarModeRef.current,
+      });
+      applyTurn(data);
+    } catch (err) {
+      console.error("Failed to skip slide", err);
+      setMessages((items) => [
+        ...items,
+        { from: "avatar", text: "I could not skip to that slide just now." },
+      ]);
+    } finally {
+      setTyping(false);
+    }
+  }
+
   return (
     <div className="session-stage">
       <header className="session-topbar">
@@ -399,21 +537,95 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
           <span>Session in progress</span>
         </div>
         <div className="session-meta">Reminiscence / {formatElapsed(elapsed)}</div>
+        {showDevSkip && (
+          <div className="session-skip-control" aria-label="Skip to slide for testing">
+            <span>Skip</span>
+            <input
+              type="number"
+              min="1"
+              max={slide.total || 1}
+              value={skipSlideInput}
+              onChange={(event) => setSkipSlideInput(event.target.value)}
+              onKeyDown={(event) => event.key === "Enter" && handleSkipToSlide()}
+              placeholder="Slide"
+              disabled={sessionInputDisabled}
+            />
+            <button type="button" onClick={handleSkipToSlide} disabled={sessionInputDisabled}>
+              Go
+            </button>
+          </div>
+        )}
         <button onClick={onEnd} className="session-end-button">End</button>
       </header>
 
       <main className="session-slide-shell">
         <section
-          className={`ppt-slide${slide.imageUrl ? " has-slide-image" : ""}`}
+          className={`ppt-slide${slide.imageUrl && !hasSlideInteraction ? " has-slide-image" : ""}${hasSlideInteraction ? " has-slide-interaction" : ""}${exerciseVideo ? " has-video-interaction" : ""}`}
           style={{
             "--slide-accent": slide.accent || theme.blush,
-            backgroundImage: slide.imageUrl ? `url(${slide.imageUrl})` : undefined,
+            backgroundImage: slide.imageUrl && !hasSlideInteraction ? `url(${slide.imageUrl})` : undefined,
           }}
         >
           <div className="ppt-slide-progress">
             Session step {slide.index + 1} / {slide.total}
             {slide.deckSlide ? ` / Deck slide ${slide.deckSlide}` : ""}
           </div>
+          {hasWheelInteraction && (
+            <div className="slide-wheel-overlay">
+              <div className="slide-wheel-pointer" aria-hidden="true" />
+              <div
+                className="slide-wheel"
+                style={{
+                  "--wheel-rotation": `${wheelRotation}deg`,
+                  "--wheel-spin-rotation": `${-wheelRotation}deg`,
+                  background: `conic-gradient(${wheelGradient})`,
+                }}
+              >
+                {wheelOptions.map((option, index) => (
+                  <span
+                    key={option.label}
+                    className="slide-wheel-label"
+                    style={{
+                      "--label-angle": `${index * wheelSliceDegrees + wheelSliceDegrees / 2}deg`,
+                    }}
+                  >
+                    <span>{option.label}</span>
+                  </span>
+                ))}
+                <button
+                  type="button"
+                  className="slide-wheel-spin"
+                  onClick={handleWheelSpin}
+                  disabled={typing || isRecording || wheelSpinning || wheelResultPending || Boolean(landedWheelResult)}
+                  aria-label={landedWheelResult ? `Wheel landed on ${landedWheelResult.label}` : "Spin the question wheel"}
+                >
+                  Spin
+                </button>
+              </div>
+            </div>
+          )}
+          {exerciseVideo && (
+            <div className="slide-video-overlay">
+              <div className="slide-video-ready">
+                <p className="slide-video-eyebrow">Seated exercise</p>
+                <h1>Ready to move?</h1>
+                <p>Please sit comfortably and safely on a sturdy chair before starting.</p>
+                <small>
+                  Only do movements that feel comfortable. {exerciseVideo.completionPrompt}
+                </small>
+              </div>
+              <div className="slide-video-frame-shell">
+                <iframe
+                  className="slide-video-frame"
+                  src={`https://www.youtube-nocookie.com/embed/${exerciseVideo.videoId}?playsinline=1&rel=0`}
+                  title="Seated exercise follow-along video"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                  referrerPolicy="strict-origin-when-cross-origin"
+                  allowFullScreen
+                />
+              </div>
+            </div>
+          )}
           <div className="ppt-slide-content">
             <p className="ppt-slide-kicker">{slide.subtitle}</p>
             <h1>{slide.title}</h1>
@@ -499,7 +711,7 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
           onClick={handleMicClick}
           className={`mic-btn${isRecording ? " mic-btn-active" : ""}`}
           aria-label={isRecording ? "Stop recording" : "Start microphone"}
-          disabled={typing && !isRecording}
+          disabled={sessionInputDisabled && !isRecording}
           title={pipelineMode === "openai-fast-scripted" ? "Recorded transcription with streaming scripted responses" : undefined}
         >
           {isRecording ? (
@@ -521,8 +733,9 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
           onKeyDown={(event) => event.key === "Enter" && sendMessage(input)}
           placeholder="Type your response..."
           className="chat-input"
+          disabled={sessionInputDisabled}
         />
-        <button type="button" onClick={() => sendMessage(input)} className="send-btn" aria-label="Send">
+        <button type="button" onClick={() => sendMessage(input)} className="send-btn" aria-label="Send" disabled={sessionInputDisabled}>
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <line x1="22" y1="2" x2="11" y2="13"/>
             <polygon points="22 2 15 22 11 13 2 9 22 2"/>
