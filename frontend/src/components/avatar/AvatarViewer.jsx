@@ -18,12 +18,11 @@ const AVATAR_CONFIGS = {
   female: {
     loader: "fbx",
     modelPath: "/models/female-rpm-vrchat/source/Wolf3D_readyplayerme_male_01.fbx",
-    position: [0, -1.55, -0.08],
-    scale: 0.0092,
+    position: [0, -2, -0.08],
+    scale: 0.0125,
     camera: { position: [0, 0, 1.2], fov: 25 },
     headGazeOffset: { pitchUp: -0.015, turnRight: 0.01 },
-    headMotion: 0.42,
-    bodyBob: { idle: 0.012, speech: 0.026, speed: 1.7 },
+    headMotion: 1,
     prepareMaterials: true,
     boneWorldRotationOffsets: [
       { name: "LeftArm", axis: [0, 0, 1], angle: -0.95 },
@@ -287,14 +286,6 @@ function RiggedAvatarScene({ config, lipSyncFrameRef, sourceScene }) {
     );
     consonantPulse.current = THREE.MathUtils.damp(consonantPulse.current, 0, 7.5, delta);
     previousConsonant.current = consonantStrength;
-
-    if (root.current && config.bodyBob) {
-      const bob = Math.sin(time * config.bodyBob.speed) * config.bodyBob.idle;
-      const speechBob = Math.sin(time * config.bodyBob.speed * 2.2 + 0.4)
-        * config.bodyBob.speech
-        * speechActivity.current;
-      root.current.position.y = config.position[1] + bob + speechBob;
-    }
 
     [...VISEME_TARGETS, ...MOUTH_TARGETS].forEach((targetName) => {
       mouthInfluences[targetName] = 0;
