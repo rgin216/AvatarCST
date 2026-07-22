@@ -67,6 +67,27 @@ npm run dev
 Frontend runs on `http://localhost:5173`  
 Backend runs on `http://localhost:5000`
 
+### Cloud Run Rhubarb support
+
+The backend's npm `postinstall` hook downloads the pinned Rhubarb Lip Sync 1.14.0
+binary for Windows or Linux, verifies its SHA-256 checksum, extracts it into
+`backend/vendor/rhubarb`, and runs `rhubarb --version` before completing.
+
+For a Cloud Run source deployment, make Rhubarb a required build dependency so
+the deployment fails instead of silently using audio-energy fallback when the
+binary cannot be installed:
+
+```bash
+gcloud run deploy avatarcst-backend \
+  --source ./backend \
+  --region australia-southeast1 \
+  --set-build-env-vars REQUIRE_RHUBARB=1
+```
+
+After deployment, request `GET /api/sessions/pipeline` and confirm the response
+contains `"rhubarb":{"available":true,"source":"vendored"}`. A custom binary
+can instead be selected at runtime with `RHUBARB_PATH`.
+
 ## Development Phases
 
 - **Phase 1** ✅ Setup (repo, deps, basic server)

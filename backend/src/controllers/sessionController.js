@@ -10,7 +10,7 @@ import {
   pipeSpeechStream,
   synthesizeSpeech,
 } from '../services/ttsService.js';
-import { generateLipSync } from '../services/rhubarbService.js';
+import { generateLipSync, getRhubarbStatus } from '../services/rhubarbService.js';
 import { buildAvatarResponse } from '../services/avatarService.js';
 import { createSpeechStreamToken, getSpeechStream } from '../services/speechStreamService.js';
 import { GENERATED_AUDIO_DIR } from '../config/storage.js';
@@ -229,6 +229,7 @@ export const respondToSession = async (req, res, next) => {
 export const getPipelineInfo = (_req, res) => {
   const info = {
     mode: DEFAULT_PIPELINE_MODE,
+    rhubarb: getRhubarbStatus(),
     ...(DEFAULT_PIPELINE_MODE === 'free' && {
       stt: 'groq-whisper',
       llm: 'groq',

@@ -1,5 +1,6 @@
 import { spawn } from 'child_process';
 import { createHash } from 'crypto';
+import extract from 'extract-zip';
 import fs from 'fs/promises';
 import https from 'https';
 import path from 'path';
@@ -23,6 +24,10 @@ const pinnedAssets = {
   win32: {
     name: `Rhubarb-Lip-Sync-${RHUBARB_VERSION}-Windows.zip`,
     sha256: '62fa416a8d5e382a3828ee4bef358ce520d0b4cabdeaea75a7ac266d098d1fe3',
+  },
+  linux: {
+    name: `Rhubarb-Lip-Sync-${RHUBARB_VERSION}-Linux.zip`,
+    sha256: 'a9a9074862cff47b2d59b8bf399a678a3b0b74f9452ad6ad94cb292913dd8667',
   },
 };
 
@@ -80,6 +85,10 @@ function requestBuffer(url, headers = {}, redirectCount = 0) {
 }
 
 function getPinnedAsset() {
+  if (process.platform === 'linux' && process.arch !== 'x64') {
+    return null;
+  }
+
   const asset = pinnedAssets[process.platform];
   if (!asset) {
     return null;
@@ -110,10 +119,6 @@ function run(command, args) {
   });
 }
 
-function quotePowerShellLiteral(value) {
-  return `'${String(value).replace(/'/g, "''")}'`;
-}
-
 async function rmQuiet(targetPath) {
   try {
     await fs.rm(targetPath, { recursive: true, force: true, maxRetries: 3, retryDelay: 300 });
@@ -140,28 +145,7 @@ async function cleanOldTempFiles() {
 async function extractZip() {
   await rmQuiet(EXTRACT_DIR);
   await fs.mkdir(EXTRACT_DIR, { recursive: true });
-
-  if (process.platform === 'win32') {
-    const command = [
-      'Add-Type -AssemblyName System.IO.Compression.FileSystem;',
-      '[System.IO.Compression.ZipFile]::ExtractToDirectory(',
-      quotePowerShellLiteral(ZIP_PATH),
-      ',',
-      quotePowerShellLiteral(EXTRACT_DIR),
-      ')',
-    ].join(' ');
-
-    await run('powershell.exe', [
-      '-NoProfile',
-      '-ExecutionPolicy',
-      'Bypass',
-      '-Command',
-      command,
-    ]);
-    return;
-  }
-
-  await run('unzip', ['-q', '-o', ZIP_PATH, '-d', EXTRACT_DIR]);
+  await extract(ZIP_PATH, { dir: EXTRACT_DIR });
 }
 
 async function findBinary(dir) {
@@ -190,7 +174,7 @@ async function main() {
   const asset = getPinnedAsset();
   if (!asset) {
     finishWarning(
-      `Automatic Rhubarb install is only configured for Windows. Install Rhubarb manually on ${process.platform} or set RHUBARB_PATH.`
+      `Automatic Rhubarb install is not configured for ${process.platform}/${process.arch}. Install Rhubarb manually or set RHUBARB_PATH.`
     );
     return;
   }
@@ -198,6 +182,8 @@ async function main() {
   try {
     await fs.access(BIN_PATH);
     await fs.access(RESOURCE_DIR);
+    if (process.platform !== 'win32') await fs.chmod(BIN_PATH, 0o755);
+    await run(BIN_PATH, ['--version']);
     console.log(`[rhubarb-install] Rhubarb already installed at ${BIN_PATH}`);
     return;
   } catch {
@@ -219,7 +205,10 @@ async function main() {
 
     await fs.rm(BIN_DIR, { recursive: true, force: true });
     await fs.cp(path.dirname(extractedBinary), BIN_DIR, { recursive: true });
+    await fs.access(BIN_PATH);
+    await fs.access(RESOURCE_DIR);
     if (process.platform !== 'win32') await fs.chmod(BIN_PATH, 0o755);
+    await run(BIN_PATH, ['--version']);
     await rmQuiet(EXTRACT_DIR);
     await rmQuiet(ZIP_PATH);
 
