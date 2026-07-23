@@ -27,6 +27,10 @@ const avatarModes = [
   { id: "visualizer", label: "Audio visual" },
 ];
 const avatarModeIds = new Set(avatarModes.map((mode) => mode.id));
+const lipSyncModes = [
+  { id: "rhubarb", label: "Rhubarb (precise)" },
+  { id: "energy", label: "Audio energy (faster)" },
+];
 const wheelColors = ["#7A9DAD", "#F47C20", "#A8C5A0", "#4472C4", "#F4C8B0"];
 
 function getInitialAvatarMode() {
@@ -56,6 +60,7 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
   const [elapsed, setElapsed] = useState(0);
   const [slide, setSlide] = useState(defaultSlide);
   const [avatarMode, setAvatarMode] = useState(getInitialAvatarMode);
+  const [lipSyncMode, setLipSyncMode] = useState("rhubarb");
   const [pendingPlay, setPendingPlay] = useState(false);
   const [questionWheel, setQuestionWheel] = useState(null);
   const [wheelSpinning, setWheelSpinning] = useState(false);
@@ -171,12 +176,13 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
     // Real audio from free pipeline — load and auto-play
     if (turn.avatar?.audio?.url) {
       const audioUrl = getBackendBase() + turn.avatar.audio.url;
-      const useRhubarb = avatarModeRef.current !== "visualizer";
-      playLiveAudio(audioUrl, useRhubarb ? turn.avatar?.lipsync?.rhubarbJson : null);
+      playLiveAudio(audioUrl, {
+        rhubarbJson: turn.avatar?.lipsync?.rhubarbJson,
+      });
     }
   }
 
-  async function playLiveAudio(audioUrl, rhubarbJson = null) {
+  async function playLiveAudio(audioUrl, { rhubarbJson } = {}) {
     const audio = audioRef.current;
     if (!audio) return;
 
@@ -213,6 +219,7 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
         const { data } = await api.post(`/sessions/${sessionId}/respond`, {
           content: "",
           avatarMode: avatarModeRef.current,
+          lipSyncMode,
         });
         applyTurn(data);
       } catch (err) {
@@ -376,6 +383,7 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
       const formData = new FormData();
       formData.append("audio", blob, "recording.webm");
       formData.append("avatarMode", avatarModeRef.current);
+      formData.append("lipSyncMode", lipSyncMode);
 
       const { data } = await api.post(`/sessions/${sessionId}/respond-audio`, formData, {
         headers: { "Content-Type": "multipart/form-data" },
@@ -417,6 +425,7 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
       const { data } = await api.post(`/sessions/${sessionId}/respond`, {
         content,
         avatarMode: avatarModeRef.current,
+        lipSyncMode,
       });
       applyTurn(data);
     } catch (err) {
@@ -444,6 +453,7 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
       const { data } = await api.post(`/sessions/${sessionId}/respond`, {
         content: `[[question-wheel:${JSON.stringify(selection)}]]`,
         avatarMode: avatarModeRef.current,
+        lipSyncMode,
       });
       applyTurn(data);
     } catch (err) {
@@ -516,6 +526,7 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
       const { data } = await api.post(`/sessions/${sessionId}/respond`, {
         content: "",
         avatarMode: avatarModeRef.current,
+        lipSyncMode,
       });
       applyTurn(data);
     } catch (err) {
@@ -675,6 +686,16 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
               aria-label="Avatar mode"
             >
               {avatarModes.map((mode) => (
+                <option key={mode.id} value={mode.id}>{mode.label}</option>
+              ))}
+            </select>
+            <select
+              value={lipSyncMode}
+              onChange={(event) => setLipSyncMode(event.target.value)}
+              aria-label="Lip-sync mode"
+              disabled={avatarMode === "visualizer"}
+            >
+              {lipSyncModes.map((mode) => (
                 <option key={mode.id} value={mode.id}>{mode.label}</option>
               ))}
             </select>
