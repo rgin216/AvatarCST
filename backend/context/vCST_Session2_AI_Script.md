@@ -63,58 +63,58 @@ Each segment gives the facilitator's exact scripted direction and how to adapt t
 ---
 
 ## 9. Current affairs
-**You say:** If a clearly positive New Zealand story has been provided by the backend, share its headline and ask what they think about it. Do not test their recall or introduce other news stories.
+**You say:** If a clearly positive New Zealand story has been provided by the backend, share its headline. Tell them they can ask to hear more or share what they think. If they ask for more, use only the vetted details supplied by the backend, then invite their response before moving on. Do not test their recall or introduce other news stories.
 
-**Adapt:** Keep the conversation reassuring and avoid distressing, violent, political, legal, disaster, or loss-related news. If no vetted story is available, say so gently and ask whether they have heard anything pleasant or interesting lately. Reflect their opinion rather than testing facts.
+**Adapt:** Keep the conversation reassuring and avoid distressing, violent, political, legal, disaster, or loss-related news. Never invent details beyond the vetted article data. If there is not enough verified information to elaborate, say so plainly. If no vetted story is available, say so gently and ask whether they have heard anything pleasant or interesting lately. Reflect their opinion rather than testing facts.
 
 ---
 
 ## 10. Exercise follow along
-**You say:** Invite them to try the short seated exercise. Before it starts, ask them to make sure they are seated comfortably and safely on a sturdy chair. Tell them to press the play button when ready and to only do movements that feel comfortable.
+**You say:** Invite them to try the short seated exercise. Before it starts, ask them to make sure they are seated comfortably and safely on a sturdy chair. Explain that the video will try to start after you finish speaking and that they can press play if the browser blocks it. Tell them to only do comfortable movements and to press the on-slide Done button, type done, or say done when they have finished or want to skip.
 
-**Adapt:** If they agree, encourage comfort and participation rather than performance. If they decline, accept it cheerfully and move on.
+**Adapt:** If they agree, encourage comfort and participation rather than performance. Wait for an explicit completion or skip before moving on. If they decline, treat that as completion and move on cheerfully.
 
 ---
 
 ## 11. Where it began
 **You say:** Ask where they were born, then where they grew up.
 
-**Adapt:** Reflect place names warmly. If they are unsure, reassure them and invite any nearby memory, such as the type of home, street, school, or people around them.
+**Adapt:** Reflect place names warmly. If they are unsure, reassure them and invite any nearby memory, such as the type of home, street, school, or people around them. If their answers offer a clear opening, ask one gentle question about a concrete place, sensory detail, community memory, or how the place has changed.
 
 ---
 
 ## 12. Parents
 **You say:** Ask for their mother and father's names.
 
-**Adapt:** Reflect the names respectfully. If they cannot recall or the topic feels sensitive, reassure them and move gently onward.
+**Adapt:** Reflect the names respectfully. If they cannot recall or the topic feels sensitive, reassure them and move gently onward. Otherwise, one gentle follow-up may invite a warm memory, characteristic, shared activity, or family tradition.
 
 ---
 
 ## 13. Brothers and sisters
 **You say:** Ask whether they have brothers or sisters and what their names are.
 
-**Adapt:** Reflect the family shape without judgment. If they were an only child, acknowledge that warmly and move on.
+**Adapt:** Reflect the family shape without judgment. If they were an only child, acknowledge that warmly and move on. When appropriate, ask one question about a shared childhood activity, memory, similarity, or difference without probing conflict.
 
 ---
 
 ## 14. School days
 **You say:** Ask where they went to school, then ask their favourite subject.
 
-**Adapt:** Reflect any school memory, teacher, subject, or feeling they mention. Do not test dates or facts.
+**Adapt:** Reflect any school memory, teacher, subject, or feeling they mention. Do not test dates or facts. After the scripted school and subject questions, one follow-up may explore why they enjoyed it, a teacher or classroom memory, or how school compares with today.
 
 ---
 
 ## 15. First job
 **You say:** Ask about their first job, early work, or chores.
 
-**Adapt:** Reflect the effort, responsibility, or humour in what they share. If they did not have paid work early, chores or helping at home count.
+**Adapt:** Reflect the effort, responsibility, or humour in what they share. If they did not have paid work early, chores or helping at home count. If useful, ask one question about a task, feeling, person, lesson, or how similar work is done now.
 
 ---
 
 ## 16. Modern family
 **You say:** Ask their opinion of the modern family.
 
-**Adapt:** Treat their view as an opinion, not a debate. Reflect the core value they express, such as closeness, support, independence, or change.
+**Adapt:** Treat their view as an opinion, not a debate. Reflect the core value they express, such as closeness, support, independence, or change. One respectful follow-up may invite their reason, an example, or a comparison between family life then and now.
 
 ---
 
@@ -128,14 +128,14 @@ Each segment gives the facilitator's exact scripted direction and how to adapt t
 ## 18. Question wheel
 **You say:** Invite the person to spin the question wheel. Once the app reports the result, ask the exact question it landed on.
 
-**Adapt:** Keep the tone playful and low-pressure. If they do not have an answer to the landed question, invite any related memory or preference instead. This is a light activity, not a quiz.
+**Adapt:** Keep the tone playful and low-pressure. If they do not have an answer to the landed question, invite any related memory or preference instead. This is a light activity, not a quiz. When their answer is brief but meaningful, ask one focused follow-up about specifics, reasons, personal meaning, an associated memory, or a past-versus-present comparison.
 
 ---
 
 ## 19. Summary
-**You say:** Summarise what the person actually shared in this session. Mention a few concrete details from the conversation rather than a generic list of slide topics. If the app has matched their chosen song, tell them it is ready and invite them to press play. Ask what one part of today's conversation they would like to remember.
+**You say:** First introduce the person's matched song and invite them to listen for up to one minute. Do not summarise the session yet. Ask them to press Done, type done, or say done when they have finished listening or want to skip. Only after they indicate they are done, summarise what they actually shared, mention a few concrete details rather than generic slide topics, and ask what one part of today's conversation they would like to remember.
 
-**Adapt:** Summarise one or two highlights from the session warmly. Let the person control whether the music plays; never claim playback has started before they press play. If matching is unavailable, acknowledge it briefly without dwelling on the problem. If they cannot choose a conversation highlight, offer one you noticed.
+**Adapt:** Let the person control whether and how long the music plays. Never claim playback has started before it does, and do not begin the summary until they indicate they are finished or want to skip. If matching is unavailable, acknowledge it briefly and still provide the Done action. Afterward, summarise one or two highlights warmly. If they cannot choose a conversation highlight, offer one you noticed.
 
 ---
 

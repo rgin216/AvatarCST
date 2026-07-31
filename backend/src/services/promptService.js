@@ -145,6 +145,8 @@ export const buildCstAdaptiveTurnInstructions = ({
   recentMessages,
   scriptId,
   expectedQuestion = '',
+  allowFollowUp = false,
+  followUpGuidance = '',
 }) => {
   const displayName = getDisplayNameFromContext({ user, recentMessages });
   const currentStepScript = getCurrentStepScript(scriptId, slide);
@@ -152,7 +154,7 @@ export const buildCstAdaptiveTurnInstructions = ({
   return `${BASE_INSTRUCTIONS}
 
 # Task
-Decide whether the person's latest message reasonably answers the current CST question, and write Aria's brief adaptive response.
+Decide whether the person's latest message reasonably answers the current CST question, write Aria's brief adaptive response, and decide whether one deeper CST follow-up would be useful.
 
 # Current Step Script
 <current_step_script>
@@ -196,13 +198,29 @@ Use answered=false when the message:
 
 # Adaptive Response Rules
 - Maximum 1 sentence.
-- Do not ask a question.
+- The response field must not ask a question.
 - Do not introduce a new slide or future step.
 - If answered=true, warmly reflect or acknowledge the answer.
 - If answered=false, gently reassure them without correcting or pressuring them.
 - Do not give away answers to upcoming orientation slides. For example, on the month slide, do not mention the season; on the day/month/year slides, do not mention weather, news, or other later prompts.
 
+# Adaptive Follow-up
+${allowFollowUp
+  ? `A single optional follow-up is allowed for this turn.
+- Use followUp only when the answer contains a meaningful but underexplored memory, preference, opinion, person, place, activity, food, work experience, or life event.
+- Prefer one focused prompt about concrete detail, sensory memory, personal meaning, reasons, sequence, or a gentle past-versus-present comparison.
+- A short category answer such as "food" should usually receive a specificity question such as "What kind of food did you especially enjoy?"
+- Return followUp=null when the answer is already detailed, the person is unsure, cannot remember, declines, seems tired or distressed, or a follow-up would repeat a recent question.
+- Never test factual recall, correct them, pressure them, make assumptions, or ask about sensitive details they did not introduce.
+- Ask exactly one question, using at most 22 words. Do not combine alternatives with a second question.
+${followUpGuidance ? `- Step-specific focus: ${followUpGuidance}` : ''}`
+  : `No adaptive follow-up is allowed for this turn. Return followUp=null.`}
+
 # Output
 Return only compact JSON:
-{"answered":true,"response":"That sounds lovely."}`;
+${allowFollowUp
+  ? '{"answered":true,"response":"That sounds lovely.","followUp":"What made that especially memorable for you?"}'
+  : '{"answered":true,"response":"That sounds lovely.","followUp":null}'}
+
+The followUp value must be either one question string or null. If answered=false, followUp must be null.`;
 };

@@ -3,6 +3,11 @@
   cst_childhood: 'session2',
 };
 
+const adaptiveReminiscence = (guidance) => ({
+  enabled: true,
+  guidance,
+});
+
 const scripts = {
   cst_intro_reminiscence: [
     {
@@ -235,7 +240,7 @@ const scripts = {
       },
       reply: ({ currentAffairs }) =>
         currentAffairs?.status === 'available'
-          ? `Here is a positive story from New Zealand: ${currentAffairs.article.title}. What do you think about that?`
+          ? `Here is a positive story from New Zealand: ${currentAffairs.article.title}. You can ask me to tell you more, or tell me what you think about it.`
           : 'I could not find a clearly positive New Zealand story just now. Have you heard anything pleasant or interesting lately?',
     },
     {
@@ -252,10 +257,10 @@ const scripts = {
         type: 'youtubeShort',
         videoId: 'xVdKRNiAmqI',
         videoUrl: 'https://www.youtube.com/shorts/xVdKRNiAmqI',
-        completionPrompt: 'When you are finished, or if you would prefer to skip, say or type "done" to continue.',
+        completionPrompt: 'When you are finished, press Done, or say or type "done" to continue.',
       },
       reply: () =>
-        'Next is a short seated exercise. Before starting, please make sure you are seated comfortably and safely on a sturdy chair. When you are ready, press the play button, and only do movements that feel comfortable for you. When you are finished, or if you would prefer to skip it, just say or type done to continue.',
+        'Next is a short seated exercise. Please sit comfortably and safely on a sturdy chair. The video will start after I finish speaking. If it does not, press play. Only do what feels comfortable. When you are finished, press Done, or say or type done.',
     },
     {
       id: 'childhood_birthplace',
@@ -267,6 +272,9 @@ const scripts = {
       bullets: ['Where you were born', 'Where you grew up'],
       visualHint: 'Source deck: NZ02. Getting to Know You (Childhood), slide 11',
       accent: '#F4C8B0',
+      adaptiveFollowUp: adaptiveReminiscence(
+        'After birthplace and where they grew up, invite one concrete place, sensory, community, or then-versus-now memory.'
+      ),
       reply: () =>
         'Now let us wander back to childhood. Where were you born?',
       followUps: [
@@ -283,6 +291,9 @@ const scripts = {
       bullets: ['Mother', 'Father', 'Family memories'],
       visualHint: 'Source deck: NZ02. Getting to Know You (Childhood), slide 12',
       accent: '#7A9DAD',
+      adaptiveFollowUp: adaptiveReminiscence(
+        'If comfortable, invite one warm memory, characteristic, shared activity, or family tradition connected to a parent.'
+      ),
       reply: () =>
         "What are your mother and father's names?",
     },
@@ -296,6 +307,9 @@ const scripts = {
       bullets: ['Brothers', 'Sisters', 'Names'],
       visualHint: 'Source deck: NZ02. Getting to Know You (Childhood), slide 13',
       accent: '#00AEEF',
+      adaptiveFollowUp: adaptiveReminiscence(
+        'Invite one shared activity, childhood memory, similarity, or difference involving their siblings without probing conflict.'
+      ),
       reply: () =>
         'Do you have any brothers or sisters? What are their names?',
     },
@@ -309,6 +323,9 @@ const scripts = {
       bullets: ['School', 'Favourite subject', 'School memories'],
       visualHint: 'Source deck: NZ02. Getting to Know You (Childhood), slide 14',
       accent: '#A8C5A0',
+      adaptiveFollowUp: adaptiveReminiscence(
+        'After school and favourite subject, invite one teacher, classroom memory, reason for the preference, or gentle then-versus-now comparison.'
+      ),
       reply: () =>
         'Where did you go to school?',
       followUps: [
@@ -325,6 +342,9 @@ const scripts = {
       bullets: ['First job', 'First chores', 'Early responsibility'],
       visualHint: 'Source deck: NZ02. Getting to Know You (Childhood), slide 15',
       accent: '#F4C8B0',
+      adaptiveFollowUp: adaptiveReminiscence(
+        'Invite one task, feeling, person, lesson, or comparison with how similar work is done today.'
+      ),
       reply: () =>
         'Thinking back to when you were young, what was your first job, or one of the first jobs or chores you remember doing?',
     },
@@ -338,6 +358,9 @@ const scripts = {
       bullets: ['Then and now', 'Family changes', 'Your opinion'],
       visualHint: 'Source deck: NZ02. Getting to Know You (Childhood), slide 16',
       accent: '#7A9DAD',
+      adaptiveFollowUp: adaptiveReminiscence(
+        'Invite one respectful reason, value, example, or comparison between family life then and now; do not turn it into a debate.'
+      ),
       reply: () =>
         'Families can look quite different now compared with years ago. What is your opinion of the modern family?',
     },
@@ -389,6 +412,9 @@ const scripts = {
           { label: 'Favorite Season', question: 'Which season is your favourite?' },
         ],
       },
+      adaptiveFollowUp: adaptiveReminiscence(
+        'Deepen the landed topic with one question about specifics, reasons, personal meaning, associated memories, or a past-versus-present comparison.'
+      ),
       reply: () =>
         'Now we have a question wheel. Press spin the wheel, and I will ask the question it lands on.',
       followUps: [
@@ -397,7 +423,7 @@ const scripts = {
     },
     {
       id: 'childhood_summary_song',
-      turns: 1,
+      turns: 2,
       deckSlide: 19,
       title: 'Finally',
       subtitle: 'Looking back over today',
@@ -407,14 +433,16 @@ const scripts = {
       accent: '#F4C8B0',
       interaction: {
         type: 'spotifySong',
-        playbackSeconds: 30,
+        playbackSeconds: 60,
       },
-      reply: ({ sessionSummary, themeSong }) => {
-        const musicPrompt = themeSong?.status === 'available'
-          ? `Your song, ${themeSong.track.name} by ${themeSong.track.artistLabel}, is ready. Press play on the slide when you would like to hear it.`
-          : 'I was not able to prepare the song this time, but we can still look back over our conversation.';
-        return `Finally, let us look back over what we have done today. ${sessionSummary || 'We shared a few moments from today together.'} ${musicPrompt} What is one part of today that you would like to remember?`;
-      },
+      reply: ({ themeSong }) =>
+        themeSong?.status === 'available'
+          ? `Before we look back over today, your song, ${themeSong.track.name} by ${themeSong.track.artistLabel}, is ready. It can play for up to one minute. When you have finished listening, press Done, or say or type done.`
+          : 'Before we look back over today, I was not able to prepare the song this time. Press Done, or say or type done, when you are ready to continue.',
+      followUps: [
+        ({ sessionSummary }) =>
+          `Now let us look back over what we have done today. ${sessionSummary || 'We shared a few moments from today together.'} What is one part of today that you would like to remember?`,
+      ],
     },
     {
       id: 'childhood_closing',

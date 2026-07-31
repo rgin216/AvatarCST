@@ -190,6 +190,101 @@ const evaluateOrientationAnswer = ({ step, content, retryCount }) => {
   };
 };
 
+const isMusicCompletionProtocol = (content = '') =>
+  /^\[\[music-complete\]\]$/i.test(content.trim());
+
+const isVideoCompletionProtocol = (content = '') =>
+  /^\[\[video-complete\]\]$/i.test(content.trim());
+
+const isNaturalMediaCompletionAnswer = (content = '') => {
+  const normalized = normalizeAnswer(content);
+  if (!normalized) return false;
+
+  return /^(?:all )?done$|^(?:i am |i m )?(?:finished|done listening)$|^(?:please )?(?:skip|continue)$|^(?:no |no,? )?thanks?$|^ready to continue$/i.test(
+    normalized
+  );
+};
+
+export const isMusicCompletionAnswer = (content = '') =>
+  isMusicCompletionProtocol(content) || isNaturalMediaCompletionAnswer(content);
+
+export const isVideoCompletionAnswer = (content = '') =>
+  isVideoCompletionProtocol(content) || isNaturalMediaCompletionAnswer(content);
+
+const evaluateMusicCompletionAnswer = ({ step, content, effectiveTurnIndex }) => {
+  if (
+    step?.interaction?.type !== 'spotifySong' ||
+    effectiveTurnIndex !== 1 ||
+    !content
+  ) {
+    return null;
+  }
+
+  if (isMusicCompletionAnswer(content)) {
+    return {
+      answered: true,
+      response: 'Thank you. I hope you enjoyed that.',
+    };
+  }
+
+  return {
+    answered: false,
+    response: 'Take your time.',
+  };
+};
+
+const evaluateVideoCompletionAnswer = ({ step, content, effectiveTurnIndex }) => {
+  if (
+    step?.interaction?.type !== 'youtubeShort' ||
+    effectiveTurnIndex !== 1 ||
+    !content
+  ) {
+    return null;
+  }
+
+  if (isVideoCompletionAnswer(content)) {
+    return {
+      answered: true,
+      response: 'Well done. I hope that felt comfortable.',
+    };
+  }
+
+  return {
+    answered: false,
+    response: 'Take your time, and only do what feels comfortable.',
+  };
+};
+
+export const isNewsElaborationRequest = (content = '') =>
+  /\b(tell me more|more about|more detail|more information|what happened|what else|elaborate|go on)\b/i.test(
+    content
+  );
+
+export const buildNewsElaboration = (currentAffairs) => {
+  const article = currentAffairs?.status === 'available' ? currentAffairs.article : null;
+  if (!article) {
+    return 'I do not have a vetted story with more detail available right now.';
+  }
+
+  const detail = article.content || article.description;
+  if (!detail) {
+    return `The verified information I have only gives the headline, ${article.title}.`;
+  }
+
+  return `The report adds: ${detail}`;
+};
+
+const evaluateNewsElaborationRequest = ({ step, content, currentAffairs }) => {
+  if (step?.id !== 'childhood_current_affairs' || !isNewsElaborationRequest(content)) {
+    return null;
+  }
+
+  return {
+    answered: true,
+    response: buildNewsElaboration(currentAffairs),
+  };
+};
+
 const parseAnswerQuality = (text = '') => {
   try {
     const parsed = JSON.parse(text);
@@ -218,19 +313,35 @@ const extractJsonObject = (text = '') => {
   }
 };
 
-const parseAdaptiveTurn = (text = '') => {
+const normalizeAdaptiveFollowUp = (value) => {
+  if (typeof value !== 'string') return null;
+  let question = value.replace(/\s+/g, ' ').trim();
+  if (!question || /^(?:none|null|n\/a)$/i.test(question)) return null;
+
+  const firstQuestionMark = question.indexOf('?');
+  if (firstQuestionMark >= 0) question = question.slice(0, firstQuestionMark + 1);
+  const words = question.replace(/[?!.]+$/, '').split(' ').filter(Boolean);
+  if (words.length === 0 || words.length > 22) return null;
+  return `${words.join(' ').replace(/[?!.]+$/, '')}?`;
+};
+
+export const parseAdaptiveTurn = (text = '') => {
   const parsed = extractJsonObject(text);
   if (parsed) {
     const explicitAnswerQuality = parseAnswerQuality(text);
+    const answered =
+      typeof parsed.answered === 'boolean' ? parsed.answered : explicitAnswerQuality === true;
     return {
-      answered: typeof parsed.answered === 'boolean' ? parsed.answered : explicitAnswerQuality === true,
+      answered,
       response: typeof parsed?.response === 'string' ? parsed.response.trim() : '',
+      followUp: answered ? normalizeAdaptiveFollowUp(parsed?.followUp) : null,
     };
   }
 
   const explicitAnswerQuality = parseAnswerQuality(text);
   return {
     answered: explicitAnswerQuality === true,
+    followUp: null,
     response: text
       .replace(/```(?:json)?[\s\S]*?```/gi, '')
       .replace(/\{[\s\S]*$/, '')
@@ -238,6 +349,17 @@ const parseAdaptiveTurn = (text = '') => {
       .trim(),
   };
 };
+
+export const canRequestAdaptiveFollowUp = ({
+  step,
+  effectiveTurnIndex,
+  hasActiveFollowUp = false,
+}) =>
+  Boolean(
+    step?.adaptiveFollowUp?.enabled &&
+    !hasActiveFollowUp &&
+    effectiveTurnIndex >= (step.turns || 1)
+  );
 
 const isQuestionWheelProtocol = (content = '') => /^\[\[question-wheel:/i.test(content.trim());
 
@@ -271,7 +393,11 @@ const isRecordableSessionAnswer = ({ step, content, wheelEvent }) =>
     content &&
     !wheelEvent &&
     step?.id &&
-    !['childhood_summary_song', 'childhood_closing'].includes(step.id)
+    ![
+      'childhood_exercise_follow_along',
+      'childhood_summary_song',
+      'childhood_closing',
+    ].includes(step.id)
   );
 
 const toSessionAnswer = ({ step, content }) => ({
@@ -280,6 +406,21 @@ const toSessionAnswer = ({ step, content }) => ({
   prompt: step.prompt,
   answer: content.trim(),
 });
+
+const attachAdaptiveFollowUpAnswer = ({ answers, step, question, content }) => {
+  const answerIndex = answers.findLastIndex((item) => item.stepId === step.id);
+  if (answerIndex < 0) return answers;
+
+  const updatedAnswers = [...answers];
+  updatedAnswers[answerIndex] = {
+    ...updatedAnswers[answerIndex],
+    adaptiveFollowUp: {
+      question,
+      answer: content.trim(),
+    },
+  };
+  return updatedAnswers;
+};
 
 export const toSecondPersonSummaryClause = (answer = '') =>
   String(answer)
@@ -305,36 +446,81 @@ const asSummaryClause = (answer, fallbackPrefix) => {
   return /^(?:you|your)\b/i.test(clause) ? clause : `${fallbackPrefix} ${clause}`;
 };
 
+const asDeeperSummaryClause = (answer, fallbackPrefix = 'you remembered how') => {
+  const clause = toSecondPersonSummaryClause(answer);
+  if (!clause) return '';
+  if (/^you\b/i.test(clause)) return clause;
+  const naturalClause = clause.replace(
+    /^(Because|He|It|She|That|The|They|We)\b/,
+    (word) => word.toLowerCase()
+  );
+  return `${fallbackPrefix} ${naturalClause}`;
+};
+
 export const buildSessionSummary = (answers = []) => {
   const meaningful = answers
     .filter((item) => item.answer && !/^ok(?:ay)?$|^yes$|^no$|^continue$/i.test(item.answer))
     .slice(-8);
 
-  const byStep = new Map(meaningful.map((item) => [item.stepId, item.answer]));
+  const byStep = new Map(meaningful.map((item) => [item.stepId, item]));
+  const primaryAnswer = (stepId) => byStep.get(stepId)?.answer || '';
+  const deeperAnswer = (stepId) => byStep.get(stepId)?.adaptiveFollowUp?.answer || '';
   const highlights = [];
 
   if (byStep.has('theme_song_choice')) {
-    highlights.push(`you chose ${normalizeSongQuery(byStep.get('theme_song_choice'))} as your theme song`);
+    highlights.push(`you chose ${normalizeSongQuery(primaryAnswer('theme_song_choice'))} as your theme song`);
   }
   if (byStep.has('childhood_birthplace')) {
-    highlights.push(asSummaryClause(byStep.get('childhood_birthplace'), 'you talked about'));
+    highlights.push(
+      deeperAnswer('childhood_birthplace')
+        ? asDeeperSummaryClause(deeperAnswer('childhood_birthplace'))
+        : asSummaryClause(primaryAnswer('childhood_birthplace'), 'you talked about')
+    );
   }
-  if (byStep.has('childhood_parents')) highlights.push(`you shared your parents' names`);
-  if (byStep.has('childhood_siblings')) highlights.push(`you talked about brothers or sisters`);
+  if (byStep.has('childhood_parents')) {
+    highlights.push(
+      deeperAnswer('childhood_parents')
+        ? asDeeperSummaryClause(deeperAnswer('childhood_parents'))
+        : `you shared your parents' names`
+    );
+  }
+  if (byStep.has('childhood_siblings')) {
+    highlights.push(
+      deeperAnswer('childhood_siblings')
+        ? asDeeperSummaryClause(deeperAnswer('childhood_siblings'))
+        : 'you talked about brothers or sisters'
+    );
+  }
   if (byStep.has('childhood_school')) {
-    highlights.push(asSummaryClause(byStep.get('childhood_school'), 'you remembered'));
+    highlights.push(
+      deeperAnswer('childhood_school')
+        ? asDeeperSummaryClause(deeperAnswer('childhood_school'))
+        : asSummaryClause(primaryAnswer('childhood_school'), 'you remembered')
+    );
   }
   if (byStep.has('childhood_first_job')) {
-    highlights.push(asSummaryClause(byStep.get('childhood_first_job'), 'you mentioned'));
+    highlights.push(
+      deeperAnswer('childhood_first_job')
+        ? asDeeperSummaryClause(deeperAnswer('childhood_first_job'))
+        : asSummaryClause(primaryAnswer('childhood_first_job'), 'you mentioned')
+    );
   }
   if (byStep.has('childhood_modern_family')) {
-    highlights.push(asSummaryClause(byStep.get('childhood_modern_family'), 'you shared'));
+    highlights.push(
+      deeperAnswer('childhood_modern_family')
+        ? asDeeperSummaryClause(deeperAnswer('childhood_modern_family'))
+        : asSummaryClause(primaryAnswer('childhood_modern_family'), 'you shared')
+    );
   }
   if (byStep.has('childhood_spin_question')) {
-    highlights.push(asSummaryClause(
-      byStep.get('childhood_spin_question'),
-      'you answered the wheel question with'
-    ));
+    highlights.push(
+      deeperAnswer('childhood_spin_question')
+        ? asDeeperSummaryClause(deeperAnswer('childhood_spin_question'))
+        : asSummaryClause(
+            primaryAnswer('childhood_spin_question'),
+            'you answered the wheel question with'
+          )
+    );
   }
 
   if (highlights.length === 0) {
@@ -532,6 +718,8 @@ export const respondToSessionTurn = async ({ sessionId, content }) => {
   const context = await getSessionTurnContext(sessionId);
   const { session, user, memoryEntries, recentMessages, step, nextStep, slide, nextSlide, boundedIndex, isFinalStep, totalSteps } = context;
 
+  const hasMusicCompletionProtocol = isMusicCompletionProtocol(userContent || '');
+  const hasVideoCompletionProtocol = isVideoCompletionProtocol(userContent || '');
   const hasWheelProtocol = isQuestionWheelProtocol(userContent || '');
   const wheelEvent = parseQuestionWheelEvent(userContent || '', step);
   if (hasWheelProtocol && !wheelEvent) {
@@ -550,10 +738,29 @@ export const respondToSessionTurn = async ({ sessionId, content }) => {
   const stepTurns = step.turns || 1;
   const currentTurnIndex = session.scriptStepTurnIndex || 0;
   const effectiveTurnIndex = currentTurnIndex || (hasPriorAssistantTurn(recentMessages) ? 1 : 0);
+  if (
+    hasMusicCompletionProtocol &&
+    (step.interaction?.type !== 'spotifySong' || effectiveTurnIndex !== 1)
+  ) {
+    const err = new Error('Music completion is not expected at this point');
+    err.status = 409;
+    throw err;
+  }
+  if (
+    hasVideoCompletionProtocol &&
+    (step.interaction?.type !== 'youtubeShort' || effectiveTurnIndex !== 1)
+  ) {
+    const err = new Error('Video completion is not expected at this point');
+    err.status = 409;
+    throw err;
+  }
   const currentRetryCount = session.scriptStepRetryCount || 0;
   const llmProvider = getLlmProviderForSession(session);
   const useFastScriptedTurn = isOpenAIFastScriptedPipeline(session.pipelineMode);
   const persistedWheelState = session.interactionState?.questionWheel;
+  const persistedAdaptiveFollowUp = session.interactionState?.adaptiveFollowUp;
+  const activeAdaptiveFollowUp =
+    persistedAdaptiveFollowUp?.stepId === step.id ? persistedAdaptiveFollowUp : null;
   const awaitingWheelResult = Boolean(
     step.interaction?.type === 'questionWheel' &&
     effectiveTurnIndex > 0 &&
@@ -569,6 +776,10 @@ export const respondToSessionTurn = async ({ sessionId, content }) => {
   if (userContent) {
     const messageContent = wheelEvent
       ? `Question wheel landed on ${wheelEvent.label}.`
+      : hasMusicCompletionProtocol
+      ? 'Music playback completed.'
+      : hasVideoCompletionProtocol
+      ? 'Exercise video completed.'
       : userContent;
     userMessage = await Message.create({ sessionId, role: 'user', content: messageContent });
   }
@@ -576,7 +787,9 @@ export const respondToSessionTurn = async ({ sessionId, content }) => {
   const needsCurrentAffairs = [step, nextStep].some(
     (candidate) => candidate?.id === 'childhood_current_affairs'
   );
-  const currentAffairs = needsCurrentAffairs ? await getPositiveNzNews() : null;
+  const currentAffairs = needsCurrentAffairs
+    ? session.interactionState?.currentAffairs || await getPositiveNzNews()
+    : null;
   let themeSong = session.interactionState?.themeSong || null;
   const scriptContext = {
     name: getDisplayName(user),
@@ -586,8 +799,20 @@ export const respondToSessionTurn = async ({ sessionId, content }) => {
   };
   const hasUserContent = Boolean(userContent);
   const hasDeliveredQuestion = effectiveTurnIndex > 0;
-  const expectedQuestion = getAskedScriptLine(step, effectiveTurnIndex, scriptContext);
+  const expectedQuestion =
+    activeAdaptiveFollowUp?.question ||
+    getAskedScriptLine(step, effectiveTurnIndex, scriptContext);
   const isQuestionWheelEvent = Boolean(wheelEvent && step.id === 'childhood_spin_question');
+  const newsElaborationRequested = Boolean(
+    step.id === 'childhood_current_affairs' &&
+    hasDeliveredQuestion &&
+    isNewsElaborationRequest(userContent || '')
+  );
+  const allowAdaptiveFollowUp = canRequestAdaptiveFollowUp({
+    step,
+    effectiveTurnIndex,
+    hasActiveFollowUp: Boolean(activeAdaptiveFollowUp),
+  });
   const storedAnswers = Array.isArray(session.interactionState?.sessionAnswers)
     ? session.interactionState.sessionAnswers
     : [];
@@ -596,11 +821,24 @@ export const respondToSessionTurn = async ({ sessionId, content }) => {
 
   let answeredCurrentQuestion = true;
   let adaptiveText = '';
+  let adaptiveFollowUpQuestion = null;
   if (!isQuestionWheelEvent && userContent && hasDeliveredQuestion) {
     const deterministicTurn = evaluateOrientationAnswer({
       step,
       content: userContent,
       retryCount: currentRetryCount,
+    }) || evaluateMusicCompletionAnswer({
+      step,
+      content: userContent,
+      effectiveTurnIndex,
+    }) || evaluateVideoCompletionAnswer({
+      step,
+      content: userContent,
+      effectiveTurnIndex,
+    }) || evaluateNewsElaborationRequest({
+      step,
+      content: userContent,
+      currentAffairs,
     });
     const adaptiveTurn = deterministicTurn || parseAdaptiveTurn(await generateResponse(
       [
@@ -613,6 +851,8 @@ export const respondToSessionTurn = async ({ sessionId, content }) => {
             recentMessages,
             scriptId: session.scriptId,
             expectedQuestion,
+            allowFollowUp: allowAdaptiveFollowUp,
+            followUpGuidance: step.adaptiveFollowUp?.guidance || '',
           }),
         },
         { role: 'user', content: userContent },
@@ -620,40 +860,94 @@ export const respondToSessionTurn = async ({ sessionId, content }) => {
       {
         provider: llmProvider,
         temperature: 0.25,
-        maxTokens: 80,
+        maxTokens: 110,
         model: useFastScriptedTurn ? process.env.OPENAI_FAST_TEXT_MODEL : undefined,
       }
     ));
     answeredCurrentQuestion = adaptiveTurn.answered;
     adaptiveText = adaptiveTurn.response;
+    adaptiveFollowUpQuestion =
+      answeredCurrentQuestion && allowAdaptiveFollowUp ? adaptiveTurn.followUp : null;
   }
 
   if (
     hasDeliveredQuestion &&
     answeredCurrentQuestion &&
+    !newsElaborationRequested &&
     isRecordableSessionAnswer({ step, content: userContent, wheelEvent })
   ) {
-    sessionAnswers = [...storedAnswers, toSessionAnswer({ step, content: userContent })];
+    sessionAnswers = activeAdaptiveFollowUp
+      ? attachAdaptiveFollowUpAnswer({
+          answers: storedAnswers,
+          step,
+          question: activeAdaptiveFollowUp.question,
+          content: userContent,
+        })
+      : [...storedAnswers, toSessionAnswer({ step, content: userContent })];
     scriptContext.sessionSummary = buildSessionSummary(sessionAnswers);
-    if (step.id === 'theme_song_choice') {
+    if (step.id === 'theme_song_choice' && !activeAdaptiveFollowUp) {
       themeSong = await searchSpotifyTrack(userContent);
       scriptContext.themeSong = themeSong;
     }
   }
 
+  const requiresMusicCompletion = Boolean(
+    step.interaction?.type === 'spotifySong' && effectiveTurnIndex === 1
+  );
+  const requiresVideoCompletion = Boolean(
+    step.interaction?.type === 'youtubeShort' && effectiveTurnIndex === 1
+  );
+  const requiresMediaCompletion = requiresMusicCompletion || requiresVideoCompletion;
   const unansweredAttemptCount =
     hasUserContent && hasDeliveredQuestion && !answeredCurrentQuestion ? currentRetryCount + 1 : 0;
-  const shouldRepeatQuestion = hasUserContent && hasDeliveredQuestion && !answeredCurrentQuestion && unansweredAttemptCount < MAX_UNANSWERED_ATTEMPTS;
-  const shouldForceProgress = hasUserContent && hasDeliveredQuestion && !answeredCurrentQuestion && unansweredAttemptCount >= MAX_UNANSWERED_ATTEMPTS;
+  const shouldRepeatQuestion =
+    hasUserContent &&
+    hasDeliveredQuestion &&
+    !answeredCurrentQuestion &&
+    (requiresMediaCompletion || unansweredAttemptCount < MAX_UNANSWERED_ATTEMPTS);
+  const shouldForceProgress =
+    hasUserContent &&
+    hasDeliveredQuestion &&
+    !answeredCurrentQuestion &&
+    !requiresMediaCompletion &&
+    unansweredAttemptCount >= MAX_UNANSWERED_ATTEMPTS;
   const canProgress = hasUserContent && hasDeliveredQuestion && (answeredCurrentQuestion || shouldForceProgress);
-  const shouldAdvance = canProgress && !isFinalStep && effectiveTurnIndex >= stepTurns;
+  const shouldAskAdaptiveFollowUp = Boolean(
+    hasUserContent &&
+    hasDeliveredQuestion &&
+    answeredCurrentQuestion &&
+    adaptiveFollowUpQuestion
+  );
+  const shouldElaborateNews = Boolean(
+    hasUserContent &&
+    answeredCurrentQuestion &&
+    newsElaborationRequested
+  );
+  const shouldAdvance =
+    canProgress &&
+    !shouldAskAdaptiveFollowUp &&
+    !shouldElaborateNews &&
+    !isFinalStep &&
+    effectiveTurnIndex >= stepTurns;
   const scriptedNextLine = shouldRepeatQuestion
-    ? expectedQuestion
+    ? requiresMediaCompletion
+      ? requiresMusicCompletion
+        ? 'When you have finished or want to skip the music, press Done, or say or type done.'
+        : 'When you have finished or want to skip the exercise, press Done, or say or type done.'
+      : expectedQuestion
+    : shouldAskAdaptiveFollowUp
+    ? adaptiveFollowUpQuestion
+    : shouldElaborateNews
+    ? currentAffairs?.status === 'available'
+      ? 'What part of that story stands out to you?'
+      : 'Have you heard anything pleasant or interesting lately?'
     : hasUserContent && hasDeliveredQuestion
     ? getProgressScriptLine({ step, nextStep, currentTurnIndex: effectiveTurnIndex, stepTurns, context: scriptContext })
     : expectedQuestion || renderScriptReply(step, scriptContext);
   const answerState = shouldRepeatQuestion
     ? 'repeat_question'
+    : shouldAskAdaptiveFollowUp
+    ? 'adaptive_follow_up'
     : shouldForceProgress
     ? 'move_on_after_retries'
     : 'answered';
@@ -722,6 +1016,17 @@ export const respondToSessionTurn = async ({ sessionId, content }) => {
   if (themeSong) {
     nextInteractionState.themeSong = themeSong;
   }
+  if (shouldAskAdaptiveFollowUp) {
+    nextInteractionState.adaptiveFollowUp = {
+      stepId: step.id,
+      question: adaptiveFollowUpQuestion,
+    };
+  } else if (
+    nextInteractionState.adaptiveFollowUp &&
+    nextInteractionState.adaptiveFollowUp.stepId !== displaySlide.id
+  ) {
+    delete nextInteractionState.adaptiveFollowUp;
+  }
   if (isQuestionWheelEvent) {
     nextInteractionState.questionWheel = wheelEvent;
   } else if (displaySlide.interaction?.type === 'questionWheel') {
@@ -731,7 +1036,29 @@ export const respondToSessionTurn = async ({ sessionId, content }) => {
   } else {
     delete nextInteractionState.questionWheel;
   }
+  if (displaySlide.id === 'childhood_current_affairs') {
+    nextInteractionState.currentAffairs = currentAffairs;
+  } else {
+    delete nextInteractionState.currentAffairs;
+  }
+  if (displaySlide.interaction?.type === 'youtubeShort') {
+    nextInteractionState.exercisePlayback = { status: 'awaiting-completion' };
+  } else {
+    delete nextInteractionState.exercisePlayback;
+  }
   if (displaySlide.id === 'childhood_summary_song') {
+    nextInteractionState.musicPlayback =
+      !hasUserContent && currentTurnIndex === 0
+        ? { status: 'awaiting-completion' }
+        : requiresMusicCompletion && hasUserContent && answeredCurrentQuestion
+        ? { status: 'complete' }
+        : nextInteractionState.musicPlayback?.status === 'complete'
+        ? nextInteractionState.musicPlayback
+        : { status: 'awaiting-completion' };
+  } else {
+    delete nextInteractionState.musicPlayback;
+  }
+  if (step.id === 'childhood_summary_song' && displaySlide.id !== 'childhood_summary_song') {
     delete nextInteractionState.sessionAnswers;
   }
   session.interactionState = nextInteractionState;
@@ -742,7 +1069,10 @@ export const respondToSessionTurn = async ({ sessionId, content }) => {
     suggestedMemoryUpdates = await savePendingMemorySuggestions({
       userId: session.userId,
       sessionId: session._id,
-      suggestions: wheelEvent ? [] : inferMemorySuggestions(userContent),
+      suggestions:
+        wheelEvent || hasMusicCompletionProtocol || hasVideoCompletionProtocol
+          ? []
+          : inferMemorySuggestions(userContent),
     });
   } catch (err) {
     console.warn('[memory] Skipping suggested memory updates:', err.message);
@@ -767,7 +1097,15 @@ export const respondToSessionTurn = async ({ sessionId, content }) => {
     },
     slide: displaySlide,
     currentAffairs: displaySlide.id === 'childhood_current_affairs' ? currentAffairs : null,
+    exercisePlayback:
+      displaySlide.interaction?.type === 'youtubeShort'
+        ? session.interactionState?.exercisePlayback || null
+        : null,
     themeSong: displaySlide.id === 'childhood_summary_song' ? themeSong : null,
+    musicPlayback:
+      displaySlide.id === 'childhood_summary_song'
+        ? session.interactionState?.musicPlayback || null
+        : null,
     questionWheel: session.interactionState?.questionWheel || null,
     assistantText,
     avatar: buildAvatarResponse({ text: assistantText }),
