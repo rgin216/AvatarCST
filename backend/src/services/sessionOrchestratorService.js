@@ -9,6 +9,8 @@ import {
   buildCstAdaptiveTurnInstructions,
 } from './promptService.js';
 import { generateResponse } from './llmService.js';
+import { getPositiveNzNews } from './newsService.js';
+import { normalizeSongQuery, searchSpotifyTrack } from './spotifyService.js';
 import { isOpenAIFastScriptedPipeline, usesOpenAITextPipeline } from '../config/pipeline.js';
 
 const RECENT_MESSAGE_LIMIT = 20;
@@ -279,7 +281,31 @@ const toSessionAnswer = ({ step, content }) => ({
   answer: content.trim(),
 });
 
-const buildSessionSummary = (answers = []) => {
+export const toSecondPersonSummaryClause = (answer = '') =>
+  String(answer)
+    .trim()
+    .replace(/\s+/g, ' ')
+    .replace(/\bI am\b/gi, 'you are')
+    .replace(/\bI was\b/gi, 'you were')
+    .replace(/\bI['’]m\b/gi, 'you are')
+    .replace(/\bI['’]ve\b/gi, 'you have')
+    .replace(/\bI['’]ll\b/gi, 'you will')
+    .replace(/\bI['’]d\b/gi, 'you would')
+    .replace(/\bmyself\b/gi, 'yourself')
+    .replace(/\bmine\b/gi, 'yours')
+    .replace(/\bmy\b/gi, 'your')
+    .replace(/\bme\b/gi, 'you')
+    .replace(/\bI\b/gi, 'you')
+    .replace(/[.!?]+$/, '')
+    .replace(/^(You|Your)\b/, (word) => word.toLowerCase());
+
+const asSummaryClause = (answer, fallbackPrefix) => {
+  const clause = toSecondPersonSummaryClause(answer);
+  if (!clause) return '';
+  return /^(?:you|your)\b/i.test(clause) ? clause : `${fallbackPrefix} ${clause}`;
+};
+
+export const buildSessionSummary = (answers = []) => {
   const meaningful = answers
     .filter((item) => item.answer && !/^ok(?:ay)?$|^yes$|^no$|^continue$/i.test(item.answer))
     .slice(-8);
@@ -287,21 +313,37 @@ const buildSessionSummary = (answers = []) => {
   const byStep = new Map(meaningful.map((item) => [item.stepId, item.answer]));
   const highlights = [];
 
-  if (byStep.has('theme_song_choice')) highlights.push(`you chose ${byStep.get('theme_song_choice')} as a song idea`);
-  if (byStep.has('childhood_birthplace')) highlights.push(`you talked about ${byStep.get('childhood_birthplace')}`);
+  if (byStep.has('theme_song_choice')) {
+    highlights.push(`you chose ${normalizeSongQuery(byStep.get('theme_song_choice'))} as your theme song`);
+  }
+  if (byStep.has('childhood_birthplace')) {
+    highlights.push(asSummaryClause(byStep.get('childhood_birthplace'), 'you talked about'));
+  }
   if (byStep.has('childhood_parents')) highlights.push(`you shared your parents' names`);
   if (byStep.has('childhood_siblings')) highlights.push(`you talked about brothers or sisters`);
-  if (byStep.has('childhood_school')) highlights.push(`you remembered ${byStep.get('childhood_school')}`);
-  if (byStep.has('childhood_first_job')) highlights.push(`you mentioned ${byStep.get('childhood_first_job')}`);
-  if (byStep.has('childhood_modern_family')) highlights.push(`you gave your view on modern family life`);
-  if (byStep.has('childhood_spin_question')) highlights.push(`the wheel question led us to ${byStep.get('childhood_spin_question')}`);
+  if (byStep.has('childhood_school')) {
+    highlights.push(asSummaryClause(byStep.get('childhood_school'), 'you remembered'));
+  }
+  if (byStep.has('childhood_first_job')) {
+    highlights.push(asSummaryClause(byStep.get('childhood_first_job'), 'you mentioned'));
+  }
+  if (byStep.has('childhood_modern_family')) {
+    highlights.push(asSummaryClause(byStep.get('childhood_modern_family'), 'you shared'));
+  }
+  if (byStep.has('childhood_spin_question')) {
+    highlights.push(asSummaryClause(
+      byStep.get('childhood_spin_question'),
+      'you answered the wheel question with'
+    ));
+  }
 
   if (highlights.length === 0) {
     const fallback = meaningful
       .filter((item) => !ORIENTATION_STEP_TYPES[item.stepId])
       .slice(-3)
-      .map((item) => item.answer);
-    if (fallback.length > 0) highlights.push(`you shared ${fallback.join(', ')}`);
+      .map((item) => asSummaryClause(item.answer, 'you shared'))
+      .filter(Boolean);
+    if (fallback.length > 0) highlights.push(...fallback);
   }
 
   if (highlights.length === 0) return '';
@@ -531,9 +573,16 @@ export const respondToSessionTurn = async ({ sessionId, content }) => {
     userMessage = await Message.create({ sessionId, role: 'user', content: messageContent });
   }
 
+  const needsCurrentAffairs = [step, nextStep].some(
+    (candidate) => candidate?.id === 'childhood_current_affairs'
+  );
+  const currentAffairs = needsCurrentAffairs ? await getPositiveNzNews() : null;
+  let themeSong = session.interactionState?.themeSong || null;
   const scriptContext = {
     name: getDisplayName(user),
     wheelQuestion: wheelEvent?.question || session.interactionState?.questionWheel?.question,
+    currentAffairs,
+    themeSong,
   };
   const hasUserContent = Boolean(userContent);
   const hasDeliveredQuestion = effectiveTurnIndex > 0;
@@ -586,6 +635,10 @@ export const respondToSessionTurn = async ({ sessionId, content }) => {
   ) {
     sessionAnswers = [...storedAnswers, toSessionAnswer({ step, content: userContent })];
     scriptContext.sessionSummary = buildSessionSummary(sessionAnswers);
+    if (step.id === 'theme_song_choice') {
+      themeSong = await searchSpotifyTrack(userContent);
+      scriptContext.themeSong = themeSong;
+    }
   }
 
   const unansweredAttemptCount =
@@ -666,6 +719,9 @@ export const respondToSessionTurn = async ({ sessionId, content }) => {
     ...(session.interactionState || {}),
     sessionAnswers,
   };
+  if (themeSong) {
+    nextInteractionState.themeSong = themeSong;
+  }
   if (isQuestionWheelEvent) {
     nextInteractionState.questionWheel = wheelEvent;
   } else if (displaySlide.interaction?.type === 'questionWheel') {
@@ -710,6 +766,8 @@ export const respondToSessionTurn = async ({ sessionId, content }) => {
       total: totalSteps,
     },
     slide: displaySlide,
+    currentAffairs: displaySlide.id === 'childhood_current_affairs' ? currentAffairs : null,
+    themeSong: displaySlide.id === 'childhood_summary_song' ? themeSong : null,
     questionWheel: session.interactionState?.questionWheel || null,
     assistantText,
     avatar: buildAvatarResponse({ text: assistantText }),

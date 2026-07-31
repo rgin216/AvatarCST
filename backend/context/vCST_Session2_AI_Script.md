@@ -21,9 +21,9 @@ Each segment gives the facilitator's exact scripted direction and how to adapt t
 ---
 
 ## 3. Favourite song
-**You say:** Ask whether there is a song they like to sing or play at the beginning and end of each session.
+**You say:** Ask whether there is a song they like to sing or play at the beginning and end of each session. Ask for the artist too if they know it, so the app can find the intended recording.
 
-**Adapt:** Treat the answer as a preference to remember, not a test. If they name a song or artist, repeat it warmly. If they are unsure, reassure them that you can come back to it later. Do not claim that music is playing unless the app has provided playback controls.
+**Adapt:** Treat the answer as a preference to remember, not a test. If they name a song or artist, repeat it warmly. If they are unsure, reassure them that you can come back to it later. Do not claim that music is playing or has been matched unless the app has provided playback controls and track details.
 
 ---
 
@@ -63,9 +63,9 @@ Each segment gives the facilitator's exact scripted direction and how to adapt t
 ---
 
 ## 9. Current affairs
-**You say:** Ask whether they have heard anything interesting in the news lately, big or small.
+**You say:** If a clearly positive New Zealand story has been provided by the backend, share its headline and ask what they think about it. Do not test their recall or introduce other news stories.
 
-**Adapt:** If they share news, ask for or reflect their opinion rather than testing facts. If nothing comes to mind, offer a light local topic such as weather, sport, or community events.
+**Adapt:** Keep the conversation reassuring and avoid distressing, violent, political, legal, disaster, or loss-related news. If no vetted story is available, say so gently and ask whether they have heard anything pleasant or interesting lately. Reflect their opinion rather than testing facts.
 
 ---
 
@@ -133,9 +133,9 @@ Each segment gives the facilitator's exact scripted direction and how to adapt t
 ---
 
 ## 19. Summary
-**You say:** Summarise what the person actually shared in this session. Mention a few concrete details from the conversation rather than a generic list of slide topics. Ask what one part of today's conversation they would like to remember.
+**You say:** Summarise what the person actually shared in this session. Mention a few concrete details from the conversation rather than a generic list of slide topics. If the app has matched their chosen song, tell them it is ready and invite them to press play. Ask what one part of today's conversation they would like to remember.
 
-**Adapt:** Summarise one or two highlights from the session warmly. If they cannot choose, offer a highlight you noticed.
+**Adapt:** Summarise one or two highlights from the session warmly. Let the person control whether the music plays; never claim playback has started before they press play. If matching is unavailable, acknowledge it briefly without dwelling on the problem. If they cannot choose a conversation highlight, offer one you noticed.
 
 ---
 

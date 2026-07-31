@@ -359,6 +359,266 @@ body {
     #F4F7FB;
 }
 
+.ppt-slide.has-news-interaction {
+  border-top: 10px solid #16835B;
+  background: #F4F8F6;
+}
+
+.ppt-slide.has-music-interaction {
+  border-top: 10px solid #1DB954;
+  background: #EEF4EF;
+}
+
+.slide-music-overlay {
+  position: absolute;
+  inset: clamp(52px, 8cqh, 90px) clamp(34px, 5cqw, 72px) clamp(28px, 5cqh, 54px);
+  z-index: 2;
+  display: grid;
+  grid-template-columns: minmax(220px, 0.72fr) minmax(0, 1.28fr);
+  align-items: center;
+  gap: clamp(28px, 5cqw, 68px);
+  overflow: hidden;
+}
+
+.slide-music-artwork {
+  width: min(100%, 430px);
+  margin: 0;
+  justify-self: end;
+}
+
+.slide-music-artwork img,
+.slide-music-artwork-fallback {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 6px;
+  object-fit: cover;
+  box-shadow: 0 18px 44px rgba(22, 34, 29, 0.24);
+}
+
+.slide-music-artwork-fallback {
+  border: 12px solid #F47C20;
+  background: #202124;
+}
+
+.slide-music-details {
+  min-width: 0;
+  color: #202124;
+}
+
+.slide-music-eyebrow {
+  margin: 0 0 clamp(8px, 1.5cqh, 14px);
+  color: #167A3D;
+  font-size: clamp(14px, 1.4cqw, 20px);
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.ppt-slide .slide-music-details h1,
+.ppt-slide .slide-music-unavailable h1 {
+  max-width: 18ch;
+  margin: 0;
+  color: #171918;
+  font-family: Nunito, sans-serif;
+  font-size: clamp(31px, 4.3cqw, 61px);
+  line-height: 1.03;
+}
+
+.slide-music-artist {
+  margin: clamp(8px, 1.5cqh, 14px) 0 0;
+  color: #435148;
+  font-size: clamp(19px, 2cqw, 28px);
+  font-weight: 800;
+}
+
+.slide-music-instruction {
+  margin: clamp(14px, 2.5cqh, 24px) 0 10px;
+  color: #29322D;
+  font-size: clamp(15px, 1.55cqw, 22px);
+  font-weight: 800;
+}
+
+.slide-spotify-embed {
+  width: min(100%, 620px);
+  min-height: 152px;
+  border: 3px solid #1DB954;
+  border-radius: 8px;
+  background: #202124;
+  box-shadow:
+    0 0 0 6px rgba(29, 185, 84, 0.14),
+    0 12px 28px rgba(22, 34, 29, 0.18);
+  overflow: hidden;
+}
+
+.slide-spotify-embed iframe {
+  display: block;
+  width: 100%;
+  border: 0;
+}
+
+.slide-spotify-embed.is-playing {
+  border-color: #F47C20;
+  box-shadow:
+    0 0 0 6px rgba(244, 124, 32, 0.16),
+    0 12px 28px rgba(22, 34, 29, 0.18);
+}
+
+.slide-music-status {
+  min-height: 1.4em;
+  margin: 10px 0 0;
+  color: #526158;
+  font-size: clamp(13px, 1.25cqw, 18px);
+  font-weight: 750;
+}
+
+.slide-music-link {
+  display: inline-block;
+  margin-top: 6px;
+  color: #167A3D;
+  font-size: clamp(13px, 1.2cqw, 17px);
+  font-weight: 900;
+}
+
+.slide-music-unavailable {
+  grid-column: 1 / -1;
+  max-width: 760px;
+  justify-self: center;
+  color: #435148;
+  text-align: center;
+}
+
+.slide-music-unavailable p:last-child {
+  margin: 20px 0 0;
+  font-size: clamp(18px, 2cqw, 28px);
+  font-weight: 700;
+}
+
+@container (max-width: 700px) {
+  .slide-music-overlay {
+    grid-template-columns: minmax(130px, 0.35fr) minmax(0, 1fr);
+    gap: 22px;
+  }
+
+  .slide-music-artwork {
+    align-self: start;
+  }
+
+  .ppt-slide .slide-music-details h1 {
+    max-width: 22ch;
+  }
+}
+
+.slide-news-overlay {
+  position: absolute;
+  inset: clamp(54px, 8cqh, 92px) clamp(34px, 5cqw, 74px) clamp(28px, 5cqh, 54px);
+  z-index: 2;
+  display: grid;
+  align-items: center;
+  overflow: hidden;
+}
+
+.slide-news-overlay.has-news-image {
+  grid-template-columns: minmax(0, 1.2fr) minmax(260px, 0.8fr);
+  gap: clamp(28px, 5cqw, 70px);
+}
+
+.slide-news-story {
+  min-width: 0;
+  color: #15362B;
+}
+
+.slide-news-eyebrow {
+  margin: 0 0 clamp(10px, 2cqh, 18px);
+  color: #126B4B;
+  font-size: clamp(14px, 1.45cqw, 20px);
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.ppt-slide .slide-news-story h1 {
+  max-width: 18ch;
+  margin: 0;
+  color: #112E25;
+  font-family: Nunito, sans-serif;
+  font-size: clamp(30px, 4.4cqw, 62px);
+  line-height: 1.05;
+}
+
+.slide-news-summary {
+  max-width: 60ch;
+  margin: clamp(16px, 3cqh, 28px) 0 0;
+  color: #3C544C;
+  font-size: clamp(16px, 1.7cqw, 24px);
+  font-weight: 650;
+  line-height: 1.35;
+}
+
+.slide-news-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  margin-top: clamp(16px, 3cqh, 28px);
+  color: #50665F;
+  font-size: clamp(13px, 1.25cqw, 18px);
+  font-weight: 800;
+}
+
+.slide-news-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  margin-top: clamp(18px, 3cqh, 30px);
+  padding: 10px 16px;
+  border: 2px solid #16835B;
+  border-radius: 6px;
+  color: #126B4B;
+  font-size: clamp(14px, 1.3cqw, 18px);
+  font-weight: 900;
+  text-decoration: none;
+}
+
+.slide-news-link:hover,
+.slide-news-link:focus-visible {
+  background: #16835B;
+  color: #FFFFFF;
+}
+
+.slide-news-image {
+  min-width: 0;
+  margin: 0;
+}
+
+.slide-news-image img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  border-radius: 6px;
+  object-fit: cover;
+  box-shadow: 0 16px 40px rgba(17, 46, 37, 0.2);
+}
+
+.slide-news-image figcaption {
+  margin-top: 8px;
+  color: #50665F;
+  font-size: clamp(11px, 1cqw, 14px);
+  font-weight: 700;
+  text-align: right;
+}
+
+@container (max-width: 700px) {
+  .slide-news-overlay.has-news-image {
+    grid-template-columns: 1fr;
+  }
+
+  .slide-news-image {
+    display: none;
+  }
+
+  .ppt-slide .slide-news-story h1 {
+    max-width: 24ch;
+  }
+}
+
 .slide-video-overlay {
   position: absolute;
   inset: clamp(36px, 5cqh, 62px) clamp(24px, 5cqw, 72px) clamp(24px, 4cqh, 48px);
