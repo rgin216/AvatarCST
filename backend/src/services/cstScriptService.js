@@ -153,7 +153,7 @@ const scripts = {
       visualHint: 'Source deck: NZ02. Getting to Know You (Childhood), slide 3',
       accent: '#F47C20',
       reply: () =>
-        'Is there a song you like to sing or play at the beginning and at the end of each session?',
+        'Is there a song you like to sing or play at the beginning and at the end of each session? If you know the artist too, please tell me their name.',
     },
     {
       id: 'childhood_orientation_day',
@@ -230,8 +230,13 @@ const scripts = {
       bullets: ['Local news', 'Weather', 'Sport', 'Something pleasant'],
       visualHint: 'Source deck: NZ02. Getting to Know You (Childhood), slide 9',
       accent: '#00AEEF',
-      reply: () =>
-        'Have you heard anything interesting in the news lately? It can be something big or something small and local.',
+      interaction: {
+        type: 'positiveNews',
+      },
+      reply: ({ currentAffairs }) =>
+        currentAffairs?.status === 'available'
+          ? `Here is a positive story from New Zealand: ${currentAffairs.article.title}. What do you think about that?`
+          : 'I could not find a clearly positive New Zealand story just now. Have you heard anything pleasant or interesting lately?',
     },
     {
       id: 'childhood_exercise_follow_along',
@@ -400,8 +405,16 @@ const scripts = {
       bullets: ['Summarise today', 'Theme song'],
       visualHint: 'Source deck: NZ02. Getting to Know You (Childhood), slide 19',
       accent: '#F4C8B0',
-      reply: ({ sessionSummary }) =>
-        `Finally, let us look back over what we have done today. ${sessionSummary || 'We shared a few moments from today together.'} What is one part of today that you would like to remember?`,
+      interaction: {
+        type: 'spotifySong',
+        playbackSeconds: 30,
+      },
+      reply: ({ sessionSummary, themeSong }) => {
+        const musicPrompt = themeSong?.status === 'available'
+          ? `Your song, ${themeSong.track.name} by ${themeSong.track.artistLabel}, is ready. Press play on the slide when you would like to hear it.`
+          : 'I was not able to prepare the song this time, but we can still look back over our conversation.';
+        return `Finally, let us look back over what we have done today. ${sessionSummary || 'We shared a few moments from today together.'} ${musicPrompt} What is one part of today that you would like to remember?`;
+      },
     },
     {
       id: 'childhood_closing',

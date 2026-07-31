@@ -7,7 +7,8 @@
     "postinstall": "node scripts/install-rhubarb.js",
     "install:rhubarb": "node scripts/install-rhubarb.js",
     "dev": "nodemon src/server.js",
-    "start": "node src/server.js"
+    "start": "node src/server.js",
+    "test": "node --test src/services/newsService.test.js src/services/spotifyService.test.js src/services/sessionOrchestratorService.test.js"
   },
   "keywords": [],
   "author": "",

@@ -32,6 +32,46 @@ const lipSyncModes = [
   { id: "energy", label: "Audio energy (faster)" },
 ];
 const wheelColors = ["#7A9DAD", "#F47C20", "#A8C5A0", "#4472C4", "#F4C8B0"];
+const SPOTIFY_IFRAME_API_URL = "https://open.spotify.com/embed/iframe-api/v1";
+
+let spotifyIframeApi = null;
+let spotifyIframeApiPromise = null;
+
+function loadSpotifyIframeApi() {
+  if (spotifyIframeApi) return Promise.resolve(spotifyIframeApi);
+  if (spotifyIframeApiPromise) return spotifyIframeApiPromise;
+
+  spotifyIframeApiPromise = new Promise((resolve, reject) => {
+    const timeout = window.setTimeout(
+      () => {
+        spotifyIframeApiPromise = null;
+        reject(new Error("Spotify player took too long to load"));
+      },
+      10000
+    );
+
+    window.onSpotifyIframeApiReady = (api) => {
+      window.clearTimeout(timeout);
+      spotifyIframeApi = api;
+      resolve(api);
+    };
+
+    const existingScript = document.querySelector(`script[src="${SPOTIFY_IFRAME_API_URL}"]`);
+    if (existingScript) return;
+
+    const script = document.createElement("script");
+    script.src = SPOTIFY_IFRAME_API_URL;
+    script.async = true;
+    script.addEventListener("error", () => {
+      window.clearTimeout(timeout);
+      spotifyIframeApiPromise = null;
+      reject(new Error("Spotify player could not be loaded"));
+    }, { once: true });
+    document.body.appendChild(script);
+  });
+
+  return spotifyIframeApiPromise;
+}
 
 function getInitialAvatarMode() {
   if (!import.meta.env.DEV) return "male";
@@ -62,6 +102,9 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
   const [avatarMode, setAvatarMode] = useState(getInitialAvatarMode);
   const [lipSyncMode, setLipSyncMode] = useState("rhubarb");
   const [pendingPlay, setPendingPlay] = useState(false);
+  const [currentAffairs, setCurrentAffairs] = useState(null);
+  const [themeSong, setThemeSong] = useState(null);
+  const [musicPlaybackState, setMusicPlaybackState] = useState("idle");
   const [questionWheel, setQuestionWheel] = useState(null);
   const [wheelSpinning, setWheelSpinning] = useState(false);
   const [wheelResultPending, setWheelResultPending] = useState(false);
@@ -89,10 +132,18 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
   const wheelTimeoutRef = useRef(null);
   const wheelResultPendingRef = useRef(false);
   const slideIdRef = useRef(defaultSlide.id);
+  const spotifyEmbedRef = useRef(null);
+  const spotifyControllerRef = useRef(null);
+  const spotifyPauseTimeoutRef = useRef(null);
+  const spotifyAutoplayPendingRef = useRef(false);
+  const avatarNarrationActiveRef = useRef(false);
   const wheelOptions = slide.interaction?.type === "questionWheel" ? slide.interaction.options || [] : [];
   const hasWheelInteraction = wheelOptions.length > 0;
   const exerciseVideo = slide.interaction?.type === "youtubeShort" ? slide.interaction : null;
-  const hasSlideInteraction = hasWheelInteraction || Boolean(exerciseVideo);
+  const hasPositiveNewsInteraction = slide.interaction?.type === "positiveNews";
+  const musicInteraction = slide.interaction?.type === "spotifySong" ? slide.interaction : null;
+  const hasSlideInteraction =
+    hasWheelInteraction || Boolean(exerciseVideo) || hasPositiveNewsInteraction || Boolean(musicInteraction);
   const landedWheelResult = questionWheel?.status === "landed" ? questionWheel : null;
   const sessionInputDisabled = typing || wheelResultPending;
   const wheelSliceDegrees = wheelOptions.length ? 360 / wheelOptions.length : 0;
@@ -145,6 +196,9 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
 
   function applyTurn(turn) {
     const slideData = turn.slide || defaultSlide;
+    const shouldAutoplayThemeSong =
+      slideData.interaction?.type === "spotifySong" &&
+      turn.themeSong?.status === "available";
     if (slideData.id !== slideIdRef.current) {
       slideIdRef.current = slideData.id;
       setWheelSpinning(false);
@@ -153,7 +207,12 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
       if (wheelTimeoutRef.current) clearTimeout(wheelTimeoutRef.current);
     }
     setSlide(slideData);
+    setCurrentAffairs(turn.currentAffairs || null);
+    setThemeSong(turn.themeSong || null);
+    setMusicPlaybackState(turn.themeSong?.status === "available" ? "loading" : "idle");
     setQuestionWheel(turn.questionWheel || null);
+    spotifyAutoplayPendingRef.current = shouldAutoplayThemeSong;
+    avatarNarrationActiveRef.current = Boolean(turn.avatar?.audio?.url);
 
     if (turn.assistantText) {
       const debugSuffix = import.meta.env.DEV
@@ -205,8 +264,32 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
         setPendingPlay(true);
       } else if (err.name !== "AbortError") {
         console.warn("Audio play error:", err.message);
+        avatarNarrationActiveRef.current = false;
+        attemptSpotifyAutoplay();
       }
     }
+  }
+
+  function attemptSpotifyAutoplay() {
+    if (
+      !spotifyAutoplayPendingRef.current ||
+      avatarNarrationActiveRef.current ||
+      !spotifyControllerRef.current
+    ) return;
+
+    spotifyAutoplayPendingRef.current = false;
+    try {
+      spotifyControllerRef.current.play();
+    } catch (error) {
+      console.warn("Spotify autoplay was blocked:", error.message);
+    }
+  }
+
+  function handleAvatarAudioEnded() {
+    avatarNarrationActiveRef.current = false;
+    handleAudioPause();
+    setPendingPlay(false);
+    attemptSpotifyAutoplay();
   }
 
   useEffect(() => {
@@ -233,6 +316,72 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
 
     startTurn();
   }, [sessionId, userName]);
+
+  useEffect(() => {
+    const spotifyUri = themeSong?.status === "available" ? themeSong.track?.uri : null;
+    const embedElement = spotifyEmbedRef.current;
+    if (!musicInteraction || !spotifyUri || !embedElement) return undefined;
+
+    let cancelled = false;
+    let controller = null;
+    const playbackSeconds = Number(musicInteraction.playbackSeconds) || 30;
+
+    loadSpotifyIframeApi()
+      .then((api) => {
+        if (cancelled) return;
+        api.createController(
+          embedElement,
+          {
+            uri: spotifyUri,
+            width: "100%",
+            height: 152,
+          },
+          (embedController) => {
+            if (cancelled) {
+              embedController.destroy();
+              return;
+            }
+            controller = embedController;
+            spotifyControllerRef.current = embedController;
+            setMusicPlaybackState("ready");
+
+            embedController.addListener("playback_started", () => {
+              spotifyAutoplayPendingRef.current = false;
+              audioRef.current?.pause();
+              if (spotifyPauseTimeoutRef.current) {
+                window.clearTimeout(spotifyPauseTimeoutRef.current);
+              }
+              setMusicPlaybackState("playing");
+              spotifyPauseTimeoutRef.current = window.setTimeout(() => {
+                embedController.pause();
+                setMusicPlaybackState("complete");
+              }, playbackSeconds * 1000);
+            });
+            attemptSpotifyAutoplay();
+          }
+        );
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          console.warn("Spotify embed error:", error.message);
+          setMusicPlaybackState("error");
+        }
+      });
+
+    return () => {
+      cancelled = true;
+      if (spotifyPauseTimeoutRef.current) {
+        window.clearTimeout(spotifyPauseTimeoutRef.current);
+        spotifyPauseTimeoutRef.current = null;
+      }
+      const activeController = controller || spotifyControllerRef.current;
+      activeController?.pause();
+      activeController?.destroy();
+      if (spotifyControllerRef.current === activeController) {
+        spotifyControllerRef.current = null;
+      }
+    };
+  }, [musicInteraction, themeSong]);
 
   const formatElapsed = (seconds) =>
     `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
@@ -517,7 +666,6 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
         scriptStepIndex: targetSlide - 1,
         scriptStepTurnIndex: 0,
         scriptStepRetryCount: 0,
-        interactionState: {},
       });
       setMessages((items) => [
         ...items,
@@ -571,7 +719,7 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
 
       <main className="session-slide-shell">
         <section
-          className={`ppt-slide${slide.imageUrl && !hasSlideInteraction ? " has-slide-image" : ""}${hasSlideInteraction ? " has-slide-interaction" : ""}${exerciseVideo ? " has-video-interaction" : ""}`}
+          className={`ppt-slide${slide.imageUrl && !hasSlideInteraction ? " has-slide-image" : ""}${hasSlideInteraction ? " has-slide-interaction" : ""}${exerciseVideo ? " has-video-interaction" : ""}${hasPositiveNewsInteraction ? " has-news-interaction" : ""}${musicInteraction ? " has-music-interaction" : ""}`}
           style={{
             "--slide-accent": slide.accent || theme.blush,
             backgroundImage: slide.imageUrl && !hasSlideInteraction ? `url(${slide.imageUrl})` : undefined,
@@ -635,6 +783,107 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
                   allowFullScreen
                 />
               </div>
+            </div>
+          )}
+          {hasPositiveNewsInteraction && (
+            <div className={`slide-news-overlay${currentAffairs?.article?.imageUrl ? " has-news-image" : ""}`}>
+              <article className="slide-news-story">
+                <p className="slide-news-eyebrow">Positive news from Aotearoa</p>
+                {currentAffairs?.status === "available" ? (
+                  <>
+                    <h1>{currentAffairs.article.title}</h1>
+                    {currentAffairs.article.description && (
+                      <p className="slide-news-summary">{currentAffairs.article.description}</p>
+                    )}
+                    <div className="slide-news-meta">
+                      <span>{currentAffairs.article.source}</span>
+                      {currentAffairs.article.publishedAt && (
+                        <time dateTime={currentAffairs.article.publishedAt}>
+                          {new Intl.DateTimeFormat("en-NZ", {
+                            day: "numeric",
+                            month: "short",
+                            year: "numeric",
+                            timeZone: "Pacific/Auckland",
+                          }).format(new Date(currentAffairs.article.publishedAt))}
+                        </time>
+                      )}
+                    </div>
+                    <a
+                      className="slide-news-link"
+                      href={currentAffairs.article.url}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      Read the source
+                    </a>
+                  </>
+                ) : (
+                  <>
+                    <h1>A gentle news pause</h1>
+                    <p className="slide-news-summary">
+                      No clearly positive New Zealand story is available right now.
+                    </p>
+                  </>
+                )}
+              </article>
+              {currentAffairs?.article?.imageUrl && (
+                <figure className="slide-news-image">
+                  <img src={currentAffairs.article.imageUrl} alt="" />
+                  <figcaption>{currentAffairs.article.source}</figcaption>
+                </figure>
+              )}
+            </div>
+          )}
+          {musicInteraction && (
+            <div className="slide-music-overlay">
+              {themeSong?.status === "available" ? (
+                <>
+                  <figure className="slide-music-artwork">
+                    {themeSong.track.artwork ? (
+                      <img
+                        src={themeSong.track.artwork}
+                        alt={`Album artwork for ${themeSong.track.album || themeSong.track.name}`}
+                      />
+                    ) : (
+                      <div className="slide-music-artwork-fallback" aria-hidden="true" />
+                    )}
+                  </figure>
+                  <section className="slide-music-details">
+                    <p className="slide-music-eyebrow">Your theme song</p>
+                    <h1>{themeSong.track.name}</h1>
+                    <p className="slide-music-artist">{themeSong.track.artistLabel}</p>
+                    <p className="slide-music-instruction">
+                      The music will start when Aria finishes speaking. If your browser blocks it,
+                      press Spotify's play button below.
+                    </p>
+                    <div
+                      className={`slide-spotify-embed is-${musicPlaybackState}`}
+                      ref={spotifyEmbedRef}
+                    />
+                    <p className="slide-music-status" aria-live="polite">
+                      {musicPlaybackState === "loading" && "Loading your song..."}
+                      {musicPlaybackState === "ready" && "Ready when you are."}
+                      {musicPlaybackState === "playing" && "Playing your 30-second music moment."}
+                      {musicPlaybackState === "complete" && "Music paused after 30 seconds."}
+                      {musicPlaybackState === "error" && "Spotify could not load this time."}
+                    </p>
+                    <a
+                      className="slide-music-link"
+                      href={themeSong.track.spotifyUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      Open in Spotify
+                    </a>
+                  </section>
+                </>
+              ) : (
+                <section className="slide-music-unavailable">
+                  <p className="slide-music-eyebrow">Your theme song</p>
+                  <h1>We could not prepare the music this time</h1>
+                  <p>Your conversation summary is still ready to enjoy together.</p>
+                </section>
+              )}
             </div>
           )}
           <div className="ppt-slide-content">
@@ -718,7 +967,7 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
             crossOrigin="anonymous"
             onPlay={handleAudioPlay}
             onPause={handleAudioPause}
-            onEnded={() => { handleAudioPause(); setPendingPlay(false); }}
+            onEnded={handleAvatarAudioEnded}
             onSeeked={() => publishLipSyncFrame(Boolean(audioRef.current && !audioRef.current.paused))}
             preload="metadata"
             hidden
