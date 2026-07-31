@@ -8,12 +8,15 @@
     "install:rhubarb": "node scripts/install-rhubarb.js",
     "dev": "nodemon src/server.js",
     "start": "node src/server.js",
-    "test": "node --test src/services/newsService.test.js src/services/spotifyService.test.js src/services/sessionOrchestratorService.test.js"
+    "test": "node --test src/"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "type": "module",
+  "engines": {
+    "node": ">=20.19.0"
+  },
   "dependencies": {
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",

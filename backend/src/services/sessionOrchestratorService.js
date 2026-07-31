@@ -200,7 +200,7 @@ const isNaturalMediaCompletionAnswer = (content = '') => {
   const normalized = normalizeAnswer(content);
   if (!normalized) return false;
 
-  return /^(?:all )?done$|^(?:i am |i m )?(?:finished|done listening)$|^(?:please )?(?:skip|continue)$|^(?:no |no,? )?thanks?$|^ready to continue$/i.test(
+  return /^(?:all )?done$|^(?:i am |i m )?(?:finished|done listening)$|^(?:please )?(?:skip|continue|stop)$|^(?:i would |i d )?rather not$|^(?:i )?(?:do not|don t) want to$|^not today$|^(?:no |no,? )?thanks?$|^ready to continue$/i.test(
     normalized
   );
 };
@@ -266,7 +266,13 @@ export const buildNewsElaboration = (currentAffairs) => {
     return 'I do not have a vetted story with more detail available right now.';
   }
 
-  const detail = article.content || article.description;
+  const cleanDetail = (value = '') => {
+    const rawDetail = String(value);
+    if (/(?:\u2026|\.\.\.)?\s*\[\+\d+\s+chars\]\s*$/i.test(rawDetail)) return '';
+    const detail = rawDetail.trim();
+    return /(?:\u2026|\.\.\.)$/.test(detail) ? '' : detail;
+  };
+  const detail = cleanDetail(article.content) || cleanDetail(article.description);
   if (!detail) {
     return `The verified information I have only gives the headline, ${article.title}.`;
   }
@@ -459,8 +465,7 @@ const asDeeperSummaryClause = (answer, fallbackPrefix = 'you remembered how') =>
 
 export const buildSessionSummary = (answers = []) => {
   const meaningful = answers
-    .filter((item) => item.answer && !/^ok(?:ay)?$|^yes$|^no$|^continue$/i.test(item.answer))
-    .slice(-8);
+    .filter((item) => item.answer && !/^ok(?:ay)?$|^yes$|^no$|^continue$/i.test(item.answer));
 
   const byStep = new Map(meaningful.map((item) => [item.stepId, item]));
   const primaryAnswer = (stepId) => byStep.get(stepId)?.answer || '';
@@ -586,7 +591,7 @@ const toSlide = ({ step, index, total }) => ({
   interaction: step.interaction,
 });
 
-const inferMemorySuggestions = (content = '') => {
+export const inferMemorySuggestions = (content = '') => {
   const text = content.trim();
   if (!text) return [];
 
@@ -610,6 +615,22 @@ const inferMemorySuggestions = (content = '') => {
   }
 
   return suggestions;
+};
+
+export const getRetryDecision = ({
+  hasUserContent,
+  hasDeliveredQuestion,
+  answeredCurrentQuestion,
+  unansweredAttemptCount,
+}) => {
+  const hasUnansweredTurn =
+    hasUserContent && hasDeliveredQuestion && !answeredCurrentQuestion;
+  return {
+    shouldRepeatQuestion:
+      hasUnansweredTurn && unansweredAttemptCount < MAX_UNANSWERED_ATTEMPTS,
+    shouldForceProgress:
+      hasUnansweredTurn && unansweredAttemptCount >= MAX_UNANSWERED_ATTEMPTS,
+  };
 };
 
 const normalizeMemoryContent = (content = '') => content.trim().replace(/\s+/g, ' ').toLowerCase();
@@ -900,17 +921,12 @@ export const respondToSessionTurn = async ({ sessionId, content }) => {
   const requiresMediaCompletion = requiresMusicCompletion || requiresVideoCompletion;
   const unansweredAttemptCount =
     hasUserContent && hasDeliveredQuestion && !answeredCurrentQuestion ? currentRetryCount + 1 : 0;
-  const shouldRepeatQuestion =
-    hasUserContent &&
-    hasDeliveredQuestion &&
-    !answeredCurrentQuestion &&
-    (requiresMediaCompletion || unansweredAttemptCount < MAX_UNANSWERED_ATTEMPTS);
-  const shouldForceProgress =
-    hasUserContent &&
-    hasDeliveredQuestion &&
-    !answeredCurrentQuestion &&
-    !requiresMediaCompletion &&
-    unansweredAttemptCount >= MAX_UNANSWERED_ATTEMPTS;
+  const { shouldRepeatQuestion, shouldForceProgress } = getRetryDecision({
+    hasUserContent,
+    hasDeliveredQuestion,
+    answeredCurrentQuestion,
+    unansweredAttemptCount,
+  });
   const canProgress = hasUserContent && hasDeliveredQuestion && (answeredCurrentQuestion || shouldForceProgress);
   const shouldAskAdaptiveFollowUp = Boolean(
     hasUserContent &&

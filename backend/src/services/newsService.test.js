@@ -1,7 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  getPositiveNzNews,
   isSuitablePositiveArticle,
+  resetPositiveNewsCacheForTests,
   selectPositiveArticle,
 } from './newsService.js';
 
@@ -65,23 +67,121 @@ test('selects the strongest suitable story and returns display-safe fields', () 
   assert.equal(selected.source, 'Example News');
 });
 
-test('keeps safe article detail for grounded elaboration and removes truncation markers', () => {
+test('discards article detail when NewsAPI reports that it was truncated', () => {
   const selected = selectPositiveArticle([
     article({
       content: 'The sanctuary recorded its highest number of returning birds this year. [+124 chars]',
     }),
   ]);
 
-  assert.equal(
-    selected.content,
-    'The sanctuary recorded its highest number of returning birds this year.'
+  assert.equal(selected.content, '');
+});
+
+const mockNewsResponse = (articles) => ({
+  ok: true,
+  json: async () => ({ status: 'ok', articles }),
+});
+
+test('reports when positive news is not configured without fetching', async (t) => {
+  resetPositiveNewsCacheForTests();
+  const previousApiKey = process.env.NEWS_API_KEY;
+  delete process.env.NEWS_API_KEY;
+  const fetchMock = t.mock.method(globalThis, 'fetch', async () => mockNewsResponse([]));
+
+  try {
+    const result = await getPositiveNzNews();
+    assert.equal(result.reason, 'not-configured');
+    assert.equal(fetchMock.mock.callCount(), 0);
+  } finally {
+    if (previousApiKey === undefined) delete process.env.NEWS_API_KEY;
+    else process.env.NEWS_API_KEY = previousApiKey;
+    resetPositiveNewsCacheForTests();
+  }
+});
+
+test('reports failed NewsAPI requests', async (t) => {
+  resetPositiveNewsCacheForTests();
+  const previousApiKey = process.env.NEWS_API_KEY;
+  process.env.NEWS_API_KEY = 'test-key';
+  t.mock.method(globalThis, 'fetch', async () => {
+    throw new Error('network unavailable');
+  });
+
+  try {
+    const result = await getPositiveNzNews();
+    assert.equal(result.reason, 'request-failed');
+  } finally {
+    if (previousApiKey === undefined) delete process.env.NEWS_API_KEY;
+    else process.env.NEWS_API_KEY = previousApiKey;
+    resetPositiveNewsCacheForTests();
+  }
+});
+
+test('falls back from NZ headlines to local publishers', async (t) => {
+  resetPositiveNewsCacheForTests();
+  const previousApiKey = process.env.NEWS_API_KEY;
+  process.env.NEWS_API_KEY = 'test-key';
+  let requestCount = 0;
+  const fetchMock = t.mock.method(globalThis, 'fetch', async () => {
+    requestCount += 1;
+    return requestCount === 1
+      ? mockNewsResponse([])
+      : mockNewsResponse([article()]);
+  });
+
+  try {
+    const result = await getPositiveNzNews();
+    assert.equal(result.status, 'available');
+    assert.equal(result.sourceScope, 'nz-publishers');
+    assert.equal(fetchMock.mock.callCount(), 2);
+    assert.match(String(fetchMock.mock.calls[1].arguments[0]), /\/everything\?/);
+    assert.match(String(fetchMock.mock.calls[1].arguments[0]), /domains=/);
+  } finally {
+    if (previousApiKey === undefined) delete process.env.NEWS_API_KEY;
+    else process.env.NEWS_API_KEY = previousApiKey;
+    resetPositiveNewsCacheForTests();
+  }
+});
+
+test('shares an in-flight request and caches the successful news result', async (t) => {
+  resetPositiveNewsCacheForTests();
+  const previousApiKey = process.env.NEWS_API_KEY;
+  process.env.NEWS_API_KEY = 'test-key';
+  const fetchMock = t.mock.method(
+    globalThis,
+    'fetch',
+    async () => mockNewsResponse([article()])
   );
+
+  try {
+    const [first, second] = await Promise.all([
+      getPositiveNzNews(),
+      getPositiveNzNews(),
+    ]);
+    const third = await getPositiveNzNews();
+    assert.deepEqual(second, first);
+    assert.deepEqual(third, first);
+    assert.equal(fetchMock.mock.callCount(), 1);
+  } finally {
+    if (previousApiKey === undefined) delete process.env.NEWS_API_KEY;
+    else process.env.NEWS_API_KEY = previousApiKey;
+    resetPositiveNewsCacheForTests();
+  }
 });
 
 test('rejects an article when additional content contains a blocked topic', () => {
   assert.equal(
     isSuitablePositiveArticle(article({
       content: 'The celebration followed a fatal crash.',
+    })),
+    false
+  );
+});
+
+test('still checks truncated article content for blocked topics', () => {
+  assert.equal(
+    isSuitablePositiveArticle(article({
+      content: 'The celebration followed a fatal crash. \u2026 [+124 chars]',
     })),
     false
   );

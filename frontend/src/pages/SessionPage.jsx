@@ -58,17 +58,28 @@ function loadSpotifyIframeApi() {
       resolve(api);
     };
 
+    const handleScriptError = () => {
+      window.clearTimeout(timeout);
+      spotifyIframeApiPromise = null;
+      reject(new Error("Spotify player could not be loaded"));
+    };
+    const handleScriptLoad = () => {
+      if (!spotifyIframeApi) return;
+      window.clearTimeout(timeout);
+      resolve(spotifyIframeApi);
+    };
     const existingScript = document.querySelector(`script[src="${SPOTIFY_IFRAME_API_URL}"]`);
-    if (existingScript) return;
+    if (existingScript) {
+      existingScript.addEventListener("load", handleScriptLoad, { once: true });
+      existingScript.addEventListener("error", handleScriptError, { once: true });
+      return;
+    }
 
     const script = document.createElement("script");
     script.src = SPOTIFY_IFRAME_API_URL;
     script.async = true;
-    script.addEventListener("error", () => {
-      window.clearTimeout(timeout);
-      spotifyIframeApiPromise = null;
-      reject(new Error("Spotify player could not be loaded"));
-    }, { once: true });
+    script.addEventListener("load", handleScriptLoad, { once: true });
+    script.addEventListener("error", handleScriptError, { once: true });
     document.body.appendChild(script);
   });
 
@@ -90,17 +101,28 @@ function loadYouTubeIframeApi() {
       resolve(window.YT);
     };
 
+    const handleScriptError = () => {
+      window.clearTimeout(timeout);
+      youtubeIframeApiPromise = null;
+      reject(new Error("YouTube player could not be loaded"));
+    };
+    const handleScriptLoad = () => {
+      if (!window.YT?.Player) return;
+      window.clearTimeout(timeout);
+      resolve(window.YT);
+    };
     const existingScript = document.querySelector(`script[src="${YOUTUBE_IFRAME_API_URL}"]`);
-    if (existingScript) return;
+    if (existingScript) {
+      existingScript.addEventListener("load", handleScriptLoad, { once: true });
+      existingScript.addEventListener("error", handleScriptError, { once: true });
+      return;
+    }
 
     const script = document.createElement("script");
     script.src = YOUTUBE_IFRAME_API_URL;
     script.async = true;
-    script.addEventListener("error", () => {
-      window.clearTimeout(timeout);
-      youtubeIframeApiPromise = null;
-      reject(new Error("YouTube player could not be loaded"));
-    }, { once: true });
+    script.addEventListener("load", handleScriptLoad, { once: true });
+    script.addEventListener("error", handleScriptError, { once: true });
     document.body.appendChild(script);
   });
 
@@ -111,6 +133,12 @@ function getInitialAvatarMode() {
   if (!import.meta.env.DEV) return "male";
   const requestedMode = new URLSearchParams(window.location.search).get("avatar");
   return avatarModeIds.has(requestedMode) ? requestedMode : "male";
+}
+
+function formatPlaybackDuration(seconds) {
+  if (seconds === 60) return "one minute";
+  if (seconds > 60 && seconds % 60 === 0) return `${seconds / 60} minutes`;
+  return `${seconds} seconds`;
 }
 
 // Strips '/api' suffix so the frontend can build full backend URLs for audio files.
@@ -187,6 +215,9 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
     Boolean(exerciseVideo) && exercisePlayback?.status !== "complete";
   const hasPositiveNewsInteraction = slide.interaction?.type === "positiveNews";
   const musicInteraction = slide.interaction?.type === "spotifySong" ? slide.interaction : null;
+  const spotifyUri = themeSong?.status === "available" ? themeSong.track?.uri : null;
+  const musicPlaybackSeconds = Number(musicInteraction?.playbackSeconds) || 30;
+  const musicPlaybackDurationLabel = formatPlaybackDuration(musicPlaybackSeconds);
   const musicAwaitingCompletion =
     Boolean(musicInteraction) && musicPlayback?.status !== "complete";
   const hasSlideInteraction =
@@ -262,13 +293,13 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
         window.clearTimeout(videoAutoplayFallbackRef.current);
         videoAutoplayFallbackRef.current = null;
       }
+      setVideoPlaybackState(
+        slideData.interaction?.type === "youtubeShort" ? "loading" : "idle"
+      );
     }
     setSlide(slideData);
     setCurrentAffairs(turn.currentAffairs || null);
     setExercisePlayback(turn.exercisePlayback || null);
-    setVideoPlaybackState(
-      slideData.interaction?.type === "youtubeShort" ? "loading" : "idle"
-    );
     setThemeSong(turn.themeSong || null);
     setMusicPlayback(turn.musicPlayback || null);
     setMusicPlaybackState(
@@ -331,8 +362,10 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
       if (err.name === "NotAllowedError") {
         // Autoplay blocked — show manual play button
         setPendingPlay(true);
-      } else if (err.name !== "AbortError") {
-        console.warn("Audio play error:", err.message);
+      } else {
+        if (err.name !== "AbortError") {
+          console.warn("Audio play error:", err.message);
+        }
         avatarNarrationActiveRef.current = false;
         attemptSpotifyAutoplay();
         attemptVideoAutoplay();
@@ -366,13 +399,25 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
     videoAutoplayPendingRef.current = false;
     try {
       videoPlayerRef.current.playVideo();
-      videoAutoplayFallbackRef.current = window.setTimeout(() => {
-        const player = videoPlayerRef.current;
-        if (!player || player.getPlayerState?.() === window.YT?.PlayerState?.PLAYING) return;
-        player.mute?.();
-        player.playVideo?.();
-        setVideoPlaybackState("playing-muted");
-      }, 900);
+      const checkAutoplay = (checksRemaining = 3) => {
+        if (videoAutoplayFallbackRef.current) {
+          window.clearTimeout(videoAutoplayFallbackRef.current);
+        }
+        videoAutoplayFallbackRef.current = window.setTimeout(() => {
+          const player = videoPlayerRef.current;
+          if (!player) return;
+          const playerState = player.getPlayerState?.();
+          if (playerState === window.YT?.PlayerState?.PLAYING) return;
+          if (playerState === window.YT?.PlayerState?.BUFFERING && checksRemaining > 0) {
+            checkAutoplay(checksRemaining - 1);
+            return;
+          }
+          player.mute?.();
+          player.playVideo?.();
+          setVideoPlaybackState("playing-muted");
+        }, 900);
+      };
+      checkAutoplay();
     } catch (error) {
       console.warn("YouTube autoplay was blocked:", error.message);
     }
@@ -412,15 +457,13 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
   }, [sessionId, userName]);
 
   useEffect(() => {
-    const spotifyUri = themeSong?.status === "available" ? themeSong.track?.uri : null;
     const embedElement = spotifyEmbedRef.current;
-    if (!musicInteraction || !musicAwaitingCompletion || !spotifyUri || !embedElement) {
+    if (!musicAwaitingCompletion || !spotifyUri || !embedElement) {
       return undefined;
     }
 
     let cancelled = false;
     let controller = null;
-    const playbackSeconds = Number(musicInteraction.playbackSeconds) || 30;
 
     loadSpotifyIframeApi()
       .then((api) => {
@@ -451,7 +494,7 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
               spotifyPauseTimeoutRef.current = window.setTimeout(() => {
                 embedController.pause();
                 setMusicPlaybackState("complete");
-              }, playbackSeconds * 1000);
+              }, musicPlaybackSeconds * 1000);
             });
             attemptSpotifyAutoplay();
           }
@@ -477,7 +520,7 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
         spotifyControllerRef.current = null;
       }
     };
-  }, [musicInteraction, musicAwaitingCompletion, themeSong]);
+  }, [musicAwaitingCompletion, musicPlaybackSeconds, spotifyUri]);
 
   useEffect(() => {
     const mountElement = videoMountRef.current;
@@ -488,11 +531,15 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
     let cancelled = false;
     let player = null;
     videoReadyRef.current = false;
+    mountElement.replaceChildren();
+    const playerHost = document.createElement("div");
+    playerHost.className = "slide-video-frame";
+    mountElement.appendChild(playerHost);
 
     loadYouTubeIframeApi()
       .then((YT) => {
         if (cancelled) return;
-        player = new YT.Player(mountElement, {
+        player = new YT.Player(playerHost, {
           videoId: exerciseVideoId,
           width: "100%",
           height: "100%",
@@ -536,6 +583,7 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
       if (videoPlayerRef.current === activePlayer) {
         videoPlayerRef.current = null;
       }
+      mountElement.replaceChildren();
     };
   }, [exerciseAwaitingCompletion, exerciseVideoId]);
 
@@ -1014,10 +1062,7 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
                 </button>
               </div>
               <div className="slide-video-frame-shell">
-                <div
-                  className="slide-video-frame"
-                  ref={videoMountRef}
-                />
+                <div className="slide-video-player-mount" ref={videoMountRef} />
               </div>
             </div>
           )}
@@ -1100,8 +1145,10 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
                     <p className="slide-music-status" aria-live="polite">
                       {musicPlaybackState === "loading" && "Loading your song..."}
                       {musicPlaybackState === "ready" && "Ready when you are."}
-                      {musicPlaybackState === "playing" && "Playing for up to one minute."}
-                      {musicPlaybackState === "complete" && "Music paused after one minute."}
+                      {musicPlaybackState === "playing" &&
+                        `Playing for up to ${musicPlaybackDurationLabel}.`}
+                      {musicPlaybackState === "complete" &&
+                        `Music paused after ${musicPlaybackDurationLabel}.`}
                       {musicPlaybackState === "error" && "Spotify could not load this time."}
                     </p>
                     <div className="slide-music-actions">

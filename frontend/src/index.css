@@ -482,7 +482,7 @@ body {
   min-height: 48px;
   border: 2px solid #126D37;
   border-radius: 8px;
-  background: #168B47;
+  background: #126D37;
   color: #FFFFFF;
   font: 900 clamp(16px, 1.5cqw, 21px) Nunito, sans-serif;
   cursor: pointer;
@@ -715,6 +715,11 @@ body {
   height: 100%;
   max-width: 100%;
   aspect-ratio: 9 / 16;
+}
+
+.slide-video-player-mount {
+  width: 100%;
+  height: 100%;
 }
 
 .slide-video-frame,
