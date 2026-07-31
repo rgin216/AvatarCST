@@ -64,3 +64,25 @@ test('selects the strongest suitable story and returns display-safe fields', () 
   assert.equal(selected.title, 'Community celebrates native bird conservation milestone');
   assert.equal(selected.source, 'Example News');
 });
+
+test('keeps safe article detail for grounded elaboration and removes truncation markers', () => {
+  const selected = selectPositiveArticle([
+    article({
+      content: 'The sanctuary recorded its highest number of returning birds this year. [+124 chars]',
+    }),
+  ]);
+
+  assert.equal(
+    selected.content,
+    'The sanctuary recorded its highest number of returning birds this year.'
+  );
+});
+
+test('rejects an article when additional content contains a blocked topic', () => {
+  assert.equal(
+    isSuitablePositiveArticle(article({
+      content: 'The celebration followed a fatal crash.',
+    })),
+    false
+  );
+});

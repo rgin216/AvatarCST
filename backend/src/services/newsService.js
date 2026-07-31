@@ -143,6 +143,9 @@ const cleanText = (value = '', maxLength = 240) =>
     .trim()
     .slice(0, maxLength);
 
+const cleanArticleContent = (value = '') =>
+  cleanText(String(value).replace(/\s*\[\+\d+\s+chars\]\s*$/i, ''), 600);
+
 const safeHttpUrl = (value = '') => {
   try {
     const url = new URL(value);
@@ -163,9 +166,10 @@ const countMatches = (patterns, text) =>
 export const scorePositiveArticle = (article = {}) => {
   const title = cleanText(article.title, 180);
   const description = cleanText(article.description, 300);
+  const content = cleanArticleContent(article.content);
   if (!title || title === '[Removed]') return Number.NEGATIVE_INFINITY;
 
-  const combinedText = `${title} ${description}`;
+  const combinedText = `${title} ${description} ${content}`;
   if (BLOCKED_PATTERNS.some((pattern) => pattern.test(combinedText))) {
     return Number.NEGATIVE_INFINITY;
   }
@@ -180,6 +184,7 @@ export const isSuitablePositiveArticle = (article = {}) =>
 const normalizeArticle = (article) => ({
   title: cleanText(article.title, 180),
   description: cleanText(article.description, 260),
+  content: cleanArticleContent(article.content),
   url: safeHttpUrl(article.url),
   imageUrl: safeHttpUrl(article.urlToImage),
   source: cleanText(article.source?.name || 'New Zealand news', 80),

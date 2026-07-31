@@ -33,9 +33,11 @@ const lipSyncModes = [
 ];
 const wheelColors = ["#7A9DAD", "#F47C20", "#A8C5A0", "#4472C4", "#F4C8B0"];
 const SPOTIFY_IFRAME_API_URL = "https://open.spotify.com/embed/iframe-api/v1";
+const YOUTUBE_IFRAME_API_URL = "https://www.youtube.com/iframe_api";
 
 let spotifyIframeApi = null;
 let spotifyIframeApiPromise = null;
+let youtubeIframeApiPromise = null;
 
 function loadSpotifyIframeApi() {
   if (spotifyIframeApi) return Promise.resolve(spotifyIframeApi);
@@ -73,6 +75,38 @@ function loadSpotifyIframeApi() {
   return spotifyIframeApiPromise;
 }
 
+function loadYouTubeIframeApi() {
+  if (window.YT?.Player) return Promise.resolve(window.YT);
+  if (youtubeIframeApiPromise) return youtubeIframeApiPromise;
+
+  youtubeIframeApiPromise = new Promise((resolve, reject) => {
+    const timeout = window.setTimeout(() => {
+      youtubeIframeApiPromise = null;
+      reject(new Error("YouTube player took too long to load"));
+    }, 10000);
+
+    window.onYouTubeIframeAPIReady = () => {
+      window.clearTimeout(timeout);
+      resolve(window.YT);
+    };
+
+    const existingScript = document.querySelector(`script[src="${YOUTUBE_IFRAME_API_URL}"]`);
+    if (existingScript) return;
+
+    const script = document.createElement("script");
+    script.src = YOUTUBE_IFRAME_API_URL;
+    script.async = true;
+    script.addEventListener("error", () => {
+      window.clearTimeout(timeout);
+      youtubeIframeApiPromise = null;
+      reject(new Error("YouTube player could not be loaded"));
+    }, { once: true });
+    document.body.appendChild(script);
+  });
+
+  return youtubeIframeApiPromise;
+}
+
 function getInitialAvatarMode() {
   if (!import.meta.env.DEV) return "male";
   const requestedMode = new URLSearchParams(window.location.search).get("avatar");
@@ -103,7 +137,10 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
   const [lipSyncMode, setLipSyncMode] = useState("rhubarb");
   const [pendingPlay, setPendingPlay] = useState(false);
   const [currentAffairs, setCurrentAffairs] = useState(null);
+  const [exercisePlayback, setExercisePlayback] = useState(null);
+  const [videoPlaybackState, setVideoPlaybackState] = useState("idle");
   const [themeSong, setThemeSong] = useState(null);
+  const [musicPlayback, setMusicPlayback] = useState(null);
   const [musicPlaybackState, setMusicPlaybackState] = useState("idle");
   const [questionWheel, setQuestionWheel] = useState(null);
   const [wheelSpinning, setWheelSpinning] = useState(false);
@@ -136,12 +173,22 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
   const spotifyControllerRef = useRef(null);
   const spotifyPauseTimeoutRef = useRef(null);
   const spotifyAutoplayPendingRef = useRef(false);
+  const videoMountRef = useRef(null);
+  const videoPlayerRef = useRef(null);
+  const videoReadyRef = useRef(false);
+  const videoAutoplayPendingRef = useRef(false);
+  const videoAutoplayFallbackRef = useRef(null);
   const avatarNarrationActiveRef = useRef(false);
   const wheelOptions = slide.interaction?.type === "questionWheel" ? slide.interaction.options || [] : [];
   const hasWheelInteraction = wheelOptions.length > 0;
   const exerciseVideo = slide.interaction?.type === "youtubeShort" ? slide.interaction : null;
+  const exerciseVideoId = exerciseVideo?.videoId || null;
+  const exerciseAwaitingCompletion =
+    Boolean(exerciseVideo) && exercisePlayback?.status !== "complete";
   const hasPositiveNewsInteraction = slide.interaction?.type === "positiveNews";
   const musicInteraction = slide.interaction?.type === "spotifySong" ? slide.interaction : null;
+  const musicAwaitingCompletion =
+    Boolean(musicInteraction) && musicPlayback?.status !== "complete";
   const hasSlideInteraction =
     hasWheelInteraction || Boolean(exerciseVideo) || hasPositiveNewsInteraction || Boolean(musicInteraction);
   const landedWheelResult = questionWheel?.status === "landed" ? questionWheel : null;
@@ -198,20 +245,42 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
     const slideData = turn.slide || defaultSlide;
     const shouldAutoplayThemeSong =
       slideData.interaction?.type === "spotifySong" &&
-      turn.themeSong?.status === "available";
+      turn.themeSong?.status === "available" &&
+      turn.musicPlayback?.status !== "complete";
+    const shouldAutoplayExercise =
+      slideData.interaction?.type === "youtubeShort" &&
+      turn.exercisePlayback?.status !== "complete";
     if (slideData.id !== slideIdRef.current) {
       slideIdRef.current = slideData.id;
       setWheelSpinning(false);
       wheelResultPendingRef.current = false;
       setWheelResultPending(false);
       if (wheelTimeoutRef.current) clearTimeout(wheelTimeoutRef.current);
+      videoReadyRef.current = false;
+      videoAutoplayPendingRef.current = false;
+      if (videoAutoplayFallbackRef.current) {
+        window.clearTimeout(videoAutoplayFallbackRef.current);
+        videoAutoplayFallbackRef.current = null;
+      }
     }
     setSlide(slideData);
     setCurrentAffairs(turn.currentAffairs || null);
+    setExercisePlayback(turn.exercisePlayback || null);
+    setVideoPlaybackState(
+      slideData.interaction?.type === "youtubeShort" ? "loading" : "idle"
+    );
     setThemeSong(turn.themeSong || null);
-    setMusicPlaybackState(turn.themeSong?.status === "available" ? "loading" : "idle");
+    setMusicPlayback(turn.musicPlayback || null);
+    setMusicPlaybackState(
+      turn.musicPlayback?.status === "complete"
+        ? "complete"
+        : turn.themeSong?.status === "available"
+        ? "loading"
+        : "idle"
+    );
     setQuestionWheel(turn.questionWheel || null);
     spotifyAutoplayPendingRef.current = shouldAutoplayThemeSong;
+    videoAutoplayPendingRef.current = shouldAutoplayExercise;
     avatarNarrationActiveRef.current = Boolean(turn.avatar?.audio?.url);
 
     if (turn.assistantText) {
@@ -266,6 +335,7 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
         console.warn("Audio play error:", err.message);
         avatarNarrationActiveRef.current = false;
         attemptSpotifyAutoplay();
+        attemptVideoAutoplay();
       }
     }
   }
@@ -285,11 +355,35 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
     }
   }
 
+  function attemptVideoAutoplay() {
+    if (
+      !videoAutoplayPendingRef.current ||
+      avatarNarrationActiveRef.current ||
+      !videoReadyRef.current ||
+      !videoPlayerRef.current
+    ) return;
+
+    videoAutoplayPendingRef.current = false;
+    try {
+      videoPlayerRef.current.playVideo();
+      videoAutoplayFallbackRef.current = window.setTimeout(() => {
+        const player = videoPlayerRef.current;
+        if (!player || player.getPlayerState?.() === window.YT?.PlayerState?.PLAYING) return;
+        player.mute?.();
+        player.playVideo?.();
+        setVideoPlaybackState("playing-muted");
+      }, 900);
+    } catch (error) {
+      console.warn("YouTube autoplay was blocked:", error.message);
+    }
+  }
+
   function handleAvatarAudioEnded() {
     avatarNarrationActiveRef.current = false;
     handleAudioPause();
     setPendingPlay(false);
     attemptSpotifyAutoplay();
+    attemptVideoAutoplay();
   }
 
   useEffect(() => {
@@ -320,7 +414,9 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
   useEffect(() => {
     const spotifyUri = themeSong?.status === "available" ? themeSong.track?.uri : null;
     const embedElement = spotifyEmbedRef.current;
-    if (!musicInteraction || !spotifyUri || !embedElement) return undefined;
+    if (!musicInteraction || !musicAwaitingCompletion || !spotifyUri || !embedElement) {
+      return undefined;
+    }
 
     let cancelled = false;
     let controller = null;
@@ -381,7 +477,67 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
         spotifyControllerRef.current = null;
       }
     };
-  }, [musicInteraction, themeSong]);
+  }, [musicInteraction, musicAwaitingCompletion, themeSong]);
+
+  useEffect(() => {
+    const mountElement = videoMountRef.current;
+    if (!exerciseVideoId || !exerciseAwaitingCompletion || !mountElement) {
+      return undefined;
+    }
+
+    let cancelled = false;
+    let player = null;
+    videoReadyRef.current = false;
+
+    loadYouTubeIframeApi()
+      .then((YT) => {
+        if (cancelled) return;
+        player = new YT.Player(mountElement, {
+          videoId: exerciseVideoId,
+          width: "100%",
+          height: "100%",
+          host: "https://www.youtube-nocookie.com",
+          playerVars: {
+            playsinline: 1,
+            rel: 0,
+            origin: window.location.origin,
+          },
+          events: {
+            onReady: (event) => {
+              if (cancelled) return;
+              videoPlayerRef.current = event.target;
+              videoReadyRef.current = true;
+              setVideoPlaybackState("ready");
+              attemptVideoAutoplay();
+            },
+            onStateChange: (event) => {
+              if (cancelled) return;
+              if (event.data === YT.PlayerState.PLAYING) {
+                setVideoPlaybackState(event.target.isMuted?.() ? "playing-muted" : "playing");
+              }
+            },
+          },
+        });
+      })
+      .catch((error) => {
+        if (!cancelled) console.warn("YouTube embed error:", error.message);
+      });
+
+    return () => {
+      cancelled = true;
+      videoReadyRef.current = false;
+      if (videoAutoplayFallbackRef.current) {
+        window.clearTimeout(videoAutoplayFallbackRef.current);
+        videoAutoplayFallbackRef.current = null;
+      }
+      const activePlayer = player || videoPlayerRef.current;
+      activePlayer?.stopVideo?.();
+      activePlayer?.destroy?.();
+      if (videoPlayerRef.current === activePlayer) {
+        videoPlayerRef.current = null;
+      }
+    };
+  }, [exerciseAwaitingCompletion, exerciseVideoId]);
 
   const formatElapsed = (seconds) =>
     `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
@@ -591,6 +747,75 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
     }
   }
 
+  async function handleMusicDone() {
+    if (typing || !musicAwaitingCompletion) return;
+
+    if (spotifyPauseTimeoutRef.current) {
+      window.clearTimeout(spotifyPauseTimeoutRef.current);
+      spotifyPauseTimeoutRef.current = null;
+    }
+    spotifyAutoplayPendingRef.current = false;
+    spotifyControllerRef.current?.pause();
+    setMusicPlaybackState("complete");
+    setMessages((items) => [...items, { from: "user", text: "Done" }]);
+    setTyping(true);
+
+    try {
+      const { data } = await api.post(`/sessions/${sessionId}/respond`, {
+        content: "[[music-complete]]",
+        avatarMode: avatarModeRef.current,
+        lipSyncMode,
+      });
+      applyTurn(data);
+    } catch (err) {
+      console.error("Failed to complete music playback", err);
+      setMusicPlaybackState(themeSong?.status === "available" ? "ready" : "idle");
+      setMessages((items) => [
+        ...items,
+        {
+          from: "avatar",
+          text: "I could not continue just now. Please press Done again, or say or type done.",
+        },
+      ]);
+    } finally {
+      setTyping(false);
+    }
+  }
+
+  async function handleExerciseDone() {
+    if (typing || !exerciseAwaitingCompletion) return;
+
+    videoAutoplayPendingRef.current = false;
+    if (videoAutoplayFallbackRef.current) {
+      window.clearTimeout(videoAutoplayFallbackRef.current);
+      videoAutoplayFallbackRef.current = null;
+    }
+    videoPlayerRef.current?.stopVideo?.();
+    setMessages((items) => [...items, { from: "user", text: "Done" }]);
+    setTyping(true);
+
+    try {
+      const { data } = await api.post(`/sessions/${sessionId}/respond`, {
+        content: "[[video-complete]]",
+        avatarMode: avatarModeRef.current,
+        lipSyncMode,
+      });
+      applyTurn(data);
+    } catch (err) {
+      console.error("Failed to complete exercise video", err);
+      videoAutoplayPendingRef.current = true;
+      setMessages((items) => [
+        ...items,
+        {
+          from: "avatar",
+          text: "I could not continue just now. Please press Done again, or say or type done.",
+        },
+      ]);
+    } finally {
+      setTyping(false);
+    }
+  }
+
   async function sendQuestionWheelResult(result) {
     if (!result || typing) return;
 
@@ -772,15 +997,26 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
                 <small>
                   Only do movements that feel comfortable. {exerciseVideo.completionPrompt}
                 </small>
+                <div className="slide-video-status" aria-live="polite">
+                  {videoPlaybackState === "loading" && "Loading the exercise..."}
+                  {videoPlaybackState === "ready" && "Ready to start after Aria finishes."}
+                  {videoPlaybackState === "playing" && "Exercise playing."}
+                  {videoPlaybackState === "playing-muted" &&
+                    "Exercise playing muted. Use the player volume control for sound."}
+                </div>
+                <button
+                  type="button"
+                  className="slide-media-done"
+                  onClick={handleExerciseDone}
+                  disabled={typing}
+                >
+                  Done
+                </button>
               </div>
               <div className="slide-video-frame-shell">
-                <iframe
+                <div
                   className="slide-video-frame"
-                  src={`https://www.youtube-nocookie.com/embed/${exerciseVideo.videoId}?playsinline=1&rel=0`}
-                  title="Seated exercise follow-along video"
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                  referrerPolicy="strict-origin-when-cross-origin"
-                  allowFullScreen
+                  ref={videoMountRef}
                 />
               </div>
             </div>
@@ -808,14 +1044,6 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
                         </time>
                       )}
                     </div>
-                    <a
-                      className="slide-news-link"
-                      href={currentAffairs.article.url}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      Read the source
-                    </a>
                   </>
                 ) : (
                   <>
@@ -836,7 +1064,16 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
           )}
           {musicInteraction && (
             <div className="slide-music-overlay">
-              {themeSong?.status === "available" ? (
+              {!musicAwaitingCompletion ? (
+                <section className="slide-music-reflection">
+                  <p className="slide-music-eyebrow">Looking back</p>
+                  <h1>What would you like to remember?</h1>
+                  <p>
+                    Take your time and choose one part of today&apos;s conversation that stands
+                    out to you.
+                  </p>
+                </section>
+              ) : themeSong?.status === "available" ? (
                 <>
                   <figure className="slide-music-artwork">
                     {themeSong.track.artwork ? (
@@ -863,18 +1100,20 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
                     <p className="slide-music-status" aria-live="polite">
                       {musicPlaybackState === "loading" && "Loading your song..."}
                       {musicPlaybackState === "ready" && "Ready when you are."}
-                      {musicPlaybackState === "playing" && "Playing your 30-second music moment."}
-                      {musicPlaybackState === "complete" && "Music paused after 30 seconds."}
+                      {musicPlaybackState === "playing" && "Playing for up to one minute."}
+                      {musicPlaybackState === "complete" && "Music paused after one minute."}
                       {musicPlaybackState === "error" && "Spotify could not load this time."}
                     </p>
-                    <a
-                      className="slide-music-link"
-                      href={themeSong.track.spotifyUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      Open in Spotify
-                    </a>
+                    <div className="slide-music-actions">
+                      <button
+                        type="button"
+                        className="slide-media-done"
+                        onClick={handleMusicDone}
+                        disabled={typing}
+                      >
+                        Done
+                      </button>
+                    </div>
                   </section>
                 </>
               ) : (
@@ -882,6 +1121,14 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
                   <p className="slide-music-eyebrow">Your theme song</p>
                   <h1>We could not prepare the music this time</h1>
                   <p>Your conversation summary is still ready to enjoy together.</p>
+                  <button
+                    type="button"
+                    className="slide-media-done"
+                    onClick={handleMusicDone}
+                    disabled={typing}
+                  >
+                    Done
+                  </button>
                 </section>
               )}
             </div>
