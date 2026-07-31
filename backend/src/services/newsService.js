@@ -2,6 +2,7 @@ const NEWS_API_URL = process.env.NEWS_API_URL || 'https://newsapi.org/v2/top-hea
 const NEWS_API_EVERYTHING_URL =
   process.env.NEWS_API_EVERYTHING_URL || 'https://newsapi.org/v2/everything';
 const DEFAULT_CACHE_MINUTES = 30;
+const UNAVAILABLE_CACHE_MS = 2 * 60 * 1000;
 const REQUEST_TIMEOUT_MS = 6_000;
 const RECENT_NEWS_DAYS = 7;
 const DEFAULT_NZ_NEWS_DOMAINS = [
@@ -127,6 +128,7 @@ const BLOCKED_PATTERNS = [
 
 let cachedNews = null;
 let cacheExpiresAt = 0;
+let pendingNewsRequest = null;
 
 const getCacheMilliseconds = () => {
   const configuredMinutes = Number.parseInt(process.env.NZ_NEWS_CACHE_MINUTES || '', 10);
@@ -143,8 +145,17 @@ const cleanText = (value = '', maxLength = 240) =>
     .trim()
     .slice(0, maxLength);
 
-const cleanArticleContent = (value = '') =>
-  cleanText(String(value).replace(/\s*\[\+\d+\s+chars\]\s*$/i, ''), 600);
+const cleanArticleContent = (value = '') => {
+  const content = String(value);
+  if (/(?:\u2026|\.\.\.)?\s*\[\+\d+\s+chars\]\s*$/i.test(content)) return '';
+  return cleanText(content, 600);
+};
+
+const cleanArticleContentForScoring = (value = '') =>
+  cleanText(
+    String(value).replace(/\s*(?:\u2026|\.\.\.)?\s*\[\+\d+\s+chars\]\s*$/i, ''),
+    600
+  );
 
 const safeHttpUrl = (value = '') => {
   try {
@@ -166,7 +177,7 @@ const countMatches = (patterns, text) =>
 export const scorePositiveArticle = (article = {}) => {
   const title = cleanText(article.title, 180);
   const description = cleanText(article.description, 300);
-  const content = cleanArticleContent(article.content);
+  const content = cleanArticleContentForScoring(article.content);
   if (!title || title === '[Removed]') return Number.NEGATIVE_INFINITY;
 
   const combinedText = `${title} ${description} ${content}`;
@@ -193,13 +204,14 @@ const normalizeArticle = (article) => ({
 
 export const selectPositiveArticle = (articles = []) =>
   articles
-    .filter(isSuitablePositiveArticle)
+    .map((article) => ({ article, score: scorePositiveArticle(article) }))
+    .filter(({ article, score }) => score >= 3 && Boolean(safeHttpUrl(article.url)))
     .sort((left, right) => {
-      const scoreDifference = scorePositiveArticle(right) - scorePositiveArticle(left);
+      const scoreDifference = right.score - left.score;
       if (scoreDifference !== 0) return scoreDifference;
-      return new Date(right.publishedAt || 0) - new Date(left.publishedAt || 0);
+      return new Date(right.article.publishedAt || 0) - new Date(left.article.publishedAt || 0);
     })
-    .map(normalizeArticle)[0] || null;
+    .map(({ article }) => normalizeArticle(article))[0] || null;
 
 const unavailableResult = (reason) => ({
   status: 'unavailable',
@@ -225,13 +237,7 @@ const fetchArticles = async ({ endpoint, params, apiKey, signal }) => {
   return Array.isArray(payload.articles) ? payload.articles : [];
 };
 
-export const getPositiveNzNews = async () => {
-  const now = Date.now();
-  if (cachedNews && cacheExpiresAt > now) return cachedNews;
-
-  const apiKey = process.env.NEWS_API_KEY?.trim();
-  if (!apiKey) return unavailableResult('not-configured');
-
+const fetchPositiveNzNews = async ({ apiKey, now }) => {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
@@ -266,7 +272,7 @@ export const getPositiveNzNews = async () => {
       sourceScope = 'nz-publishers';
     }
 
-    cachedNews = article
+    return article
       ? {
           status: 'available',
           article,
@@ -275,12 +281,42 @@ export const getPositiveNzNews = async () => {
           sourceScope,
         }
       : unavailableResult('no-suitable-headline');
-    cacheExpiresAt = now + getCacheMilliseconds();
-    return cachedNews;
   } catch (error) {
     console.warn('[news] Positive NZ headline unavailable:', error.message);
     return unavailableResult('request-failed');
   } finally {
     clearTimeout(timeout);
   }
+};
+
+const cacheNewsResult = (result, now) => {
+  cachedNews = result;
+  cacheExpiresAt = now + (
+    result.status === 'available'
+      ? getCacheMilliseconds()
+      : Math.min(getCacheMilliseconds(), UNAVAILABLE_CACHE_MS)
+  );
+  return result;
+};
+
+export const getPositiveNzNews = async () => {
+  const now = Date.now();
+  if (cachedNews && cacheExpiresAt > now) return cachedNews;
+  if (pendingNewsRequest) return pendingNewsRequest;
+
+  const apiKey = process.env.NEWS_API_KEY?.trim();
+  if (!apiKey) return cacheNewsResult(unavailableResult('not-configured'), now);
+
+  pendingNewsRequest = fetchPositiveNzNews({ apiKey, now })
+    .then((result) => cacheNewsResult(result, now))
+    .finally(() => {
+      pendingNewsRequest = null;
+    });
+  return pendingNewsRequest;
+};
+
+export const resetPositiveNewsCacheForTests = () => {
+  cachedNews = null;
+  cacheExpiresAt = 0;
+  pendingNewsRequest = null;
 };

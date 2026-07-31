@@ -30,7 +30,7 @@ const safeHttpsUrl = (value = '') => {
 };
 
 export const normalizeSongQuery = (value = '') => {
-  const query = cleanText(value, 120)
+  const query = cleanText(String(value).replace(/\[\[[^\]]+\]\]/g, ' '), 120)
     .replace(
       /^(?:(?:can|could|would) you (?:please )?play|please play|play|(?:my )?favou?rite song is|the song is|i (?:really )?(?:like|love|enjoy)(?:(?: listening| singing)(?: and (?:listening|singing))? to)?|probably)\s+/i,
       ''
@@ -160,7 +160,7 @@ export const scoreSpotifyTrackMatch = (track, query) => {
 
 export const selectSpotifyTrack = (payload = {}, query = '') => {
   const tracks = getTrackItems(payload);
-  const nonExplicitTracks = tracks.filter((track) => track && track.explicit !== true);
+  const nonExplicitTracks = tracks.filter((track) => track && track.explicit === false);
   const normalizedTracks = nonExplicitTracks.map(normalizeSpotifyTrack).filter(Boolean);
   if (!query) return normalizedTracks[0] || null;
 
