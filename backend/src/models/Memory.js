@@ -7,6 +7,7 @@ const entrySchema = new Schema({
     default: 'personal',
   },
   content: { type: String, required: true },
+  evidence: { type: String },
   addedBy: { type: String, enum: ['system', 'caregiver'], default: 'system' },
   status: { type: String, enum: ['pending', 'approved', 'rejected'], default: 'approved' },
   reason: { type: String },

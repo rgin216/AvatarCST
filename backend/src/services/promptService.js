@@ -41,7 +41,11 @@ const formatMemory = (entries = []) =>
   entries.length === 0
     ? 'No caregiver memory has been added yet.'
     : entries
-        .map((entry) => `{"category":${quoteData(entry.category)},"content":${quoteData(entry.content)}}`)
+        .map((entry) => JSON.stringify({
+          category: entry.category,
+          content: entry.content,
+          ...(entry.selectionReason ? { selectionReason: entry.selectionReason } : {}),
+        }))
         .join('\n');
 
 const formatRecentMessages = (messages = []) =>

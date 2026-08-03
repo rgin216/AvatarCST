@@ -15,6 +15,51 @@ import { isOpenAIFastScriptedPipeline, usesOpenAITextPipeline } from '../config/
 
 const RECENT_MESSAGE_LIMIT = 20;
 const MAX_UNANSWERED_ATTEMPTS = 3;
+const MAX_MEMORY_SUGGESTIONS = 4;
+const MAX_SELECTED_MEMORIES = 4;
+const VALID_MEMORY_CATEGORIES = new Set([
+  'preference',
+  'personal',
+  'session_insight',
+  'caregiver_note',
+]);
+const SYSTEM_SUGGESTION_CATEGORIES = new Set(['preference', 'personal', 'session_insight']);
+const MEMORY_STOP_WORDS = new Set([
+  'about', 'after', 'again', 'also', 'and', 'are', 'because', 'been', 'before',
+  'being', 'could', 'did', 'does', 'doing', 'enjoy', 'favourite', 'favorite',
+  'feel', 'from', 'have', 'into', 'just', 'like', 'more', 'most', 'much', 'remember',
+  'some', 'that', 'the', 'their', 'them', 'then', 'there', 'these', 'they', 'thing',
+  'think', 'this', 'those', 'today', 'very', 'want', 'was', 'were', 'what', 'when',
+  'where', 'which', 'with', 'would', 'you', 'your',
+]);
+const MEMORY_TOPICS = {
+  family: ['child', 'children', 'daughter', 'dad', 'family', 'father', 'grandchild', 'grandmother', 'grandfather', 'husband', 'mother', 'mum', 'parent', 'sister', 'brother', 'wife'],
+  food: ['bake', 'cook', 'dish', 'drink', 'eat', 'food', 'meal', 'recipe', 'tea'],
+  home: ['garden', 'gardening', 'home', 'house', 'neighbour', 'rose'],
+  media: ['book', 'film', 'movie', 'radio', 'television', 'tv'],
+  music: ['album', 'artist', 'band', 'concert', 'music', 'singer', 'song'],
+  place: ['born', 'city', 'country', 'grew', 'hometown', 'live', 'lived', 'moved', 'place', 'town'],
+  school: ['class', 'school', 'studied', 'subject', 'teacher', 'university'],
+  sport: ['exercise', 'game', 'rugby', 'sport', 'team'],
+  travel: ['beach', 'holiday', 'journey', 'lake', 'mountain', 'trip', 'travel', 'visited'],
+  work: ['career', 'job', 'office', 'profession', 'retired', 'work', 'worked'],
+};
+const INSTRUCTION_LIKE_MEMORY_PATTERNS = [
+  /\bignore (?:all |any |the )?(?:previous|prior|system|developer)\b/i,
+  /\b(?:system|developer) (?:message|prompt|instruction)s?\b/i,
+  /\b(?:follow|obey) (?:these|my|the following) instructions?\b/i,
+  /\b(?:reveal|repeat|show) (?:the )?(?:hidden|system|developer) prompt\b/i,
+  /```|<\/?(?:system|assistant|developer)>|\[\[[^\]]+\]\]/i,
+];
+const UNSAFE_MEMORY_PATTERNS = [
+  /\b(?:api|secret|access) key\b/i,
+  /\b(?:password|passcode|pin number)\b/i,
+  /\b(?:bank account|credit card|debit card|ird number|social security)\b/i,
+  /\b(?:home|street) address is\b/i,
+  /\b(?:email address|phone number) is\b/i,
+  /\b(?:diagnosed with|medication dose|prescription is)\b/i,
+  /\b(?:self[- ]harm|suicid(?:e|al)|sexual assault|rape|abuse)\b/i,
+];
 const ORIENTATION_STEP_TYPES = {
   childhood_orientation_day: 'weekday',
   childhood_orientation_month: 'month',
@@ -591,30 +636,215 @@ const toSlide = ({ step, index, total }) => ({
   interaction: step.interaction,
 });
 
+const cleanMemoryField = (value = '', maxLength = 240) =>
+  String(value)
+    .replace(/\s+/g, ' ')
+    .replace(/^["']+|["']+$/g, '')
+    .trim()
+    .slice(0, maxLength);
+
+const isSafeMemoryText = (value = '') => {
+  const text = String(value).replace(/\s+/g, ' ').trim();
+  return Boolean(text) && text.length <= 600 &&
+    !INSTRUCTION_LIKE_MEMORY_PATTERNS.some((pattern) => pattern.test(text)) &&
+    !UNSAFE_MEMORY_PATTERNS.some((pattern) => pattern.test(text));
+};
+
+const toSemanticTokens = (value = '') =>
+  cleanMemoryField(value, 1_000)
+    .toLowerCase()
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .split(/\s+/)
+    .filter((token) => token.length > 2 && !MEMORY_STOP_WORDS.has(token));
+
+const getMemoryTopics = (value = '') => {
+  const tokens = new Set(toSemanticTokens(value));
+  return Object.entries(MEMORY_TOPICS)
+    .filter(([, keywords]) => keywords.some((keyword) => tokens.has(keyword)))
+    .map(([topic]) => topic);
+};
+
+const trimExtractedValue = (value = '') =>
+  cleanMemoryField(value.replace(/\s+(?:and|but)\s+i\s+.*$/i, ''), 180)
+    .replace(/[,:;]+$/, '')
+    .trim();
+
+const MEMORY_EXTRACTORS = [
+  {
+    category: 'preference',
+    pattern: /\b(?:my\s+)?favou?rite\s+([a-z][a-z -]{1,30}?)\s+(?:is|was)\s+(.+)/i,
+    buildContent: (match) => `Favourite ${match[1].trim()}: ${trimExtractedValue(match[2])}`,
+    reason: 'The user directly stated a favourite.',
+  },
+  {
+    category: 'preference',
+    pattern: /\bi\s+(?:really\s+)?(?:like|love|enjoy|prefer)\s+(.+)/i,
+    buildContent: (match) => `Enjoys ${trimExtractedValue(match[1])}`,
+    reason: 'The user directly stated a current preference.',
+  },
+  {
+    category: 'preference',
+    pattern: /\bi\s+(?:used to\s+)?(?:liked|loved|enjoyed|preferred)\s+(.+)/i,
+    buildContent: (match) => `Enjoyed ${trimExtractedValue(match[1])}`,
+    reason: 'The user directly stated a past preference.',
+  },
+  {
+    category: 'personal',
+    pattern: /\bi\s+(grew up|was born|used to live|lived)\s+(in|at|near)\s+(.+)/i,
+    buildContent: (match) => `${match[1][0].toUpperCase()}${match[1].slice(1)} ${match[2]} ${trimExtractedValue(match[3])}`,
+    reason: 'The user shared a place from their life history.',
+  },
+  {
+    category: 'personal',
+    pattern: /\bi\s+moved\s+(to|from)\s+(.+)/i,
+    buildContent: (match) => `Moved ${match[1]} ${trimExtractedValue(match[2])}`,
+    reason: 'The user shared a move from their life history.',
+  },
+  {
+    category: 'personal',
+    pattern: /\bi\s+(?:used to\s+)?worked\s+(as|at|for|in)\s+(.+)/i,
+    buildContent: (match) => `Worked ${match[1]} ${trimExtractedValue(match[2])}`,
+    reason: 'The user shared their work history.',
+  },
+  {
+    category: 'personal',
+    pattern: /\bi\s+(studied|attended|went to school at)\s+(.+)/i,
+    buildContent: (match) => `${match[1][0].toUpperCase()}${match[1].slice(1)} ${trimExtractedValue(match[2])}`,
+    reason: 'The user shared their education history.',
+  },
+  {
+    category: 'personal',
+    pattern: /\bi\s+(?:have|had)\s+(.+\b(?:brother|brothers|sister|sisters|son|sons|daughter|daughters|child|children)\b.*)/i,
+    buildContent: (match) => `Has family: ${trimExtractedValue(match[1])}`,
+    reason: 'The user shared information about their family.',
+  },
+  {
+    category: 'personal',
+    pattern: /\bmy\s+(mother|mum|father|dad|parents?|sister|brother|wife|husband|daughter|son)\s+(?:is|was|are|were)(?:\s+(?:named|called))?\s+(.+)/i,
+    buildContent: (match) => `${match[1][0].toUpperCase()}${match[1].slice(1)}: ${trimExtractedValue(match[2])}`,
+    reason: 'The user shared information about a family member.',
+  },
+  {
+    category: 'personal',
+    pattern: /\bi\s+remember\s+(.+)/i,
+    buildContent: (match) => `Remembers ${trimExtractedValue(match[1])}`,
+    reason: 'The user shared an autobiographical memory.',
+  },
+];
+
+const validateMemorySuggestion = (suggestion, sourceText) => {
+  const category = cleanMemoryField(suggestion?.category, 40);
+  const content = cleanMemoryField(suggestion?.content);
+  const evidence = cleanMemoryField(suggestion?.evidence);
+  const reason = cleanMemoryField(suggestion?.reason);
+  if (!SYSTEM_SUGGESTION_CATEGORIES.has(category) || !content || !evidence || !reason) return null;
+  if (!isSafeMemoryText(content) || !isSafeMemoryText(evidence)) return null;
+
+  const normalizedSource = cleanMemoryField(sourceText, 1_000).toLowerCase();
+  if (!normalizedSource.includes(evidence.toLowerCase())) return null;
+
+  const contentTokens = new Set(toSemanticTokens(content));
+  const evidenceTokens = toSemanticTokens(evidence);
+  if (!evidenceTokens.some((token) => contentTokens.has(token))) return null;
+
+  return { category, content, evidence, reason };
+};
+
 export const inferMemorySuggestions = (content = '') => {
-  const text = content.trim();
-  if (!text) return [];
+  const rawText = String(content).replace(/\s+/g, ' ').trim();
+  if (rawText.length > 1_000) return [];
+  const text = cleanMemoryField(rawText, 1_000);
+  if (!text || !isSafeMemoryText(text)) return [];
 
-  const suggestions = [];
-  const favouriteMatch = text.match(/\b(?:my )?favou?rite ([a-z ]{3,30}) is ([^.!?]+)/i);
-  if (favouriteMatch) {
-    suggestions.push({
-      category: 'preference',
-      content: `Favourite ${favouriteMatch[1].trim()}: ${favouriteMatch[2].trim()}`,
-      reason: 'User stated a preference during the session.',
-    });
-  }
+  const candidates = text
+    .split(/[.!?\n]+/)
+    .map((sentence) => sentence.trim())
+    .filter(Boolean)
+    .flatMap((sentence) => MEMORY_EXTRACTORS.flatMap((extractor) => {
+      const match = sentence.match(extractor.pattern);
+      if (!match) return [];
+      return [{
+        category: extractor.category,
+        content: extractor.buildContent(match),
+        evidence: match[0],
+        reason: extractor.reason,
+      }];
+    }))
+    .map((candidate) => validateMemorySuggestion(candidate, text))
+    .filter(Boolean);
 
-  const placeMatch = text.match(/\b(?:i grew up in|i was born in|i lived in) ([^.!?]+)/i);
-  if (placeMatch) {
-    suggestions.push({
-      category: 'personal',
-      content: `Place from life history: ${placeMatch[1].trim()}`,
-      reason: 'User shared autobiographical context.',
-    });
-  }
+  const seen = new Set();
+  return candidates
+    .filter((candidate) => {
+      const key = `${candidate.category}:${normalizeMemoryContent(candidate.content)}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .slice(0, MAX_MEMORY_SUGGESTIONS);
+};
 
-  return suggestions;
+export const selectRelevantMemoryEntries = ({
+  memoryEntries = [],
+  currentQuestion = '',
+  step = {},
+  recentMessages = [],
+  userContent = '',
+} = {}) => {
+  const currentContext = [
+    currentQuestion,
+    step.id,
+    step.title,
+    step.prompt,
+    step.adaptiveFollowUp?.guidance,
+    userContent,
+  ].filter(Boolean).join(' ');
+  const conversationContext = recentMessages
+    .slice(-4)
+    .map((message) => message.content)
+    .filter(Boolean)
+    .join(' ');
+  const currentTokens = new Set(toSemanticTokens(currentContext));
+  const conversationTokens = new Set(toSemanticTokens(conversationContext));
+  const currentTopics = new Set(getMemoryTopics(currentContext));
+  const conversationTopics = new Set(getMemoryTopics(conversationContext));
+
+  return memoryEntries
+    .map((entry, index) => {
+      if (
+        (entry.status && entry.status !== 'approved') ||
+        !VALID_MEMORY_CATEGORIES.has(entry.category) ||
+        !isSafeMemoryText(entry.content)
+      ) return null;
+
+      const memoryTokens = new Set(toSemanticTokens(entry.content));
+      const directTerms = [...memoryTokens].filter((token) => currentTokens.has(token));
+      const conversationTerms = [...memoryTokens]
+        .filter((token) => conversationTokens.has(token) && !currentTokens.has(token));
+      const memoryTopics = getMemoryTopics(entry.content);
+      const directTopics = memoryTopics.filter((topic) => currentTopics.has(topic));
+      const recentTopics = memoryTopics
+        .filter((topic) => conversationTopics.has(topic) && !currentTopics.has(topic));
+      const score = directTerms.length * 3 + directTopics.length * 5 +
+        conversationTerms.length + recentTopics.length * 2;
+      if (score < 3) return null;
+
+      const selectionReason = directTopics.length > 0
+        ? `Selected because it is relevant to the current ${directTopics[0]} topic.`
+        : directTerms.length > 0
+        ? `Selected because it shares the key term "${directTerms[0]}" with the current question.`
+        : recentTopics.length > 0
+        ? `Selected because it is relevant to the recent ${recentTopics[0]} discussion.`
+        : `Selected because it connects to the recent term "${conversationTerms[0]}".`;
+
+      return { entry: { ...entry, selectionReason }, score, index };
+    })
+    .filter(Boolean)
+    .sort((left, right) => right.score - left.score || left.index - right.index)
+    .slice(0, MAX_SELECTED_MEMORIES)
+    .map(({ entry }) => entry);
 };
 
 export const getRetryDecision = ({
@@ -639,10 +869,19 @@ const savePendingMemorySuggestions = async ({ userId, sessionId, suggestions = [
   const normalizedSuggestions = suggestions
     .map((suggestion) => ({
       ...suggestion,
+      category: suggestion.category?.trim(),
       content: suggestion.content?.trim(),
+      evidence: suggestion.evidence?.trim(),
       reason: suggestion.reason?.trim(),
     }))
-    .filter((suggestion) => suggestion.content);
+    .filter((suggestion) =>
+      SYSTEM_SUGGESTION_CATEGORIES.has(suggestion.category) &&
+      suggestion.content &&
+      suggestion.evidence &&
+      suggestion.reason &&
+      isSafeMemoryText(suggestion.content) &&
+      isSafeMemoryText(suggestion.evidence)
+    );
 
   if (normalizedSuggestions.length === 0) return [];
 
@@ -663,6 +902,7 @@ const savePendingMemorySuggestions = async ({ userId, sessionId, suggestions = [
     .map((suggestion) => ({
       category: suggestion.category,
       content: suggestion.content,
+      evidence: suggestion.evidence,
       reason: suggestion.reason,
       addedBy: 'system',
       status: 'pending',
@@ -684,6 +924,7 @@ const savePendingMemorySuggestions = async ({ userId, sessionId, suggestions = [
       id: entry._id,
       category: entry.category,
       content: entry.content,
+      evidence: entry.evidence,
       reason: entry.reason,
       status: entry.status,
     }));
@@ -823,6 +1064,14 @@ export const respondToSessionTurn = async ({ sessionId, content }) => {
   const expectedQuestion =
     activeAdaptiveFollowUp?.question ||
     getAskedScriptLine(step, effectiveTurnIndex, scriptContext);
+  const selectedMemoryEntries = selectRelevantMemoryEntries({
+    memoryEntries,
+    currentQuestion: expectedQuestion,
+    step,
+    recentMessages,
+    userContent: userContent || '',
+  });
+  let promptedMemoryEntries = [];
   const isQuestionWheelEvent = Boolean(wheelEvent && step.id === 'childhood_spin_question');
   const newsElaborationRequested = Boolean(
     step.id === 'childhood_current_affairs' &&
@@ -861,30 +1110,34 @@ export const respondToSessionTurn = async ({ sessionId, content }) => {
       content: userContent,
       currentAffairs,
     });
-    const adaptiveTurn = deterministicTurn || parseAdaptiveTurn(await generateResponse(
-      [
+    let adaptiveTurn = deterministicTurn;
+    if (!adaptiveTurn) {
+      promptedMemoryEntries = selectedMemoryEntries;
+      adaptiveTurn = parseAdaptiveTurn(await generateResponse(
+        [
+          {
+            role: 'system',
+            content: buildCstAdaptiveTurnInstructions({
+              user,
+              memoryEntries: selectedMemoryEntries,
+              slide,
+              recentMessages,
+              scriptId: session.scriptId,
+              expectedQuestion,
+              allowFollowUp: allowAdaptiveFollowUp,
+              followUpGuidance: step.adaptiveFollowUp?.guidance || '',
+            }),
+          },
+          { role: 'user', content: userContent },
+        ],
         {
-          role: 'system',
-          content: buildCstAdaptiveTurnInstructions({
-            user,
-            memoryEntries,
-            slide,
-            recentMessages,
-            scriptId: session.scriptId,
-            expectedQuestion,
-            allowFollowUp: allowAdaptiveFollowUp,
-            followUpGuidance: step.adaptiveFollowUp?.guidance || '',
-          }),
-        },
-        { role: 'user', content: userContent },
-      ],
-      {
-        provider: llmProvider,
-        temperature: 0.25,
-        maxTokens: 110,
-        model: useFastScriptedTurn ? process.env.OPENAI_FAST_TEXT_MODEL : undefined,
-      }
-    ));
+          provider: llmProvider,
+          temperature: 0.25,
+          maxTokens: 110,
+          model: useFastScriptedTurn ? process.env.OPENAI_FAST_TEXT_MODEL : undefined,
+        }
+      ));
+    }
     answeredCurrentQuestion = adaptiveTurn.answered;
     adaptiveText = adaptiveTurn.response;
     adaptiveFollowUpQuestion =
@@ -970,9 +1223,10 @@ export const respondToSessionTurn = async ({ sessionId, content }) => {
 
   let assistantText = scriptedNextLine;
   if (userContent && !adaptiveText && !isQuestionWheelEvent) {
+    promptedMemoryEntries = selectedMemoryEntries;
     const systemPrompt = buildCstAdaptiveResponseInstructions({
       user,
-      memoryEntries,
+      memoryEntries: selectedMemoryEntries,
       slide,
       recentMessages,
       scriptId: session.scriptId,
@@ -1086,7 +1340,7 @@ export const respondToSessionTurn = async ({ sessionId, content }) => {
       userId: session.userId,
       sessionId: session._id,
       suggestions:
-        wheelEvent || hasMusicCompletionProtocol || hasVideoCompletionProtocol
+        wheelEvent || hasMusicCompletionProtocol || hasVideoCompletionProtocol || !answeredCurrentQuestion
           ? []
           : inferMemorySuggestions(userContent),
     });
@@ -1129,10 +1383,11 @@ export const respondToSessionTurn = async ({ sessionId, content }) => {
       user: userMessage,
       assistant: assistantMessage,
     },
-    memoryUsed: memoryEntries.slice(0, 4).map((entry) => ({
+    memoryUsed: promptedMemoryEntries.map((entry) => ({
       id: entry._id,
       category: entry.category,
       content: entry.content,
+      selectionReason: entry.selectionReason,
     })),
     suggestedMemoryUpdates,
   };
