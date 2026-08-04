@@ -686,7 +686,7 @@ const MEMORY_EXTRACTORS = [
   },
   {
     category: 'preference',
-    pattern: /\bi\s+(?:used to\s+)?(?:liked|loved|enjoyed|preferred)\s+(.+)/i,
+    pattern: /\bi\s+(?:used to\s+(?:like|love|enjoy|prefer)|liked|loved|enjoyed|preferred)\s+(.+)/i,
     buildContent: (match) => `Enjoyed ${trimExtractedValue(match[1])}`,
     reason: 'The user directly stated a past preference.',
   },
@@ -704,7 +704,7 @@ const MEMORY_EXTRACTORS = [
   },
   {
     category: 'personal',
-    pattern: /\bi\s+(?:used to\s+)?worked\s+(as|at|for|in)\s+(.+)/i,
+    pattern: /\bi\s+(?:used to\s+work|worked|work)\s+(as|at|for|in)\s+(.+)/i,
     buildContent: (match) => `Worked ${match[1]} ${trimExtractedValue(match[2])}`,
     reason: 'The user shared their work history.',
   },
