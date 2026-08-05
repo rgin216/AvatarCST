@@ -85,6 +85,11 @@ const getDisplayName = (user) => user?.preferredName || user?.name || 'there';
 
 const joinSpeechParts = (...parts) => parts.map((part) => part?.trim()).filter(Boolean).join(' ');
 
+export const buildSpeechSegments = ({ adaptiveText = '', scriptedText = '' } = {}) => [
+  ...(adaptiveText?.trim() ? [{ kind: 'adaptive', text: adaptiveText.trim() }] : []),
+  ...(scriptedText?.trim() ? [{ kind: 'scripted', text: scriptedText.trim() }] : []),
+];
+
 const getNzDateParts = () => {
   const parts = new Intl.DateTimeFormat('en-NZ', {
     weekday: 'long',
@@ -1249,6 +1254,10 @@ export const respondToSessionTurn = async ({ sessionId, content }) => {
   if (userContent) {
     assistantText = joinSpeechParts(adaptiveText, scriptedNextLine);
   }
+  const speechSegments = buildSpeechSegments({
+    adaptiveText: userContent ? adaptiveText : '',
+    scriptedText: scriptedNextLine,
+  });
 
   const assistantMessage = await Message.create({ sessionId, role: 'assistant', content: assistantText });
   const nextStepIndex = shouldAdvance ? boundedIndex + 1 : boundedIndex;
@@ -1378,6 +1387,7 @@ export const respondToSessionTurn = async ({ sessionId, content }) => {
         : null,
     questionWheel: session.interactionState?.questionWheel || null,
     assistantText,
+    speechSegments,
     avatar: buildAvatarResponse({ text: assistantText }),
     messages: {
       user: userMessage,

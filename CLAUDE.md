@@ -72,7 +72,7 @@ For recorded microphone input:
 4. `sessionOrchestratorService.js` uses the transcript, session script state, recent messages, and memory entries.
 5. `llmService.js` calls the OpenAI Responses API for answer adequacy and a brief adaptive acknowledgement.
 6. `sessionController.js` chooses the voice from the selected avatar mode.
-7. Male/female avatars synthesize an OpenAI TTS audio file, then `rhubarbService.js` generates mouth cues.
+7. Male/female avatars synthesize an OpenAI TTS audio file, then `rhubarbService.js` generates mouth cues. Adaptive acknowledgements keep the expressive model, while scripted lines use `tts-1`; mixed turns are joined into one WAV before lip sync.
 8. The audio visualizer skips Rhubarb and uses a short-lived streaming OpenAI TTS token.
 9. The frontend plays the audio and drives the avatar from Rhubarb cues, or from audio energy for the visualizer.
 
@@ -252,9 +252,12 @@ Backend variables from `backend/.env.example`:
 - `OPENAI_FAST_TEXT_MODEL`
 - `OPENAI_TRANSCRIBE_MODEL`
 - `OPENAI_TTS_MODEL`
+- `OPENAI_ADAPTIVE_TTS_MODEL`
+- `OPENAI_SCRIPTED_TTS_MODEL`
 - `OPENAI_TTS_VOICE`
 - `OPENAI_TTS_MALE_VOICE`
 - `OPENAI_TTS_FEMALE_VOICE`
+- `OPENAI_SCRIPTED_TTS_FEMALE_VOICE`
 - `OPENAI_TTS_INSTRUCTIONS`
 - `RHUBARB_PATH`
 - `GROQ_API_KEY`
