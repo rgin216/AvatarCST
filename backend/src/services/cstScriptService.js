@@ -21,7 +21,7 @@ const scripts = {
       visualHint: 'Source deck: NZ01. Welcome, slide 1',
       accent: '#00AEEF',
       reply: ({ name }) =>
-        `Hello ${name}, and welcome. I am Aria, and I will be guiding you through this AI-supported Cognitive Stimulation Therapy session. Today is our first session, so we will take it gently and get comfortable together. How are you feeling today?`,
+        `Hello ${name}, and welcome. I am Aria, and I will be guiding you through this AI-supported Cognitive Stimulation Therapy session. Today is our first session, so we will take it gently and get comfortable together. How are you feeling today? Is there anything you’d like to share about your day so far?`,
     },
     {
       id: 'facilitator_role',
