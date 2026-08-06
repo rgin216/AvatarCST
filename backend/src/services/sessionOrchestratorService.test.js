@@ -52,6 +52,11 @@ test('recognises button, typed, and spoken video completion answers', () => {
 
 test('recognises requests for more news and elaborates only from vetted details', () => {
   assert.equal(isNewsElaborationRequest('Can you tell me more?'), true);
+  assert.equal(isNewsElaborationRequest('how long has the cat been lost'), true);
+  assert.equal(isNewsElaborationRequest('Where was the cat found'), true);
+  assert.equal(isNewsElaborationRequest('I wonder whether the cat is safe'), true);
+  assert.equal(isNewsElaborationRequest('What breed was the cat'), true);
+  assert.equal(isNewsElaborationRequest('What a lovely story'), false);
   assert.equal(isNewsElaborationRequest('That sounds nice'), false);
 
   assert.equal(

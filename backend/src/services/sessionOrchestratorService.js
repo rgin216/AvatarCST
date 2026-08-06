@@ -323,10 +323,33 @@ const evaluateVideoCompletionAnswer = ({ step, content, effectiveTurnIndex }) =>
   };
 };
 
-export const isNewsElaborationRequest = (content = '') =>
-  /\b(tell me more|more about|more detail|more information|what happened|what else|elaborate|go on)\b/i.test(
-    content
+export const isNewsElaborationRequest = (content = '') => {
+  const request = String(content).trim();
+  if (!request) return false;
+
+  if (
+    /\b(tell me more|more about|more detail|more information|what happened|what else|elaborate|go on)\b/i.test(
+      request
+    )
+  ) {
+    return true;
+  }
+
+  // Recorded speech often arrives without a question mark, so recognise common
+  // spoken question forms while the user is on the current-affairs slide.
+  if (/\?\s*$/.test(request)) return true;
+  if (/\b(i wonder(?:ed)?|i was wondering|i(?:'d| would) like to know)\b/i.test(request)) {
+    return true;
+  }
+  if (/^(?:when|where|which|who|why|can|could|did|do|does|has|have|is|are|was|were|will|would)\b/i.test(request)) {
+    return true;
+  }
+  if (/^what\b(?!\s+(?:a|an)\b)/i.test(request)) return true;
+
+  return /^how\s+(?:(?:did|does|do|has|have|is|are|was|were|can|could|will|would)\b|(?:long|many|much|old|far|soon|often)\b|\S+\s+(?:did|does|do|has|have|is|are|was|were|can|could|will|would)\b)/i.test(
+    request
   );
+};
 
 export const buildNewsElaboration = (currentAffairs) => {
   const article = currentAffairs?.status === 'available' ? currentAffairs.article : null;
