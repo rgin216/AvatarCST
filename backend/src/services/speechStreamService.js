@@ -14,7 +14,6 @@ export const createSpeechStreamToken = ({
   text,
   provider = 'openai',
   voice = null,
-  model = null,
   lipsync = 'audio-energy',
 }) => {
   cleanupExpiredStreams();
@@ -23,7 +22,6 @@ export const createSpeechStreamToken = ({
     text,
     provider,
     voice,
-    model,
     lipsync,
     expiresAt: Date.now() + STREAM_TTL_MS,
   });

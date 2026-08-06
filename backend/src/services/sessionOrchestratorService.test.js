@@ -1,7 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  buildSpeechSegments,
   buildSessionSummary,
   buildNewsElaboration,
   canRequestAdaptiveFollowUp,
@@ -16,24 +15,6 @@ import {
 } from './sessionOrchestratorService.js';
 import { buildCstAdaptiveTurnInstructions } from './promptService.js';
 import { getScriptStep, renderScriptFollowUp } from './cstScriptService.js';
-
-test('keeps adaptive and scripted speech in ordered model-routing segments', () => {
-  assert.deepEqual(
-    buildSpeechSegments({
-      adaptiveText: 'That sounds lovely. ',
-      scriptedText: ' How are you feeling today?',
-    }),
-    [
-      { kind: 'adaptive', text: 'That sounds lovely.' },
-      { kind: 'scripted', text: 'How are you feeling today?' },
-    ]
-  );
-
-  assert.deepEqual(
-    buildSpeechSegments({ scriptedText: 'Welcome.' }),
-    [{ kind: 'scripted', text: 'Welcome.' }]
-  );
-});
 
 test('recognises button, typed, and spoken music completion answers', () => {
   for (const answer of [

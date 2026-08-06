@@ -9,9 +9,7 @@ import {
   getVoiceOptionsForAvatar,
   pipeSpeechStream,
   synthesizeSpeech,
-  synthesizeSpeechPlan,
 } from '../services/ttsService.js';
-import { createOpenAiSpeechPlan } from '../services/speechPlanService.js';
 import { generateLipSync, getRhubarbStatus } from '../services/rhubarbService.js';
 import { buildAvatarResponse } from '../services/avatarService.js';
 import { createSpeechStreamToken, getSpeechStream } from '../services/speechStreamService.js';
@@ -150,29 +148,12 @@ function getSpeechOptions(pipelineMode, avatarMode) {
   };
 }
 
-function getTurnSpeechPlan(turn, speechOptions) {
-  if (speechOptions.provider === 'openai') {
-    return createOpenAiSpeechPlan({
-      turn,
-      voice: speechOptions.voice,
-    });
-  }
-
-  return {
-    segments: [{ kind: 'scripted', text: turn.assistantText }],
-    requiredPhrases: [],
-  };
-}
-
-function createStreamedAudioForTurn(turn, pipelineMode, avatarMode, speechPlan = null) {
+function createStreamedAudioForTurn(assistantText, pipelineMode, avatarMode) {
   const speechOptions = getSpeechOptions(pipelineMode, avatarMode);
-  const plan = speechPlan || getTurnSpeechPlan(turn, speechOptions);
-  const segment = plan.segments[0];
   const token = createSpeechStreamToken({
-    text: segment.text,
+    text: assistantText,
     provider: speechOptions.provider,
-    voice: segment.voice || speechOptions.voice,
-    model: segment.model,
+    voice: speechOptions.voice,
     lipsync: 'audio-energy',
   });
 
@@ -182,29 +163,14 @@ function createStreamedAudioForTurn(turn, pipelineMode, avatarMode, speechPlan =
   };
 }
 
-async function synthesizeTurnAudio(turn, outputPath, speechOptions, speechPlan) {
-  if (speechOptions.provider === 'openai') {
-    await synthesizeSpeechPlan(speechPlan.segments, outputPath, speechOptions);
-    return;
-  }
-
-  await synthesizeSpeech(turn.assistantText, outputPath, speechOptions);
-}
-
-async function createRhubarbAudioForTurn(turn, pipelineMode, avatarMode, timings, speechPlan = null) {
+async function createRhubarbAudioForTurn(assistantText, pipelineMode, avatarMode, timings) {
   const speechOptions = getSpeechOptions(pipelineMode, avatarMode);
-  const plan = speechPlan || getTurnSpeechPlan(turn, speechOptions);
   const responseFormat = speechOptions.provider === 'openai' ? 'wav' : 'mp3';
   const audioFileName = `${uuidv4()}.${responseFormat}`;
   const audioOutputPath = path.join(GENERATED_AUDIO_DIR, audioFileName);
   await timeAsync(
     'ttsMs',
-    () => synthesizeTurnAudio(
-      turn,
-      audioOutputPath,
-      { ...speechOptions, responseFormat },
-      plan
-    ),
+    () => synthesizeSpeech(assistantText, audioOutputPath, { ...speechOptions, responseFormat }),
     timings
   );
   const rhubarbJson = await timeAsync('rhubarbMs', () => generateLipSync(audioOutputPath), timings);
@@ -218,60 +184,15 @@ async function createRhubarbAudioForTurn(turn, pipelineMode, avatarMode, timings
   };
 }
 
-async function createPreparedEnergyAudioForTurn(turn, pipelineMode, avatarMode, timings, speechPlan) {
-  const speechOptions = getSpeechOptions(pipelineMode, avatarMode);
-  const audioFileName = `${uuidv4()}.wav`;
-  const audioOutputPath = path.join(GENERATED_AUDIO_DIR, audioFileName);
-  await timeAsync(
-    'ttsMs',
-    () => synthesizeTurnAudio(
-      turn,
-      audioOutputPath,
-      { ...speechOptions, responseFormat: 'wav' },
-      speechPlan
-    ),
-    timings
-  );
-
-  return {
-    audioUrl: `/generated-audio/${audioFileName}`,
-    audioOutputPath,
-    streaming: false,
-    lipsyncEngine: 'audio-energy',
-  };
-}
-
-async function createAudioForTurn(turn, pipelineMode, avatarMode, lipSyncMode, timings) {
-  const speechOptions = getSpeechOptions(pipelineMode, avatarMode);
-  const speechPlan = getTurnSpeechPlan(turn, speechOptions);
-  const requiresPreparedAudio = Boolean(
-    speechOptions.provider === 'openai' &&
-    (speechPlan.requiredPhrases.length > 0 || speechPlan.segments.length > 1)
-  );
-
+async function createAudioForTurn(assistantText, pipelineMode, avatarMode, lipSyncMode, timings) {
   if (!shouldUseRhubarbForAvatar(avatarMode) || lipSyncMode === 'energy') {
-    if (requiresPreparedAudio) {
-      return createPreparedEnergyAudioForTurn(
-        turn,
-        pipelineMode,
-        avatarMode,
-        timings,
-        speechPlan
-      );
-    }
     return {
-      ...createStreamedAudioForTurn(turn, pipelineMode, avatarMode, speechPlan),
+      ...createStreamedAudioForTurn(assistantText, pipelineMode, avatarMode),
       lipsyncEngine: 'audio-energy',
     };
   }
 
-  return createRhubarbAudioForTurn(
-    turn,
-    pipelineMode,
-    avatarMode,
-    timings,
-    speechPlan
-  );
+  return createRhubarbAudioForTurn(assistantText, pipelineMode, avatarMode, timings);
 }
 
 export const respondToSession = async (req, res, next) => {
@@ -291,7 +212,7 @@ export const respondToSession = async (req, res, next) => {
     );
 
     try {
-      const audio = await createAudioForTurn(turn, turn.pipelineMode, avatarMode, lipSyncMode, timings);
+      const audio = await createAudioForTurn(turn.assistantText, turn.pipelineMode, avatarMode, lipSyncMode, timings);
       audioOutputPath = audio.audioOutputPath;
       turn.avatar = buildAvatarResponse({
         text: turn.assistantText,
@@ -362,7 +283,7 @@ export const respondAudioToSession = async (req, res, next) => {
     );
 
     try {
-      const audio = await createAudioForTurn(turn, session.pipelineMode, avatarMode, lipSyncMode, timings);
+      const audio = await createAudioForTurn(turn.assistantText, session.pipelineMode, avatarMode, lipSyncMode, timings);
       audioOutputPath = audio.audioOutputPath;
       turn.avatar = buildAvatarResponse({
         text: turn.assistantText,
@@ -396,7 +317,6 @@ export const streamSpeechToken = async (req, res, next) => {
     await pipeSpeechStream(speech.text, res, {
       provider: speech.provider,
       voice: speech.voice,
-      model: speech.model,
       responseFormat: 'mp3',
     });
   } catch (err) {
