@@ -33,8 +33,8 @@ const scripts = {
       bullets: ['Keep each other company', 'Try interesting questions', 'Enjoy fun conversations'],
       visualHint: 'Source deck: NZ01. Welcome, slide 2',
       accent: '#F47C20',
-      reply: ({ name }) =>
-        `Thank you for sharing that, ${name}. My role is to keep you company, try some interesting questions with you, and enjoy some fun conversation together. There are no tests here and no right or wrong answers. Does that sound alright?`,
+      reply: () =>
+        'My role is to keep you company, try some interesting questions with you, and enjoy some fun conversation together. There are no tests here and no right or wrong answers. Does that sound alright?',
     },
     {
       id: 'introduce_yourself',
@@ -132,7 +132,7 @@ const scripts = {
       visualHint: 'Source deck: NZ02. Getting to Know You (Childhood), slide 1',
       accent: '#00AEEF',
       reply: ({ name }) =>
-        `Welcome back, ${name}. It is lovely to see you again. Today our theme is getting to know you, especially memories from childhood. When you are ready, we will begin with a quick check-in. Respond with "I'm ready" when you are ready to start.`,
+        `Welcome back, ${name}. It is lovely to see you again. Today our theme is getting to know you, especially memories from childhood. When you are ready, say "I'm ready" to begin.`,
     },
     {
       id: 'childhood_check_in',
@@ -145,7 +145,7 @@ const scripts = {
       visualHint: 'Source deck: NZ02. Getting to Know You (Childhood), slide 2',
       accent: '#F47C20',
       reply: () =>
-        'Before we get into our childhood theme, let us check in gently. How are you doing today?',
+        'How are you doing today?',
     },
     {
       id: 'theme_song_choice',
@@ -392,10 +392,10 @@ const scripts = {
         options: [
           { label: 'Favorite Sports Team', question: 'Do you have a favourite sports team, or a sport you enjoy watching?' },
           { label: 'Favorite Sport', question: 'What is a favourite sport you enjoy watching or playing?' },
-          { label: 'Tell us about your career', question: 'Can you tell me a little about your career or the work you have done?' },
-          { label: 'Where did you grow up?', question: 'Where did you grow up?' },
+          { label: 'A proud moment', question: 'What is something you have done that made you feel proud?' },
+          { label: 'Childhood games', question: 'What game did you especially enjoy playing as a child?' },
           { label: 'Beach, Mountain or Lake', question: 'Would you choose the beach, the mountains, or a lake?' },
-          { label: 'Where were you born?', question: 'Where were you born?' },
+          { label: 'Childhood treats', question: 'Was there a special treat you enjoyed as a child?' },
           { label: 'Morning or Night?', question: 'Are you more of a morning person or a night person?' },
           { label: 'What do you do to relax?', question: 'What do you like to do to relax?' },
           { label: 'Favorite Book?', question: 'Do you have a favourite book, or a book you remember enjoying?' },
@@ -407,9 +407,9 @@ const scripts = {
           { label: 'Favorite Movie', question: 'Do you have a favourite movie?' },
           { label: 'Favorite Food', question: 'What is one of your favourite foods?' },
           { label: 'Favorite Trip', question: 'Do you remember a favourite trip or holiday?' },
-          { label: 'Favorite Music', question: 'What kind of music do you especially enjoy?' },
+          { label: 'Favorite Celebration', question: 'What celebration or special occasion do you remember enjoying?' },
           { label: 'Favorite TV Show', question: 'Do you have a favourite TV show?' },
-          { label: 'Favorite Season', question: 'Which season is your favourite?' },
+          { label: 'Childhood Toy', question: 'Was there a toy or treasured object you especially remember from childhood?' },
         ],
       },
       adaptiveFollowUp: adaptiveReminiscence(
@@ -455,7 +455,7 @@ const scripts = {
       visualHint: 'Source deck: NZ02. Getting to Know You (Childhood), slide 20',
       accent: '#4472C4',
       reply: ({ name }) =>
-        `Thank you, ${name}. I have really enjoyed hearing about your childhood today. Our next session will be Physical Games. Take good care, and I will look forward to seeing you next time.`,
+        `That brings us to the end of today's session, ${name}. Our next session will be Physical Games. Take good care, and I will look forward to seeing you next time.`,
     },
   ],
 };

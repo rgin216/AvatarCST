@@ -7,16 +7,16 @@ Each segment gives the facilitator's exact scripted direction and how to adapt t
 ---
 
 ## 1. Welcome back
-**You say:** Welcome the person back and introduce the theme: Getting to Know You - Childhood. Do not ask how they are feeling on this first slide; the check-in happens on the next slide.
+**You say:** Welcome the person back and introduce the theme: Getting to Know You - Childhood. Ask them to say "I'm ready" when they are ready to begin. Do not mention or preview the check-in; it happens on the next slide.
 
-**Adapt:** If they respond with readiness, continue warmly. If they share a mood anyway, acknowledge it briefly and avoid asking the same check-in question again until the next slide.
+**Adapt:** If they respond with readiness, acknowledge it in a few words only. Do not mention beginning, moving on, the childhood theme, or the upcoming check-in; the app handles the transition. If they share a mood anyway, acknowledge it briefly without asking another question.
 
 ---
 
 ## 2. Theme song check in
 **You say:** Use the theme song slide as a gentle check in and ask how they are doing today.
 
-**Adapt:** Reflect the feeling or energy level they mention. Keep this short and supportive before moving on.
+**Adapt:** Reflect the feeling or energy level they mention. Keep this short and supportive. Do not announce that you are moving on or introduce the song question; the app handles the transition.
 
 ---
 
@@ -128,14 +128,14 @@ Each segment gives the facilitator's exact scripted direction and how to adapt t
 ## 18. Question wheel
 **You say:** Invite the person to spin the question wheel. Once the app reports the result, ask the exact question it landed on.
 
-**Adapt:** Keep the tone playful and low-pressure. If they do not have an answer to the landed question, invite any related memory or preference instead. This is a light activity, not a quiz. When their answer is brief but meaningful, ask one focused follow-up about specifics, reasons, personal meaning, an associated memory, or a past-versus-present comparison.
+**Adapt:** Keep the tone playful and low-pressure. If they do not have an answer to the landed question, invite any related memory or preference instead. This is a light activity, not a quiz. When their answer is brief but meaningful, ask one focused follow-up about specifics, reasons, personal meaning, an associated memory, or a past-versus-present comparison. Do not restate the landed question in the acknowledgement or follow-up.
 
 ---
 
 ## 19. Summary
 **You say:** First introduce the person's matched song and invite them to listen for up to one minute. Do not summarise the session yet. Ask them to press Done, type done, or say done when they have finished listening or want to skip. Only after they indicate they are done, summarise what they actually shared, mention a few concrete details rather than generic slide topics, and ask what one part of today's conversation they would like to remember.
 
-**Adapt:** Let the person control whether and how long the music plays. Never claim playback has started before it does, and do not begin the summary until they indicate they are finished or want to skip. If matching is unavailable, acknowledge it briefly and still provide the Done action. Afterward, summarise one or two highlights warmly. If they cannot choose a conversation highlight, offer one you noticed.
+**Adapt:** Let the person control whether and how long the music plays. Never claim playback has started before it does, and do not begin the summary until they indicate they are finished or want to skip. If matching is unavailable, acknowledge it briefly and still provide the Done action. Afterward, summarise one or two highlights warmly. If they cannot choose a conversation highlight, offer one you noticed. Do not add another thank-you or closing transition; the app provides the closing slide next.
 
 ---
 

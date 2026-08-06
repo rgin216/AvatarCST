@@ -85,6 +85,29 @@ const getDisplayName = (user) => user?.preferredName || user?.name || 'there';
 
 const joinSpeechParts = (...parts) => parts.map((part) => part?.trim()).filter(Boolean).join(' ');
 
+const SPEECH_OVERLAP_STOP_WORDS = new Set([
+  'about', 'after', 'again', 'also', 'and', 'are', 'before', 'but', 'can', 'doing',
+  'for', 'from', 'have', 'how', 'into', 'let', 'like', 'now', 'our', 'that', 'the',
+  'their', 'them', 'there', 'they', 'this', 'today', 'was', 'were', 'what', 'when',
+  'with', 'would', 'you', 'your',
+]);
+
+const getDistinctSpeechTerms = (text = '') => [...new Set(
+  String(text)
+    .toLowerCase()
+    .replace(/[^a-z0-9 ]/g, ' ')
+    .split(/\s+/)
+    .filter((term) => term.length > 2 && !SPEECH_OVERLAP_STOP_WORDS.has(term))
+)];
+
+const hasSubstantialSpeechOverlap = (adaptiveText = '', scriptedText = '') => {
+  if (!adaptiveText || !scriptedText) return false;
+  const scriptedTerms = new Set(getDistinctSpeechTerms(scriptedText));
+  const sharedTerms = getDistinctSpeechTerms(adaptiveText)
+    .filter((term) => scriptedTerms.has(term));
+  return sharedTerms.length >= 2;
+};
+
 const getNzDateParts = () => {
   const parts = new Intl.DateTimeFormat('en-NZ', {
     weekday: 'long',
@@ -1064,6 +1087,13 @@ export const respondToSessionTurn = async ({ sessionId, content }) => {
   const expectedQuestion =
     activeAdaptiveFollowUp?.question ||
     getAskedScriptLine(step, effectiveTurnIndex, scriptContext);
+  const plannedNextLine = getProgressScriptLine({
+    step,
+    nextStep,
+    currentTurnIndex: effectiveTurnIndex,
+    stepTurns,
+    context: scriptContext,
+  });
   const selectedMemoryEntries = selectRelevantMemoryEntries({
     memoryEntries,
     currentQuestion: expectedQuestion,
@@ -1124,6 +1154,7 @@ export const respondToSessionTurn = async ({ sessionId, content }) => {
               recentMessages,
               scriptId: session.scriptId,
               expectedQuestion,
+              plannedNextLine,
               allowFollowUp: allowAdaptiveFollowUp,
               followUpGuidance: step.adaptiveFollowUp?.guidance || '',
             }),
@@ -1247,6 +1278,9 @@ export const respondToSessionTurn = async ({ sessionId, content }) => {
   }
 
   if (userContent) {
+    if (hasSubstantialSpeechOverlap(adaptiveText, scriptedNextLine)) {
+      adaptiveText = '';
+    }
     assistantText = joinSpeechParts(adaptiveText, scriptedNextLine);
   }
 

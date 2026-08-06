@@ -149,6 +149,7 @@ export const buildCstAdaptiveTurnInstructions = ({
   recentMessages,
   scriptId,
   expectedQuestion = '',
+  plannedNextLine = '',
   allowFollowUp = false,
   followUpGuidance = '',
 }) => {
@@ -171,6 +172,11 @@ Prompt: ${slide.prompt}
 
 # Question They Were Asked
 ${quoteData(expectedQuestion || slide.prompt)}
+
+# Planned Scripted Next Line
+${plannedNextLine
+  ? `If this answer is accepted, the app will append this exact scripted line after your response: ${quoteData(plannedNextLine)}`
+  : 'No later scripted line is currently planned.'}
 
 # User
 The person's display name is ${quoteData(displayName)}.
@@ -204,6 +210,9 @@ Use answered=false when the message:
 - Maximum 1 sentence.
 - The response field must not ask a question.
 - Do not introduce a new slide or future step.
+- React only to the person's latest answer. Do not announce beginning, continuing, moving on, changing topic, or what Aria will ask next.
+- Do not echo the preceding assistant message or restate the wording, purpose, or transition contained in the planned scripted next line.
+- Let the planned scripted line handle every transition. Your response should end cleanly before it.
 - If answered=true, warmly reflect or acknowledge the answer.
 - If answered=false, gently reassure them without correcting or pressuring them.
 - Do not give away answers to upcoming orientation slides. For example, on the month slide, do not mention the season; on the day/month/year slides, do not mention weather, news, or other later prompts.
