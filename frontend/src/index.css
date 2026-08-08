@@ -798,7 +798,7 @@ body {
   top: 50%;
   width: 0;
   height: 0;
-  transform: rotate(var(--label-angle)) translateY(-35cqi);
+  transform: rotate(var(--label-angle)) translateY(-35.5cqi);
   transform-origin: 0 0;
   pointer-events: none;
 }
@@ -807,9 +807,9 @@ body {
   position: absolute;
   left: 50%;
   top: 0;
-  width: 10.5cqi;
+  width: 26cqi;
   color: #111827;
-  font: 900 clamp(5px, 1.35cqi, 16px) Nunito, sans-serif;
+  font: 900 clamp(8px, calc(3.38cqi - 1px), 28px) Nunito, sans-serif;
   line-height: 1.04;
   text-align: center;
   text-wrap: balance;
