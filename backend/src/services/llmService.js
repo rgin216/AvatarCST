@@ -98,6 +98,7 @@ const generateOpenAIResponse = async (messages, options = {}) => {
         instructions: getResponsesInstructions(messages),
         input: chatMessagesToResponsesInput(messages),
         max_output_tokens: maxTokens,
+        ...(options.textFormat ? { text: { format: options.textFormat } } : {}),
       }),
     });
   } catch (err) {

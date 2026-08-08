@@ -1,3 +1,8 @@
+import {
+  extractSongRequest,
+  formatExtractedSongQuery,
+} from './songExtractionService.js';
+
 const SPOTIFY_TOKEN_URL =
   process.env.SPOTIFY_TOKEN_URL || 'https://accounts.spotify.com/api/token';
 const SPOTIFY_SEARCH_URL =
@@ -197,13 +202,36 @@ const getAccessToken = async ({ clientId, clientSecret, signal }) => {
   return accessToken;
 };
 
+export const resolveSongQuery = async (
+  songAnswer = '',
+  { extractor = extractSongRequest } = {}
+) => {
+  const fallbackQuery = normalizeSongQuery(songAnswer);
+  if (!fallbackQuery) return { query: '', reason: 'missing-query' };
+  if (!process.env.OPENAI_API_KEY) return { query: fallbackQuery, reason: null };
+
+  try {
+    const extractedSong = await extractor(songAnswer);
+    const query = formatExtractedSongQuery(extractedSong);
+    return query
+      ? { query, reason: null }
+      : { query: '', reason: 'ambiguous-query' };
+  } catch (error) {
+    console.warn('[spotify] Song extraction unavailable; using the original answer:', error.message);
+    return { query: fallbackQuery, reason: null };
+  }
+};
+
 export const searchSpotifyTrack = async (songAnswer = '') => {
-  const query = normalizeSongQuery(songAnswer);
-  if (!query) return unavailableResult('missing-query', query);
+  const fallbackQuery = normalizeSongQuery(songAnswer);
+  if (!fallbackQuery) return unavailableResult('missing-query', fallbackQuery);
 
   const clientId = process.env.SPOTIFY_CLIENT_ID?.trim();
   const clientSecret = process.env.SPOTIFY_CLIENT_SECRET?.trim();
-  if (!clientId || !clientSecret) return unavailableResult('not-configured', query);
+  if (!clientId || !clientSecret) return unavailableResult('not-configured', fallbackQuery);
+
+  const { query, reason } = await resolveSongQuery(songAnswer);
+  if (!query) return unavailableResult(reason || 'missing-query', query);
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);

@@ -741,6 +741,7 @@ body {
   aspect-ratio: 1;
   display: grid;
   place-items: center;
+  container-type: inline-size;
   transform: translate(-50%, -50%);
 }
 
@@ -797,7 +798,7 @@ body {
   top: 50%;
   width: 0;
   height: 0;
-  transform: rotate(var(--label-angle)) translateY(max(-360px, -29cqw));
+  transform: rotate(var(--label-angle)) translateY(-35cqi);
   transform-origin: 0 0;
   pointer-events: none;
 }
@@ -806,14 +807,15 @@ body {
   position: absolute;
   left: 50%;
   top: 0;
-  width: clamp(116px, 9.6vw, 178px);
+  width: 10.5cqi;
   color: #111827;
-  font: 900 clamp(13px, 1.55vw, 24px) Nunito, sans-serif;
-  line-height: 1.08;
+  font: 900 clamp(5px, 1.35cqi, 16px) Nunito, sans-serif;
+  line-height: 1.04;
   text-align: center;
+  text-wrap: balance;
   transform: translate(-50%, -50%) rotate(270deg);
   transform-origin: center;
-  overflow-wrap: anywhere;
+  overflow-wrap: normal;
 }
 
 .slide-wheel-spin {
@@ -1185,11 +1187,6 @@ body {
     border-top-width: 16px;
     border-bottom-width: 16px;
     border-right-width: 34px;
-  }
-
-  .slide-wheel-label > span {
-    width: 68px;
-    font-size: 9px;
   }
 
   .slide-wheel-spin {
