@@ -32,6 +32,7 @@ const lipSyncModes = [
   { id: "energy", label: "Audio energy (faster)" },
 ];
 const wheelColors = ["#7A9DAD", "#F47C20", "#A8C5A0", "#4472C4", "#F4C8B0"];
+const INACTIVITY_TIMEOUT_MS = 60_000;
 const SPOTIFY_IFRAME_API_URL = "https://open.spotify.com/embed/iframe-api/v1";
 const YOUTUBE_IFRAME_API_URL = "https://www.youtube.com/iframe_api";
 
@@ -164,6 +165,8 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
   const [avatarMode, setAvatarMode] = useState(getInitialAvatarMode);
   const [lipSyncMode, setLipSyncMode] = useState("rhubarb");
   const [pendingPlay, setPendingPlay] = useState(false);
+  const [avatarNarrationActive, setAvatarNarrationActive] = useState(false);
+  const [inactivityResetToken, setInactivityResetToken] = useState(0);
   const [currentAffairs, setCurrentAffairs] = useState(null);
   const [exercisePlayback, setExercisePlayback] = useState(null);
   const [videoPlaybackState, setVideoPlaybackState] = useState("idle");
@@ -207,6 +210,10 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
   const videoAutoplayPendingRef = useRef(false);
   const videoAutoplayFallbackRef = useRef(null);
   const avatarNarrationActiveRef = useRef(false);
+  const playLiveAudioRef = useRef(null);
+  const inactivityTimeoutRef = useRef(null);
+  const inactivityRemindedRef = useRef(false);
+  const assistantTurnRef = useRef(0);
   const wheelOptions = slide.interaction?.type === "questionWheel" ? slide.interaction.options || [] : [];
   const hasWheelInteraction = wheelOptions.length > 0;
   const exerciseVideo = slide.interaction?.type === "youtubeShort" ? slide.interaction : null;
@@ -261,6 +268,10 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
   }, []);
 
   useEffect(() => () => {
+    if (inactivityTimeoutRef.current) window.clearTimeout(inactivityTimeoutRef.current);
+  }, []);
+
+  useEffect(() => () => {
     audioContextRef.current?.close();
   }, []);
 
@@ -312,13 +323,18 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
     setQuestionWheel(turn.questionWheel || null);
     spotifyAutoplayPendingRef.current = shouldAutoplayThemeSong;
     videoAutoplayPendingRef.current = shouldAutoplayExercise;
-    avatarNarrationActiveRef.current = Boolean(turn.avatar?.audio?.url);
+    const hasAvatarNarration = Boolean(turn.avatar?.audio?.url);
+    avatarNarrationActiveRef.current = hasAvatarNarration;
+    setAvatarNarrationActive(hasAvatarNarration);
 
     if (turn.assistantText) {
       const debugSuffix = import.meta.env.DEV
         ? ` [Step ${slideData.index + 1}/${slideData.total}: ${slideData.title}]`
         : "";
       setMessages((items) => [...items, { from: "avatar", text: turn.assistantText + debugSuffix }]);
+      assistantTurnRef.current += 1;
+      inactivityRemindedRef.current = false;
+      setInactivityResetToken((value) => value + 1);
     }
 
     // Always resolve the voice placeholder — replace with transcript or remove if empty
@@ -367,11 +383,14 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
           console.warn("Audio play error:", err.message);
         }
         avatarNarrationActiveRef.current = false;
+        setAvatarNarrationActive(false);
         attemptSpotifyAutoplay();
         attemptVideoAutoplay();
       }
     }
   }
+
+  playLiveAudioRef.current = playLiveAudio;
 
   function attemptSpotifyAutoplay() {
     if (
@@ -425,11 +444,98 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
 
   function handleAvatarAudioEnded() {
     avatarNarrationActiveRef.current = false;
+    setAvatarNarrationActive(false);
     handleAudioPause();
     setPendingPlay(false);
     attemptSpotifyAutoplay();
     attemptVideoAutoplay();
   }
+
+  function registerUserActivity() {
+    if (inactivityTimeoutRef.current) {
+      window.clearTimeout(inactivityTimeoutRef.current);
+      inactivityTimeoutRef.current = null;
+    }
+    setInactivityResetToken((value) => value + 1);
+  }
+
+  useEffect(() => {
+    if (inactivityTimeoutRef.current) {
+      window.clearTimeout(inactivityTimeoutRef.current);
+      inactivityTimeoutRef.current = null;
+    }
+
+    const inputExpected =
+      assistantTurnRef.current > 0 &&
+      !typing &&
+      !isRecording &&
+      !avatarNarrationActive &&
+      !pendingPlay &&
+      !wheelResultPending &&
+      !wheelSpinning &&
+      (!hasWheelInteraction || Boolean(landedWheelResult)) &&
+      !exerciseAwaitingCompletion &&
+      !musicAwaitingCompletion &&
+      !inactivityRemindedRef.current;
+    if (!sessionId || !inputExpected) return undefined;
+
+    inactivityTimeoutRef.current = window.setTimeout(async () => {
+      if (inactivityRemindedRef.current) return;
+      inactivityRemindedRef.current = true;
+      setTyping(true);
+
+      try {
+        const { data } = await api.post(`/sessions/${sessionId}/reminder`, {
+          avatarMode: avatarModeRef.current,
+          lipSyncMode,
+        });
+        if (data.assistantText) {
+          setMessages((items) => [...items, { from: "avatar", text: data.assistantText }]);
+        }
+
+        const hasReminderNarration = Boolean(data.avatar?.audio?.url);
+        avatarNarrationActiveRef.current = hasReminderNarration;
+        setAvatarNarrationActive(hasReminderNarration);
+        if (hasReminderNarration) {
+          playLiveAudioRef.current?.(getBackendBase() + data.avatar.audio.url, {
+            rhubarbJson: data.avatar?.lipsync?.rhubarbJson,
+          });
+        }
+      } catch (err) {
+        console.error("Failed to request inactivity reminder", err);
+        setMessages((items) => [
+          ...items,
+          {
+            from: "avatar",
+            text: "Take your time; there is no rush. Please think about the question I just asked. If you cannot think of an answer, feel free to say or type, ‘I don’t know.’",
+          },
+        ]);
+      } finally {
+        setTyping(false);
+      }
+    }, INACTIVITY_TIMEOUT_MS);
+
+    return () => {
+      if (inactivityTimeoutRef.current) {
+        window.clearTimeout(inactivityTimeoutRef.current);
+        inactivityTimeoutRef.current = null;
+      }
+    };
+  }, [
+    sessionId,
+    typing,
+    isRecording,
+    avatarNarrationActive,
+    pendingPlay,
+    wheelResultPending,
+    wheelSpinning,
+    hasWheelInteraction,
+    landedWheelResult,
+    exerciseAwaitingCompletion,
+    musicAwaitingCompletion,
+    inactivityResetToken,
+    lipSyncMode,
+  ]);
 
   useEffect(() => {
     if (!sessionId || booted.current) return;
@@ -756,6 +862,7 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
 
   function handleMicClick() {
     if (wheelResultPendingRef.current && !isRecording) return;
+    registerUserActivity();
 
     if (isRecording) {
       stopRecording();
@@ -769,6 +876,7 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
   async function sendMessage(text) {
     const content = text.trim();
     if (!content || typing || wheelResultPendingRef.current) return;
+    registerUserActivity();
 
     setMessages((items) => [...items, { from: "user", text: content }]);
     setInput("");
@@ -1094,7 +1202,8 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
                   <>
                     <h1>A gentle news pause</h1>
                     <p className="slide-news-summary">
-                      No clearly positive New Zealand story is available right now.
+                      {currentAffairs?.message ||
+                        "No clearly positive New Zealand story is available right now."}
                     </p>
                   </>
                 )}
@@ -1293,7 +1402,10 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
         </button>
         <input
           value={input}
-          onChange={(event) => setInput(event.target.value)}
+          onChange={(event) => {
+            setInput(event.target.value);
+            registerUserActivity();
+          }}
           onKeyDown={(event) => event.key === "Enter" && sendMessage(input)}
           placeholder="Type your response..."
           className="chat-input"

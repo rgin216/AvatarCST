@@ -9,6 +9,7 @@ import {
   getMessages,
   clearUserSessions,
   respondToSession,
+  remindSession,
   respondAudioToSession,
   getPipelineInfo,
   streamSpeechToken,
@@ -25,6 +26,7 @@ router.get('/:id', getSession);
 router.patch('/:id', updateSession);
 router.patch('/:id/end', endSession);
 router.post('/:id/respond', respondToSession);
+router.post('/:id/reminder', remindSession);
 router.post('/:id/respond-audio', upload.single('audio'), respondAudioToSession);
 router.post('/:id/messages', addMessage);
 router.get('/:id/messages', getMessages);

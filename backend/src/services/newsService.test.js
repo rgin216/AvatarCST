@@ -5,6 +5,7 @@ import {
   isSuitablePositiveArticle,
   resetPositiveNewsCacheForTests,
   selectPositiveArticle,
+  selectPositiveArticles,
 } from './newsService.js';
 
 const article = (overrides = {}) => ({
@@ -65,6 +66,21 @@ test('selects the strongest suitable story and returns display-safe fields', () 
 
   assert.equal(selected.title, 'Community celebrates native bird conservation milestone');
   assert.equal(selected.source, 'Example News');
+});
+
+test('keeps suitable stories in ranked order for sequential use', () => {
+  const selected = selectPositiveArticles([
+    article({
+      title: 'Community celebrates school garden success',
+      url: 'https://example.test/second-story',
+      publishedAt: '2026-07-29T08:00:00Z',
+    }),
+    article(),
+  ]);
+
+  assert.equal(selected.length, 2);
+  assert.equal(selected[0].url, 'https://example.test/story');
+  assert.equal(selected[1].url, 'https://example.test/second-story');
 });
 
 test('discards article detail when NewsAPI reports that it was truncated', () => {
@@ -161,6 +177,41 @@ test('shares an in-flight request and caches the successful news result', async 
     const third = await getPositiveNzNews();
     assert.deepEqual(second, first);
     assert.deepEqual(third, first);
+    assert.equal(fetchMock.mock.callCount(), 1);
+  } finally {
+    if (previousApiKey === undefined) delete process.env.NEWS_API_KEY;
+    else process.env.NEWS_API_KEY = previousApiKey;
+    resetPositiveNewsCacheForTests();
+  }
+});
+
+test('selects the next unused cached story and reports when results are exhausted', async (t) => {
+  resetPositiveNewsCacheForTests();
+  const previousApiKey = process.env.NEWS_API_KEY;
+  process.env.NEWS_API_KEY = 'test-key';
+  const secondArticle = article({
+    title: 'Community celebrates school garden success',
+    url: 'https://example.test/second-story',
+    publishedAt: '2026-07-29T08:00:00Z',
+  });
+  const fetchMock = t.mock.method(
+    globalThis,
+    'fetch',
+    async () => mockNewsResponse([article(), secondArticle])
+  );
+
+  try {
+    const first = await getPositiveNzNews();
+    const second = await getPositiveNzNews({ excludeTitles: [first.article.title] });
+    const exhausted = await getPositiveNzNews({
+      excludeTitles: [first.article.title, second.article.title],
+    });
+
+    assert.equal(first.article.url, 'https://example.test/story');
+    assert.equal(second.article.url, 'https://example.test/second-story');
+    assert.equal(exhausted.status, 'unavailable');
+    assert.equal(exhausted.reason, 'no-new-headline');
+    assert.match(exhausted.message, /no new positive New Zealand stories/i);
     assert.equal(fetchMock.mock.callCount(), 1);
   } finally {
     if (previousApiKey === undefined) delete process.env.NEWS_API_KEY;

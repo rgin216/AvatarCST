@@ -634,14 +634,20 @@ export const buildSessionSummary = (answers = []) => {
   return `Today, ${highlights.slice(0, -1).join(', ')}, and ${highlights[highlights.length - 1]}.`;
 };
 
+const renderContextualScriptReply = (step, context) =>
+  step?.id === 'childhood_current_affairs' &&
+  context?.currentAffairs?.reason === 'no-new-headline'
+    ? 'There are no new positive New Zealand stories available right now. Have you heard anything pleasant or interesting lately?'
+    : renderScriptReply(step, context);
+
 const getAskedScriptLine = (step, currentTurnIndex, context) =>
   currentTurnIndex <= 1
-    ? renderScriptReply(step, context)
+    ? renderContextualScriptReply(step, context)
     : renderScriptFollowUp(step, currentTurnIndex - 2, context);
 
 const getProgressScriptLine = ({ step, nextStep, currentTurnIndex, stepTurns, context }) => {
-  if (currentTurnIndex <= 0) return renderScriptReply(step, context);
-  if (currentTurnIndex >= stepTurns) return renderScriptReply(nextStep, context);
+  if (currentTurnIndex <= 0) return renderContextualScriptReply(step, context);
+  if (currentTurnIndex >= stepTurns) return renderContextualScriptReply(nextStep, context);
   return renderScriptFollowUp(step, currentTurnIndex - 1, context);
 };
 
@@ -1019,6 +1025,111 @@ export const getSessionTurnContext = async (sessionId) => {
   };
 };
 
+export const getPreviouslyShownNews = async (userId, currentSessionId) => {
+  const sessions = await Session.find({
+    userId,
+    _id: { $ne: currentSessionId },
+  })
+    .select('_id shownNewsUrls interactionState.currentAffairs.article.url')
+    .lean();
+
+  const urls = sessions.flatMap((priorSession) => [
+    ...(priorSession.shownNewsUrls || []),
+    priorSession.interactionState?.currentAffairs?.article?.url,
+  ]).filter(Boolean);
+  const sessionIds = sessions.map((priorSession) => priorSession._id);
+  const newsMessages = sessionIds.length > 0
+    ? await Message.find({
+        sessionId: { $in: sessionIds },
+        role: 'assistant',
+        content: /Here is a positive story from New Zealand:/i,
+      })
+        .select('content')
+        .lean()
+    : [];
+  const titles = newsMessages
+    .map((message) =>
+      message.content.match(
+        /Here is a positive story from New Zealand:\s*(.+)\.\s+You can ask me/i
+      )?.[1]?.trim()
+    )
+    .filter(Boolean);
+
+  return {
+    urls: [...new Set(urls)],
+    titles: [...new Set(titles)],
+  };
+};
+
+const extractLastQuestion = (value = '') => {
+  const text = String(value).replace(/\s+/g, ' ').trim();
+  const questionEnd = text.lastIndexOf('?');
+  if (questionEnd < 0) return '';
+
+  const prefix = text.slice(0, questionEnd);
+  let questionStart = 0;
+  for (const match of prefix.matchAll(/[.!?]\s+/g)) {
+    questionStart = match.index + match[0].length;
+  }
+  return text.slice(questionStart, questionEnd + 1).trim();
+};
+
+export const buildInactivityReminderText = (question = '') => {
+  const repeatedQuestion = String(question).replace(/\s+/g, ' ').trim();
+  return joinSpeechParts(
+    'Take your time; there is no rush.',
+    repeatedQuestion,
+    'If you cannot think of an answer, feel free to say or type, "I don\'t know."'
+  );
+};
+
+export const getSessionInactivityReminder = async (sessionId) => {
+  const context = await getSessionTurnContext(sessionId);
+  const { session, user, recentMessages, step } = context;
+  assertCanUseSession(session, 'respond');
+
+  const currentTurnIndex = session.scriptStepTurnIndex || 0;
+  const effectiveTurnIndex = currentTurnIndex || (hasPriorAssistantTurn(recentMessages) ? 1 : 0);
+  const persistedAdaptiveFollowUp = session.interactionState?.adaptiveFollowUp;
+  const activeAdaptiveFollowUp =
+    persistedAdaptiveFollowUp?.stepId === step.id ? persistedAdaptiveFollowUp : null;
+  const currentAffairs = session.interactionState?.currentAffairs || null;
+  const scriptContext = {
+    name: getDisplayName(user),
+    wheelQuestion: session.interactionState?.questionWheel?.question,
+    currentAffairs,
+    themeSong: session.interactionState?.themeSong || null,
+  };
+  const expectedLine =
+    activeAdaptiveFollowUp?.question ||
+    getAskedScriptLine(step, effectiveTurnIndex, scriptContext);
+  const newsQuestion = step.id === 'childhood_current_affairs'
+    ? currentAffairs?.status === 'available'
+      ? 'What do you think about that story?'
+      : 'Have you heard anything pleasant or interesting lately?'
+    : '';
+  const question =
+    newsQuestion ||
+    extractLastQuestion(expectedLine) ||
+    extractLastQuestion(step.prompt) ||
+    step.prompt;
+  const assistantText = buildInactivityReminderText(question);
+  const assistantMessage = await Message.create({
+    sessionId,
+    role: 'assistant',
+    content: assistantText,
+  });
+
+  return {
+    sessionId: session._id,
+    sessionStatus: session.status,
+    pipelineMode: session.pipelineMode,
+    assistantText,
+    avatar: buildAvatarResponse({ text: assistantText }),
+    messages: { assistant: assistantMessage },
+  };
+};
+
 // TODO: wrap writes in a MongoDB transaction when upgrading to Atlas M10+ (replica set required)
 export const respondToSessionTurn = async ({ sessionId, content }) => {
   const userContent = content?.trim();
@@ -1095,8 +1206,15 @@ export const respondToSessionTurn = async ({ sessionId, content }) => {
   const needsCurrentAffairs = [step, nextStep].some(
     (candidate) => candidate?.id === 'childhood_current_affairs'
   );
+  const previouslyShownNews =
+    needsCurrentAffairs && !session.interactionState?.currentAffairs
+      ? await getPreviouslyShownNews(session.userId, session._id)
+      : { urls: [], titles: [] };
   const currentAffairs = needsCurrentAffairs
-    ? session.interactionState?.currentAffairs || await getPositiveNzNews()
+    ? session.interactionState?.currentAffairs || await getPositiveNzNews({
+        excludeUrls: [...(session.shownNewsUrls || []), ...previouslyShownNews.urls],
+        excludeTitles: previouslyShownNews.titles,
+      })
     : null;
   let themeSong = session.interactionState?.themeSong || null;
   const scriptContext = {
@@ -1365,6 +1483,11 @@ export const respondToSessionTurn = async ({ sessionId, content }) => {
   }
   if (displaySlide.id === 'childhood_current_affairs') {
     nextInteractionState.currentAffairs = currentAffairs;
+    const newsUrl = currentAffairs?.status === 'available' ? currentAffairs.article?.url : null;
+    const shownNewsUrls = session.shownNewsUrls || [];
+    if (newsUrl && !shownNewsUrls.includes(newsUrl)) {
+      session.shownNewsUrls = [...shownNewsUrls, newsUrl];
+    }
   } else {
     delete nextInteractionState.currentAffairs;
   }

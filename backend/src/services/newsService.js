@@ -202,7 +202,7 @@ const normalizeArticle = (article) => ({
   publishedAt: safePublishedAt(article.publishedAt),
 });
 
-export const selectPositiveArticle = (articles = []) =>
+export const selectPositiveArticles = (articles = []) =>
   articles
     .map((article) => ({ article, score: scorePositiveArticle(article) }))
     .filter(({ article, score }) => score >= 3 && Boolean(safeHttpUrl(article.url)))
@@ -211,13 +211,21 @@ export const selectPositiveArticle = (articles = []) =>
       if (scoreDifference !== 0) return scoreDifference;
       return new Date(right.article.publishedAt || 0) - new Date(left.article.publishedAt || 0);
     })
-    .map(({ article }) => normalizeArticle(article))[0] || null;
+    .map(({ article }) => normalizeArticle(article))
+    .filter((article, index, rankedArticles) =>
+      rankedArticles.findIndex((candidate) => candidate.url === article.url) === index
+    );
+
+export const selectPositiveArticle = (articles = []) =>
+  selectPositiveArticles(articles)[0] || null;
 
 const unavailableResult = (reason) => ({
   status: 'unavailable',
   article: null,
   reason,
-  message: 'No clearly positive New Zealand story is available right now.',
+  message: reason === 'no-new-headline'
+    ? 'There are no new positive New Zealand stories available right now.'
+    : 'No clearly positive New Zealand story is available right now.',
 });
 
 const fetchArticles = async ({ endpoint, params, apiKey, signal }) => {
@@ -248,10 +256,10 @@ const fetchPositiveNzNews = async ({ apiKey, now }) => {
       apiKey,
       signal: controller.signal,
     });
-    let article = selectPositiveArticle(topHeadlines);
+    let articles = selectPositiveArticles(topHeadlines);
     let sourceScope = 'nz-top-headlines';
 
-    if (!article) {
+    if (articles.length === 0) {
       const configuredDomains = process.env.NZ_NEWS_DOMAINS?.trim();
       const recentFrom = new Date(now - RECENT_NEWS_DAYS * 24 * 60 * 60 * 1000)
         .toISOString()
@@ -268,14 +276,14 @@ const fetchPositiveNzNews = async ({ apiKey, now }) => {
         apiKey,
         signal: controller.signal,
       });
-      article = selectPositiveArticle(localPublisherArticles);
+      articles = selectPositiveArticles(localPublisherArticles);
       sourceScope = 'nz-publishers';
     }
 
-    return article
+    return articles.length > 0
       ? {
           status: 'available',
-          article,
+          articles,
           fetchedAt: new Date().toISOString(),
           filter: 'strict-positive',
           sourceScope,
@@ -299,7 +307,7 @@ const cacheNewsResult = (result, now) => {
   return result;
 };
 
-export const getPositiveNzNews = async () => {
+const getPositiveNzNewsCandidates = async () => {
   const now = Date.now();
   if (cachedNews && cacheExpiresAt > now) return cachedNews;
   if (pendingNewsRequest) return pendingNewsRequest;
@@ -313,6 +321,28 @@ export const getPositiveNzNews = async () => {
       pendingNewsRequest = null;
     });
   return pendingNewsRequest;
+};
+
+export const getPositiveNzNews = async ({ excludeUrls = [], excludeTitles = [] } = {}) => {
+  const result = await getPositiveNzNewsCandidates();
+  if (result.status !== 'available') return result;
+
+  const excluded = new Set(excludeUrls.map((url) => safeHttpUrl(url)).filter(Boolean));
+  const excludedTitleSet = new Set(
+    excludeTitles.map((title) => cleanText(title, 180).toLowerCase()).filter(Boolean)
+  );
+  const article = result.articles.find((candidate) =>
+    !excluded.has(candidate.url) && !excludedTitleSet.has(candidate.title.toLowerCase())
+  );
+  if (!article) return unavailableResult('no-new-headline');
+
+  return {
+    status: 'available',
+    article,
+    fetchedAt: result.fetchedAt,
+    filter: result.filter,
+    sourceScope: result.sourceScope,
+  };
 };
 
 export const resetPositiveNewsCacheForTests = () => {

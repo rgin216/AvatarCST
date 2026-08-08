@@ -3,7 +3,10 @@ import fs from 'fs';
 import { v4 as uuidv4 } from 'uuid';
 import Session from '../models/Session.js';
 import Message from '../models/Message.js';
-import { respondToSessionTurn } from '../services/sessionOrchestratorService.js';
+import {
+  getSessionInactivityReminder,
+  respondToSessionTurn,
+} from '../services/sessionOrchestratorService.js';
 import { transcribeAudio } from '../services/sttService.js';
 import {
   getVoiceOptionsForAvatar,
@@ -223,6 +226,47 @@ export const respondToSession = async (req, res, next) => {
       if (audio.streaming) turn.avatar.audio.streaming = true;
     } catch (ttsErr) {
       console.error('[tts] Skipping audio for this turn:', ttsErr.message);
+    }
+
+    turn.timings = { ...timings, totalMs: nowMs() - startedAtMs };
+    res.status(201).json(turn);
+  } catch (err) {
+    if (audioOutputPath) fs.unlink(audioOutputPath, () => {});
+    next(err);
+  }
+};
+
+export const remindSession = async (req, res, next) => {
+  const timings = {};
+  let audioOutputPath = null;
+  const startedAtMs = nowMs();
+  try {
+    const avatarMode = getAvatarMode(req.body?.avatarMode);
+    const lipSyncMode = getLipSyncMode(req.body?.lipSyncMode);
+    const turn = await timeAsync(
+      'orchestratorMs',
+      () => getSessionInactivityReminder(req.params.id),
+      timings
+    );
+
+    try {
+      const audio = await createAudioForTurn(
+        turn.assistantText,
+        turn.pipelineMode,
+        avatarMode,
+        lipSyncMode,
+        timings
+      );
+      audioOutputPath = audio.audioOutputPath;
+      turn.avatar = buildAvatarResponse({
+        text: turn.assistantText,
+        audioUrl: audio.audioUrl,
+        rhubarbJson: audio.rhubarbJson,
+        lipsyncEngine: audio.lipsyncEngine,
+      });
+      if (audio.streaming) turn.avatar.audio.streaming = true;
+    } catch (ttsErr) {
+      console.error('[tts] Skipping reminder audio:', ttsErr.message);
     }
 
     turn.timings = { ...timings, totalMs: nowMs() - startedAtMs };
