@@ -733,6 +733,37 @@ export const buildTopicSessionSummary = (answers = [], { themeSong = null } = {}
     : 'Today, you explored a few memories and ideas together.';
 };
 
+export const buildSavedThemeSong = (
+  themeSong,
+  { sourceSessionId, savedAt = new Date() } = {}
+) => {
+  if (themeSong?.status !== 'available' || !themeSong.track?.id || !sourceSessionId) {
+    return null;
+  }
+
+  return {
+    status: 'available',
+    query: themeSong.query,
+    track: {
+      id: themeSong.track.id,
+      uri: themeSong.track.uri,
+      name: themeSong.track.name,
+      artists: themeSong.track.artists,
+      artistLabel: themeSong.track.artistLabel,
+      album: themeSong.track.album,
+      artwork: themeSong.track.artwork,
+      spotifyUrl: themeSong.track.spotifyUrl,
+      durationMs: themeSong.track.durationMs,
+    },
+    matchedAt: themeSong.matchedAt,
+    sourceSessionId,
+    savedAt,
+  };
+};
+
+export const getThemeSongForSession = (session, user) =>
+  session?.interactionState?.themeSong || user?.savedThemeSong || null;
+
 const normalizeGeneratedSessionSummary = (summary = '') =>
   String(summary)
     .trim()
@@ -1339,7 +1370,7 @@ export const getSessionInactivityReminder = async (sessionId, expectedActivityRe
     name: getDisplayName(user),
     wheelQuestion: session.interactionState?.questionWheel?.question,
     currentAffairs,
-    themeSong: session.interactionState?.themeSong || null,
+    themeSong: getThemeSongForSession(session, user),
   };
   const expectedLine =
     activeAdaptiveFollowUp?.question ||
@@ -1459,7 +1490,7 @@ export const respondToSessionTurn = async ({ sessionId, content }) => {
         excludeTitles: [...(session.shownNewsTitles || []), ...previouslyShownNews.titles],
       })
     : null;
-  let themeSong = session.interactionState?.themeSong || null;
+  let themeSong = getThemeSongForSession(session, user);
   const scriptContext = {
     name: getDisplayName(user),
     wheelQuestion: wheelEvent?.question || session.interactionState?.questionWheel?.question,
@@ -1577,6 +1608,17 @@ export const respondToSessionTurn = async ({ sessionId, content }) => {
     if (step.id === 'theme_song_choice' && !activeAdaptiveFollowUp) {
       themeSong = await searchSpotifyTrack(userContent);
       scriptContext.themeSong = themeSong;
+      const savedThemeSong = buildSavedThemeSong(themeSong, {
+        sourceSessionId: session._id,
+      });
+      if (savedThemeSong) {
+        await User.findByIdAndUpdate(
+          session.userId,
+          { $set: { savedThemeSong } },
+          { runValidators: true }
+        );
+        user.savedThemeSong = savedThemeSong;
+      }
     }
   }
 
