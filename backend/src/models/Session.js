@@ -15,7 +15,10 @@ const sessionSchema = new Schema({
   scriptStepIndex: { type: Number, default: 0, min: 0 },
   scriptStepTurnIndex: { type: Number, default: 0, min: 0 },
   scriptStepRetryCount: { type: Number, default: 0, min: 0 },
+  activityRevision: { type: Number, default: 0, min: 0 },
+  lastReminderRevision: { type: Number, default: -1 },
   shownNewsUrls: [{ type: String }],
+  shownNewsTitles: [{ type: String }],
   interactionState: { type: Schema.Types.Mixed, default: {} },
   presentationState: {
     slideIndex: { type: Number, default: 0 },

@@ -171,20 +171,29 @@ async function createRhubarbAudioForTurn(assistantText, pipelineMode, avatarMode
   const responseFormat = speechOptions.provider === 'openai' ? 'wav' : 'mp3';
   const audioFileName = `${uuidv4()}.${responseFormat}`;
   const audioOutputPath = path.join(GENERATED_AUDIO_DIR, audioFileName);
-  await timeAsync(
-    'ttsMs',
-    () => synthesizeSpeech(assistantText, audioOutputPath, { ...speechOptions, responseFormat }),
-    timings
-  );
-  const rhubarbJson = await timeAsync('rhubarbMs', () => generateLipSync(audioOutputPath), timings);
+  try {
+    await timeAsync(
+      'ttsMs',
+      () => synthesizeSpeech(assistantText, audioOutputPath, { ...speechOptions, responseFormat }),
+      timings
+    );
+    const rhubarbJson = await timeAsync(
+      'rhubarbMs',
+      () => generateLipSync(audioOutputPath),
+      timings
+    );
 
-  return {
-    audioUrl: `/generated-audio/${audioFileName}`,
-    rhubarbJson,
-    audioOutputPath,
-    streaming: false,
-    lipsyncEngine: 'rhubarb',
-  };
+    return {
+      audioUrl: `/generated-audio/${audioFileName}`,
+      rhubarbJson,
+      audioOutputPath,
+      streaming: false,
+      lipsyncEngine: 'rhubarb',
+    };
+  } catch (error) {
+    await fs.promises.unlink(audioOutputPath).catch(() => {});
+    throw error;
+  }
 }
 
 async function createAudioForTurn(assistantText, pipelineMode, avatarMode, lipSyncMode, timings) {
@@ -200,7 +209,6 @@ async function createAudioForTurn(assistantText, pipelineMode, avatarMode, lipSy
 
 export const respondToSession = async (req, res, next) => {
   const timings = {};
-  let audioOutputPath = null;
   const startedAtMs = nowMs();
   try {
     const avatarMode = getAvatarMode(req.body?.avatarMode);
@@ -216,7 +224,6 @@ export const respondToSession = async (req, res, next) => {
 
     try {
       const audio = await createAudioForTurn(turn.assistantText, turn.pipelineMode, avatarMode, lipSyncMode, timings);
-      audioOutputPath = audio.audioOutputPath;
       turn.avatar = buildAvatarResponse({
         text: turn.assistantText,
         audioUrl: audio.audioUrl,
@@ -231,21 +238,19 @@ export const respondToSession = async (req, res, next) => {
     turn.timings = { ...timings, totalMs: nowMs() - startedAtMs };
     res.status(201).json(turn);
   } catch (err) {
-    if (audioOutputPath) fs.unlink(audioOutputPath, () => {});
     next(err);
   }
 };
 
 export const remindSession = async (req, res, next) => {
   const timings = {};
-  let audioOutputPath = null;
   const startedAtMs = nowMs();
   try {
     const avatarMode = getAvatarMode(req.body?.avatarMode);
     const lipSyncMode = getLipSyncMode(req.body?.lipSyncMode);
     const turn = await timeAsync(
       'orchestratorMs',
-      () => getSessionInactivityReminder(req.params.id),
+      () => getSessionInactivityReminder(req.params.id, req.body?.activityRevision),
       timings
     );
 
@@ -257,7 +262,6 @@ export const remindSession = async (req, res, next) => {
         lipSyncMode,
         timings
       );
-      audioOutputPath = audio.audioOutputPath;
       turn.avatar = buildAvatarResponse({
         text: turn.assistantText,
         audioUrl: audio.audioUrl,
@@ -272,7 +276,6 @@ export const remindSession = async (req, res, next) => {
     turn.timings = { ...timings, totalMs: nowMs() - startedAtMs };
     res.status(201).json(turn);
   } catch (err) {
-    if (audioOutputPath) fs.unlink(audioOutputPath, () => {});
     next(err);
   }
 };
@@ -300,7 +303,6 @@ export const getPipelineInfo = (_req, res) => {
 
 export const respondAudioToSession = async (req, res, next) => {
   const uploadedFilePath = req.file?.path;
-  let audioOutputPath = null;
   const timings = {};
   const startedAtMs = nowMs();
 
@@ -328,7 +330,6 @@ export const respondAudioToSession = async (req, res, next) => {
 
     try {
       const audio = await createAudioForTurn(turn.assistantText, session.pipelineMode, avatarMode, lipSyncMode, timings);
-      audioOutputPath = audio.audioOutputPath;
       turn.avatar = buildAvatarResponse({
         text: turn.assistantText,
         audioUrl: audio.audioUrl,
@@ -344,7 +345,6 @@ export const respondAudioToSession = async (req, res, next) => {
     turn.timings = { ...timings, totalMs: nowMs() - startedAtMs };
     res.status(201).json(turn);
   } catch (err) {
-    if (audioOutputPath) fs.unlink(audioOutputPath, () => {});
     next(err);
   } finally {
     if (uploadedFilePath) fs.unlink(uploadedFilePath, () => {});

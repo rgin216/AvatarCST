@@ -213,6 +213,9 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
   const playLiveAudioRef = useRef(null);
   const inactivityTimeoutRef = useRef(null);
   const inactivityRemindedRef = useRef(false);
+  const inactivityRequestRef = useRef(null);
+  const inactivityRequestGenerationRef = useRef(0);
+  const activityRevisionRef = useRef(null);
   const assistantTurnRef = useRef(0);
   const wheelOptions = slide.interaction?.type === "questionWheel" ? slide.interaction.options || [] : [];
   const hasWheelInteraction = wheelOptions.length > 0;
@@ -269,6 +272,9 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
 
   useEffect(() => () => {
     if (inactivityTimeoutRef.current) window.clearTimeout(inactivityTimeoutRef.current);
+    inactivityRequestGenerationRef.current += 1;
+    inactivityRequestRef.current?.abort();
+    inactivityRequestRef.current = null;
   }, []);
 
   useEffect(() => () => {
@@ -284,6 +290,9 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
   }, []);
 
   function applyTurn(turn) {
+    if (Number.isInteger(turn.activityRevision)) {
+      activityRevisionRef.current = turn.activityRevision;
+    }
     const slideData = turn.slide || defaultSlide;
     const shouldAutoplayThemeSong =
       slideData.interaction?.type === "spotifySong" &&
@@ -382,10 +391,7 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
         if (err.name !== "AbortError") {
           console.warn("Audio play error:", err.message);
         }
-        avatarNarrationActiveRef.current = false;
-        setAvatarNarrationActive(false);
-        attemptSpotifyAutoplay();
-        attemptVideoAutoplay();
+        handleAvatarAudioUnavailable();
       }
     }
   }
@@ -451,10 +457,28 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
     attemptVideoAutoplay();
   }
 
+  function handleAvatarAudioUnavailable() {
+    avatarNarrationActiveRef.current = false;
+    setAvatarNarrationActive(false);
+    attemptSpotifyAutoplay();
+    attemptVideoAutoplay();
+  }
+
+  function cancelInFlightInactivityReminder() {
+    const hadInFlightRequest = Boolean(inactivityRequestRef.current);
+    inactivityRequestGenerationRef.current += 1;
+    inactivityRequestRef.current?.abort();
+    inactivityRequestRef.current = null;
+    return hadInFlightRequest;
+  }
+
   function registerUserActivity() {
     if (inactivityTimeoutRef.current) {
       window.clearTimeout(inactivityTimeoutRef.current);
       inactivityTimeoutRef.current = null;
+    }
+    if (cancelInFlightInactivityReminder()) {
+      inactivityRemindedRef.current = false;
     }
     setInactivityResetToken((value) => value + 1);
   }
@@ -477,18 +501,33 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
       !exerciseAwaitingCompletion &&
       !musicAwaitingCompletion &&
       !inactivityRemindedRef.current;
-    if (!sessionId || !inputExpected) return undefined;
+    const expectedActivityRevision = activityRevisionRef.current;
+    if (!sessionId || !inputExpected || !Number.isInteger(expectedActivityRevision)) {
+      return undefined;
+    }
 
     inactivityTimeoutRef.current = window.setTimeout(async () => {
       if (inactivityRemindedRef.current) return;
       inactivityRemindedRef.current = true;
-      setTyping(true);
+      const requestGeneration = inactivityRequestGenerationRef.current + 1;
+      inactivityRequestGenerationRef.current = requestGeneration;
+      const controller = new AbortController();
+      inactivityRequestRef.current = controller;
 
       try {
         const { data } = await api.post(`/sessions/${sessionId}/reminder`, {
           avatarMode: avatarModeRef.current,
           lipSyncMode,
+          activityRevision: expectedActivityRevision,
+        }, {
+          signal: controller.signal,
         });
+        if (
+          controller.signal.aborted ||
+          requestGeneration !== inactivityRequestGenerationRef.current ||
+          data.activityRevision !== expectedActivityRevision ||
+          activityRevisionRef.current !== expectedActivityRevision
+        ) return;
         if (data.assistantText) {
           setMessages((items) => [...items, { from: "avatar", text: data.assistantText }]);
         }
@@ -502,6 +541,12 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
           });
         }
       } catch (err) {
+        if (
+          controller.signal.aborted ||
+          err.code === "ERR_CANCELED" ||
+          err.name === "CanceledError" ||
+          err.response?.status === 409
+        ) return;
         console.error("Failed to request inactivity reminder", err);
         setMessages((items) => [
           ...items,
@@ -511,7 +556,9 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
           },
         ]);
       } finally {
-        setTyping(false);
+        if (requestGeneration === inactivityRequestGenerationRef.current) {
+          inactivityRequestRef.current = null;
+        }
       }
     }, INACTIVITY_TIMEOUT_MS);
 
@@ -1371,6 +1418,7 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
             onPlay={handleAudioPlay}
             onPause={handleAudioPause}
             onEnded={handleAvatarAudioEnded}
+            onError={handleAvatarAudioUnavailable}
             onSeeked={() => publishLipSyncFrame(Boolean(audioRef.current && !audioRef.current.paused))}
             preload="metadata"
             hidden

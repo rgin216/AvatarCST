@@ -14,6 +14,7 @@ import { normalizeSongQuery, searchSpotifyTrack } from './spotifyService.js';
 import { isOpenAIFastScriptedPipeline, usesOpenAITextPipeline } from '../config/pipeline.js';
 
 const RECENT_MESSAGE_LIMIT = 20;
+const PRIOR_NEWS_SESSION_LIMIT = 20;
 const MAX_UNANSWERED_ATTEMPTS = 3;
 const MAX_MEMORY_SUGGESTIONS = 4;
 const MAX_SELECTED_MEMORIES = 4;
@@ -107,6 +108,7 @@ const hasSubstantialSpeechOverlap = (adaptiveText = '', scriptedText = '') => {
     .filter((term) => scriptedTerms.has(term));
   return sharedTerms.length >= 2;
 };
+const PLEASANT_NEWS_PROMPT = 'Have you heard anything pleasant or interesting lately?';
 
 const getNzDateParts = () => {
   const parts = new Intl.DateTimeFormat('en-NZ', {
@@ -841,7 +843,7 @@ export const generateSessionSummary = async ({
 const renderContextualScriptReply = (step, context) =>
   step?.id === 'childhood_current_affairs' &&
   context?.currentAffairs?.reason === 'no-new-headline'
-    ? 'There are no new positive New Zealand stories available right now. Have you heard anything pleasant or interesting lately?'
+    ? `There are no new positive New Zealand stories available right now. ${PLEASANT_NEWS_PROMPT}`
     : renderScriptReply(step, context);
 
 const getAskedScriptLine = (step, currentTurnIndex, context) =>
@@ -863,6 +865,26 @@ const assertCanUseSession = (session, action) => {
   if (ACTIVE_SESSION_STATUSES.includes(session.status)) return;
 
   const err = new Error(`Cannot ${action} for a ${session.status} session`);
+  err.status = 409;
+  throw err;
+};
+
+const registerSessionActivity = async (sessionId) => {
+  const session = await Session.findOneAndUpdate(
+    { _id: sessionId, status: { $in: ACTIVE_SESSION_STATUSES } },
+    { $inc: { activityRevision: 1 } },
+    { new: true }
+  );
+  if (session) return session;
+
+  const currentSession = await Session.findById(sessionId).select('status').lean();
+  if (!currentSession) {
+    const err = new Error('Session not found');
+    err.status = 404;
+    throw err;
+  }
+  assertCanUseSession(currentSession, 'respond');
+  const err = new Error('Session activity could not be registered');
   err.status = 409;
   throw err;
 };
@@ -1186,8 +1208,8 @@ const savePendingMemorySuggestions = async ({ userId, sessionId, suggestions = [
     }));
 };
 
-export const getSessionTurnContext = async (sessionId) => {
-  const session = await Session.findById(sessionId);
+export const getSessionTurnContext = async (sessionId, existingSession = null) => {
+  const session = existingSession || await Session.findById(sessionId);
   if (!session) {
     const err = new Error('Session not found');
     err.status = 404;
@@ -1234,30 +1256,13 @@ export const getPreviouslyShownNews = async (userId, currentSessionId) => {
     userId,
     _id: { $ne: currentSessionId },
   })
-    .select('_id shownNewsUrls interactionState.currentAffairs.article.url')
+    .select('shownNewsUrls shownNewsTitles')
+    .sort({ createdAt: -1 })
+    .limit(PRIOR_NEWS_SESSION_LIMIT)
     .lean();
 
-  const urls = sessions.flatMap((priorSession) => [
-    ...(priorSession.shownNewsUrls || []),
-    priorSession.interactionState?.currentAffairs?.article?.url,
-  ]).filter(Boolean);
-  const sessionIds = sessions.map((priorSession) => priorSession._id);
-  const newsMessages = sessionIds.length > 0
-    ? await Message.find({
-        sessionId: { $in: sessionIds },
-        role: 'assistant',
-        content: /Here is a positive story from New Zealand:/i,
-      })
-        .select('content')
-        .lean()
-    : [];
-  const titles = newsMessages
-    .map((message) =>
-      message.content.match(
-        /Here is a positive story from New Zealand:\s*(.+)\.\s+You can ask me/i
-      )?.[1]?.trim()
-    )
-    .filter(Boolean);
+  const urls = sessions.flatMap((priorSession) => priorSession.shownNewsUrls || []);
+  const titles = sessions.flatMap((priorSession) => priorSession.shownNewsTitles || []);
 
   return {
     urls: [...new Set(urls)],
@@ -1287,8 +1292,40 @@ export const buildInactivityReminderText = (question = '') => {
   );
 };
 
-export const getSessionInactivityReminder = async (sessionId) => {
-  const context = await getSessionTurnContext(sessionId);
+export const getSessionInactivityReminder = async (sessionId, expectedActivityRevision) => {
+  const activityRevision = Number(expectedActivityRevision);
+  if (!Number.isInteger(activityRevision) || activityRevision < 0) {
+    const err = new Error('A valid activity revision is required');
+    err.status = 400;
+    throw err;
+  }
+
+  const claimedSession = await Session.findOneAndUpdate(
+    {
+      _id: sessionId,
+      status: { $in: ACTIVE_SESSION_STATUSES },
+      activityRevision,
+      lastReminderRevision: { $ne: activityRevision },
+    },
+    { $set: { lastReminderRevision: activityRevision } },
+    { new: true }
+  );
+  if (!claimedSession) {
+    const currentSession = await Session.findById(sessionId)
+      .select('status activityRevision lastReminderRevision')
+      .lean();
+    if (!currentSession) {
+      const err = new Error('Session not found');
+      err.status = 404;
+      throw err;
+    }
+    assertCanUseSession(currentSession, 'remind');
+    const err = new Error('This reminder request is no longer current');
+    err.status = 409;
+    throw err;
+  }
+
+  const context = await getSessionTurnContext(sessionId, claimedSession);
   const { session, user, recentMessages, step } = context;
   assertCanUseSession(session, 'respond');
 
@@ -1310,7 +1347,7 @@ export const getSessionInactivityReminder = async (sessionId) => {
   const newsQuestion = step.id === 'childhood_current_affairs'
     ? currentAffairs?.status === 'available'
       ? 'What do you think about that story?'
-      : 'Have you heard anything pleasant or interesting lately?'
+      : PLEASANT_NEWS_PROMPT
     : '';
   const question =
     newsQuestion ||
@@ -1328,6 +1365,7 @@ export const getSessionInactivityReminder = async (sessionId) => {
     sessionId: session._id,
     sessionStatus: session.status,
     pipelineMode: session.pipelineMode,
+    activityRevision: session.activityRevision,
     assistantText,
     avatar: buildAvatarResponse({ text: assistantText }),
     messages: { assistant: assistantMessage },
@@ -1338,7 +1376,8 @@ export const getSessionInactivityReminder = async (sessionId) => {
 export const respondToSessionTurn = async ({ sessionId, content }) => {
   const userContent = content?.trim();
 
-  const context = await getSessionTurnContext(sessionId);
+  const activitySession = await registerSessionActivity(sessionId);
+  const context = await getSessionTurnContext(sessionId, activitySession);
   const { session, user, memoryEntries, recentMessages, step, nextStep, slide, nextSlide, boundedIndex, isFinalStep, totalSteps } = context;
 
   const hasMusicCompletionProtocol = isMusicCompletionProtocol(userContent || '');
@@ -1417,7 +1456,7 @@ export const respondToSessionTurn = async ({ sessionId, content }) => {
   const currentAffairs = needsCurrentAffairs
     ? session.interactionState?.currentAffairs || await getPositiveNzNews({
         excludeUrls: [...(session.shownNewsUrls || []), ...previouslyShownNews.urls],
-        excludeTitles: previouslyShownNews.titles,
+        excludeTitles: [...(session.shownNewsTitles || []), ...previouslyShownNews.titles],
       })
     : null;
   let themeSong = session.interactionState?.themeSong || null;
@@ -1597,7 +1636,7 @@ export const respondToSessionTurn = async ({ sessionId, content }) => {
     : shouldElaborateNews
     ? currentAffairs?.status === 'available'
       ? 'What part of that story stands out to you?'
-      : 'Have you heard anything pleasant or interesting lately?'
+      : PLEASANT_NEWS_PROMPT
     : hasUserContent && hasDeliveredQuestion
     ? getProgressScriptLine({ step, nextStep, currentTurnIndex: effectiveTurnIndex, stepTurns, context: scriptContext })
     : expectedQuestion || renderScriptReply(step, scriptContext);
@@ -1700,9 +1739,14 @@ export const respondToSessionTurn = async ({ sessionId, content }) => {
   if (displaySlide.id === 'childhood_current_affairs') {
     nextInteractionState.currentAffairs = currentAffairs;
     const newsUrl = currentAffairs?.status === 'available' ? currentAffairs.article?.url : null;
+    const newsTitle = currentAffairs?.status === 'available' ? currentAffairs.article?.title : null;
     const shownNewsUrls = session.shownNewsUrls || [];
+    const shownNewsTitles = session.shownNewsTitles || [];
     if (newsUrl && !shownNewsUrls.includes(newsUrl)) {
       session.shownNewsUrls = [...shownNewsUrls, newsUrl];
+    }
+    if (newsTitle && !shownNewsTitles.includes(newsTitle)) {
+      session.shownNewsTitles = [...shownNewsTitles, newsTitle];
     }
   } else {
     delete nextInteractionState.currentAffairs;
@@ -1749,6 +1793,7 @@ export const respondToSessionTurn = async ({ sessionId, content }) => {
     sessionStatus: session.status,
     scriptId: session.scriptId,
     pipelineMode: session.pipelineMode,
+    activityRevision: session.activityRevision,
     scriptStep: {
       id: step.id,
       index: boundedIndex,

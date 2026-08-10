@@ -19,8 +19,6 @@ const SONG_EXTRACTION_FORMAT = {
       },
       confidence: {
         type: 'number',
-        minimum: 0,
-        maximum: 1,
       },
     },
     required: ['title', 'artist', 'confidence'],

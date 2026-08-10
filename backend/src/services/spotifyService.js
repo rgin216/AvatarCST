@@ -212,7 +212,7 @@ export const resolveSongQuery = async (
 
   try {
     const extractedSong = await extractor(songAnswer);
-    const query = formatExtractedSongQuery(extractedSong);
+    const query = formatExtractedSongQuery(extractedSong || {});
     return query
       ? { query, reason: null }
       : { query: '', reason: 'ambiguous-query' };
@@ -231,7 +231,7 @@ export const searchSpotifyTrack = async (songAnswer = '') => {
   if (!clientId || !clientSecret) return unavailableResult('not-configured', fallbackQuery);
 
   const { query, reason } = await resolveSongQuery(songAnswer);
-  if (!query) return unavailableResult(reason || 'missing-query', query);
+  if (!query) return unavailableResult(reason || 'missing-query', fallbackQuery);
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);

@@ -97,6 +97,49 @@ test('uses the extracted song and artist for a conversational answer', async () 
   }
 });
 
+test('reports an ambiguous query when the extractor returns no song', async () => {
+  const previousOpenAIKey = process.env.OPENAI_API_KEY;
+  process.env.OPENAI_API_KEY = 'test-key';
+
+  try {
+    const resolved = await resolveSongQuery('Maybe play something nice', {
+      extractor: async () => null,
+    });
+
+    assert.deepEqual(resolved, {
+      query: '',
+      reason: 'ambiguous-query',
+    });
+  } finally {
+    if (previousOpenAIKey === undefined) delete process.env.OPENAI_API_KEY;
+    else process.env.OPENAI_API_KEY = previousOpenAIKey;
+  }
+});
+
+test('uses the normalized original answer when the extractor throws', async () => {
+  const previousOpenAIKey = process.env.OPENAI_API_KEY;
+  process.env.OPENAI_API_KEY = 'test-key';
+
+  try {
+    const resolved = await resolveSongQuery(
+      'My favourite song is Here Comes the Sun by The Beatles',
+      {
+        extractor: async () => {
+          throw new Error('extractor unavailable');
+        },
+      }
+    );
+
+    assert.deepEqual(resolved, {
+      query: 'Here Comes the Sun by The Beatles',
+      reason: null,
+    });
+  } finally {
+    if (previousOpenAIKey === undefined) delete process.env.OPENAI_API_KEY;
+    else process.env.OPENAI_API_KEY = previousOpenAIKey;
+  }
+});
+
 test('normalizes safe Spotify track display fields', () => {
   const selected = normalizeSpotifyTrack(track());
 
