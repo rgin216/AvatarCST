@@ -97,6 +97,17 @@ test('keeps the music and summary as separate one-minute turns', () => {
   assert.match(summary, /like to remember/);
 });
 
+test('treats Modern Family as the television show', () => {
+  const { step } = getScriptStep('cst_childhood', 15);
+  const opening = step.reply({});
+
+  assert.equal(step.id, 'childhood_modern_family');
+  assert.match(step.prompt, /television show Modern Family/i);
+  assert.match(opening, /television comedy called Modern Family/i);
+  assert.doesNotMatch(opening, /families can look|family life then and now/i);
+  assert.match(step.adaptiveFollowUp.guidance, /characters, stories, or humour/i);
+});
+
 test('converts first-person answers into clean second-person clauses', () => {
   assert.equal(
     toSecondPersonSummaryClause('I loved accounting because I was good at numbers.'),
@@ -128,7 +139,7 @@ test('builds a natural summary without embedding first-person answers', () => {
     },
     {
       stepId: 'childhood_modern_family',
-      answer: 'I think families have become more flexible.',
+      answer: 'I never watched it.',
     },
     {
       stepId: 'childhood_spin_question',
@@ -138,7 +149,7 @@ test('builds a natural summary without embedding first-person answers', () => {
 
   assert.equal(
     summary,
-    "Today, you shared your parents' names, you talked about brothers or sisters, you loved accounting because you were good at numbers, you were a checkout operator at a supermarket called Woolworths, you think families have become more flexible, and you studied as a software engineer and now work at Deloitte."
+    "Today, you shared your parents' names, you talked about brothers or sisters, you loved accounting because you were good at numbers, you were a checkout operator at a supermarket called Woolworths, and you studied as a software engineer and now work at Deloitte."
   );
   assert.doesNotMatch(summary, /\byou (?:remembered|mentioned) I\b/i);
   assert.doesNotMatch(summary, /\.\./);

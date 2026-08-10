@@ -111,10 +111,10 @@ Each segment gives the facilitator's exact scripted direction and how to adapt t
 
 ---
 
-## 16. Modern family
-**You say:** Ask their opinion of the modern family.
+## 16. Modern Family
+**You say:** Ask whether they have seen or heard of the television comedy *Modern Family*. If they have, ask what they think of the show.
 
-**Adapt:** Treat their view as an opinion, not a debate. Reflect the core value they express, such as closeness, support, independence, or change. One respectful follow-up may invite their reason, an example, or a comparison between family life then and now.
+**Adapt:** Keep the discussion about the television show. If they know it, one respectful follow-up may ask about its characters, stories, or humour. If they have not seen it, acknowledge that and optionally ask about another television comedy they remember enjoying; do not ask them to judge a show they have not watched.
 
 ---
 

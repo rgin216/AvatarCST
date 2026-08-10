@@ -556,9 +556,11 @@ const asDeeperSummaryClause = (answer, fallbackPrefix = 'you remembered how') =>
   return `${fallbackPrefix} ${naturalClause}`;
 };
 
+const LOW_VALUE_SUMMARY_ANSWER = /^(?:i\s+)?(?:do(?:n['\u2019]?t| not) know|never heard of it|haven['\u2019]?t heard of it|have not heard of it|never (?:seen|watched) it|no idea|not sure|nothing|okay|ok|yes|no|continue)[.!?]*$/i;
+
 export const buildSessionSummary = (answers = []) => {
   const meaningful = answers
-    .filter((item) => item.answer && !/^ok(?:ay)?$|^yes$|^no$|^continue$/i.test(item.answer));
+    .filter((item) => item.answer && !LOW_VALUE_SUMMARY_ANSWER.test(item.answer.trim()));
 
   const byStep = new Map(meaningful.map((item) => [item.stepId, item]));
   const primaryAnswer = (stepId) => byStep.get(stepId)?.answer || '';
@@ -636,7 +638,6 @@ export const buildSessionSummary = (answers = []) => {
   return `Today, ${highlights.slice(0, -1).join(', ')}, and ${highlights[highlights.length - 1]}.`;
 };
 
-const LOW_VALUE_SUMMARY_ANSWER = /^(?:i\s+)?(?:do(?:n['\u2019]?t| not) know|never heard of it|haven['\u2019]?t heard of it|have not heard of it|never (?:seen|watched) it|no idea|not sure|nothing|okay|ok|yes|no|continue)[.!?]*$/i;
 const FIRST_PERSON_SUMMARY_LANGUAGE = /\b(?:I|I['\u2019](?:m|ve|ll|d)|me|my|mine|myself)\b/i;
 const QUOTE_LIKE_SUMMARY_LANGUAGE = /\byou (?:answered|replied|responded|said|stated)\b/i;
 const SUMMARY_TOPIC_RULES = [

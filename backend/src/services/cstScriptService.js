@@ -354,15 +354,15 @@ const scripts = {
       deckSlide: 16,
       title: 'Modern Family',
       subtitle: 'Your opinion',
-      prompt: 'What is your opinion of the modern family?',
-      bullets: ['Then and now', 'Family changes', 'Your opinion'],
+      prompt: 'Have you seen the television show Modern Family? If so, what do you think of it?',
+      bullets: ['Television comedy', 'Characters and stories', 'Your opinion'],
       visualHint: 'Source deck: NZ02. Getting to Know You (Childhood), slide 16',
       accent: '#7A9DAD',
       adaptiveFollowUp: adaptiveReminiscence(
-        'Invite one respectful reason, value, example, or comparison between family life then and now; do not turn it into a debate.'
+        'If they know the show, invite one thought about its characters, stories, or humour. If they do not know it, acknowledge that and optionally ask about another television comedy they remember enjoying.'
       ),
       reply: () =>
-        'Families can look quite different now compared with years ago. What is your opinion of the modern family?',
+        'There is a television comedy called Modern Family. Have you seen or heard of it? If you have, what do you think of the show?',
     },
     {
       id: 'childhood_about_aria',
