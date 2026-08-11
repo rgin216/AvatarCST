@@ -239,8 +239,8 @@ export const isThemeSongSkipAnswer = (content = '') => {
 };
 
 export const resolveThemeSongSelectionAnswer = (content = '', themeSong = {}) => {
-  const suggestions = Array.isArray(themeSong.suggestions) ? themeSong.suggestions : [];
-  if (themeSong.status !== 'needs-selection' || suggestions.length === 0) return content;
+  const suggestions = Array.isArray(themeSong?.suggestions) ? themeSong.suggestions : [];
+  if (themeSong?.status !== 'needs-selection' || suggestions.length === 0) return content;
 
   const normalized = normalizeAnswer(content);
   const ordinalPatterns = [

@@ -102,6 +102,13 @@ test('lists clean artist suggestions and resolves ordinal or title choices', () 
   );
 });
 
+test('accepts a first-time song choice when no theme-song state exists yet', () => {
+  assert.equal(
+    resolveThemeSongSelectionAnswer('Clementine, I forgot the artist', null),
+    'Clementine, I forgot the artist'
+  );
+});
+
 test('distinguishes ambiguous and missing theme-song searches', () => {
   assert.match(
     buildThemeSongLookupFeedback({ status: 'unavailable', reason: 'ambiguous-query' }),
