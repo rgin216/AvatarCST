@@ -6,6 +6,7 @@ import {
   buildThemeSongLookupFeedback,
   canRequestAdaptiveFollowUp,
   getRetryDecision,
+  extractPreferredNameAnswer,
   inferMemorySuggestions,
   isRecordableSessionAnswer,
   isMusicCompletionAnswer,
@@ -18,7 +19,7 @@ import {
   toSecondPersonSummaryClause,
 } from './sessionOrchestratorService.js';
 import { buildCstAdaptiveTurnInstructions } from './promptService.js';
-import { getScriptStep, renderScriptFollowUp } from './cstScriptService.js';
+import { getScriptStep, renderScriptFollowUp, renderScriptReply } from './cstScriptService.js';
 
 test('does not record the auto-advance protocol as a session answer', () => {
   const sessionAnswers = [{ stepId: 'previous', answer: 'A meaningful memory' }];
@@ -100,6 +101,35 @@ test('lists clean artist suggestions and resolves ordinal or title choices', () 
     resolveThemeSongSelectionAnswer('Japanese Denim', pendingSong),
     'Japanese Denim by Daniel Caesar'
   );
+});
+
+test('asks for a preferred name on Session 1 slide 2 and then moves to location', () => {
+  const nicknameStep = getScriptStep('cst_intro_reminiscence', 1).step;
+  const introductionStep = getScriptStep('cst_intro_reminiscence', 2).step;
+
+  assert.match(renderScriptReply(nicknameStep, { name: 'Ryan' }), /I know your name is Ryan/i);
+  assert.match(renderScriptReply(nicknameStep, { name: 'Ryan' }), /nickname or another name/i);
+  assert.equal(introductionStep.turns, 3);
+  assert.match(renderScriptReply(introductionStep, {}), /Where do you live/i);
+  assert.doesNotMatch(renderScriptReply(introductionStep, {}), /what is your name/i);
+});
+
+test('extracts a clearly stated preferred name without replacing a name that is already fine', () => {
+  assert.equal(extractPreferredNameAnswer('Please call me Ry', 'Ryan'), 'Ry');
+  assert.equal(extractPreferredNameAnswer('My nickname is Ryno', 'Ryan'), 'Ryno');
+  assert.equal(extractPreferredNameAnswer('Ryan is fine', 'Ryan'), '');
+  assert.equal(extractPreferredNameAnswer('No, I do not have a nickname', 'Ryan'), '');
+});
+
+test('Session 1 closing slide includes the discussion recap', () => {
+  const closingStep = getScriptStep('cst_intro_reminiscence', 7).step;
+  const reply = renderScriptReply(closingStep, {
+    sessionSummary: 'Today, you spent time sharing a little about your home and daily life.',
+  });
+
+  assert.match(reply, /Today, you spent time sharing a little about your home and daily life/i);
+  assert.match(reply, /what is one part of today/i);
+  assert.doesNotMatch(reply, /^Ryan,/i);
 });
 
 test('accepts a first-time song choice when no theme-song state exists yet', () => {
@@ -497,6 +527,8 @@ test('requires a null follow-up on steps where adaptive depth is disabled', () =
   });
 
   assert.match(prompt, /No adaptive follow-up is allowed/);
+  assert.match(prompt, /Do not address the person by name/i);
+  assert.match(prompt, /Always acknowledge the latest answer/i);
   assert.match(prompt, /"followUp":null/);
   assert.doesNotMatch(prompt, /"followUp":"What made that especially memorable/);
 });

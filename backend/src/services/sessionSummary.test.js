@@ -43,6 +43,21 @@ test('builds a topic-level fallback without copying conversational answers', () 
   assert.doesNotMatch(summary, /I['’]d|never heard|framerate|blending and shading/i);
 });
 
+test('builds a Session 1 recap from the topics discussed', () => {
+  const summary = buildTopicSessionSummary([
+    { stepId: 'introduce_yourself', answer: 'I live in Auckland with my caretaker' },
+    { stepId: 'what_is_cst', answer: 'That sounds interesting' },
+    { stepId: 'cst_interests', answer: 'Having fun' },
+    { stepId: 'session_themes', answer: 'Food' },
+  ]);
+
+  assert.equal(
+    summary,
+    'Today, you spent time sharing a little about your home and daily life, discussing what CST is and what you would like from it, and looking ahead to future session themes.'
+  );
+  assert.doesNotMatch(summary, /I live|caretaker|Having fun/i);
+});
+
 test('builds up to four paraphrased second-person fallback points', () => {
   const summary = buildTopicSessionSummary([
     { stepId: 'theme_song_choice', answer: 'I chose Blue Moon' },
