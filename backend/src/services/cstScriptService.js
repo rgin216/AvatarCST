@@ -8,6 +8,19 @@ const adaptiveReminiscence = (guidance) => ({
   guidance,
 });
 
+const seatedExerciseInteraction = {
+  type: 'youtubeShort',
+  videoId: 'xVdKRNiAmqI',
+  videoUrl: 'https://www.youtube.com/shorts/xVdKRNiAmqI',
+  completionPrompt: 'When you are finished, press Done, or say or type "done" to continue.',
+};
+
+const spotifySongInteraction = ({ summarizeOnComplete = false } = {}) => ({
+  type: 'spotifySong',
+  playbackSeconds: 60,
+  ...(summarizeOnComplete ? { summarizeOnComplete: true } : {}),
+});
+
 const scripts = {
   cst_intro_reminiscence: [
     {
@@ -254,11 +267,9 @@ const scripts = {
       visualHint: 'Source deck: NZ02. Getting to Know You (Childhood), slide 10',
       accent: '#4472C4',
       interaction: {
-        type: 'youtubeShort',
-        videoId: 'xVdKRNiAmqI',
-        videoUrl: 'https://www.youtube.com/shorts/xVdKRNiAmqI',
-        completionPrompt: 'When you are finished, press Done, or say or type "done" to continue.',
+        ...seatedExerciseInteraction,
       },
+      recordAnswer: false,
       reply: () =>
         'Next is a short seated exercise. Please sit comfortably and safely on a sturdy chair. The video will start after I finish speaking. If it does not, press play. Only do what feels comfortable. When you are finished, press Done, or say or type done.',
     },
@@ -431,10 +442,8 @@ const scripts = {
       bullets: ['Summarise today', 'Theme song'],
       visualHint: 'Source deck: NZ02. Getting to Know You (Childhood), slide 19',
       accent: '#F4C8B0',
-      interaction: {
-        type: 'spotifySong',
-        playbackSeconds: 60,
-      },
+      interaction: spotifySongInteraction({ summarizeOnComplete: true }),
+      recordAnswer: false,
       reply: ({ themeSong }) =>
         themeSong?.status === 'available'
           ? `Before we look back over today, your song, ${themeSong.track.name} by ${themeSong.track.artistLabel}, is ready. It can play for up to one minute. When you have finished listening, press Done, or say or type done.`
@@ -454,6 +463,7 @@ const scripts = {
       bullets: ['Thank you', 'Next session', 'Physical Games'],
       visualHint: 'Source deck: NZ02. Getting to Know You (Childhood), slide 20',
       accent: '#4472C4',
+      recordAnswer: false,
       reply: ({ name }) =>
         `That brings us to the end of today's session, ${name}. Our next session will be Physical Games. Take good care, and I will look forward to seeing you next time.`,
     },
@@ -462,6 +472,9 @@ const scripts = {
 
 export const getScript = (scriptId = 'cst_intro_reminiscence') =>
   scripts[scriptId] || scripts.cst_intro_reminiscence;
+
+export const getScriptStepIndex = (scriptId, stepId) =>
+  getScript(scriptId).findIndex((step) => step.id === stepId);
 
 export const getScriptStep = (scriptId, stepIndex = 0) => {
   const script = getScript(scriptId);

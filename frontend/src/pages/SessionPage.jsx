@@ -217,6 +217,9 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
   const inactivityRequestGenerationRef = useRef(0);
   const activityRevisionRef = useRef(null);
   const assistantTurnRef = useRef(0);
+  const autoAdvanceRequestedSlideRef = useRef(null);
+  const autoAdvanceRetryCountRef = useRef(0);
+  const requestAutomaticSlideAdvanceRef = useRef(null);
   const wheelOptions = slide.interaction?.type === "questionWheel" ? slide.interaction.options || [] : [];
   const hasWheelInteraction = wheelOptions.length > 0;
   const exerciseVideo = slide.interaction?.type === "youtubeShort" ? slide.interaction : null;
@@ -230,10 +233,11 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
   const musicPlaybackDurationLabel = formatPlaybackDuration(musicPlaybackSeconds);
   const musicAwaitingCompletion =
     Boolean(musicInteraction) && musicPlayback?.status !== "complete";
+  const autoAdvanceInteraction = slide.interaction?.type === "autoAdvance";
   const hasSlideInteraction =
     hasWheelInteraction || Boolean(exerciseVideo) || hasPositiveNewsInteraction || Boolean(musicInteraction);
   const landedWheelResult = questionWheel?.status === "landed" ? questionWheel : null;
-  const sessionInputDisabled = typing || wheelResultPending;
+  const sessionInputDisabled = typing || wheelResultPending || autoAdvanceInteraction;
   const wheelSliceDegrees = wheelOptions.length ? 360 / wheelOptions.length : 0;
   const wheelGradient = wheelOptions.length
     ? wheelOptions
@@ -303,6 +307,8 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
       turn.exercisePlayback?.status !== "complete";
     if (slideData.id !== slideIdRef.current) {
       slideIdRef.current = slideData.id;
+      autoAdvanceRequestedSlideRef.current = null;
+      autoAdvanceRetryCountRef.current = 0;
       setWheelSpinning(false);
       wheelResultPendingRef.current = false;
       setWheelResultPending(false);
@@ -483,6 +489,64 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
     setInactivityResetToken((value) => value + 1);
   }
 
+  async function requestAutomaticSlideAdvance() {
+    const currentSlideId = slideIdRef.current;
+    if (
+      !sessionId ||
+      slide.interaction?.type !== "autoAdvance" ||
+      autoAdvanceRequestedSlideRef.current === currentSlideId
+    ) return;
+
+    autoAdvanceRequestedSlideRef.current = currentSlideId;
+    setTyping(true);
+    try {
+      const { data } = await api.post(`/sessions/${sessionId}/respond`, {
+        content: "[[auto-advance]]",
+        avatarMode: avatarModeRef.current,
+        lipSyncMode,
+      });
+      applyTurn(data);
+    } catch (err) {
+      console.error("Failed to advance an automatic slide", err);
+      autoAdvanceRetryCountRef.current += 1;
+      if (autoAdvanceRetryCountRef.current < 3) {
+        window.setTimeout(() => {
+          if (slideIdRef.current === currentSlideId) {
+            autoAdvanceRequestedSlideRef.current = null;
+            setInactivityResetToken((value) => value + 1);
+          }
+        }, 1500);
+      }
+    } finally {
+      setTyping(false);
+    }
+  }
+
+  requestAutomaticSlideAdvanceRef.current = requestAutomaticSlideAdvance;
+
+  useEffect(() => {
+    if (
+      !autoAdvanceInteraction ||
+      typing ||
+      avatarNarrationActive ||
+      pendingPlay ||
+      autoAdvanceRequestedSlideRef.current === slide.id
+    ) return undefined;
+
+    const timer = window.setTimeout(
+      () => requestAutomaticSlideAdvanceRef.current?.(),
+      250
+    );
+    return () => window.clearTimeout(timer);
+  }, [
+    autoAdvanceInteraction,
+    avatarNarrationActive,
+    pendingPlay,
+    slide.id,
+    typing,
+    inactivityResetToken,
+  ]);
+
   useEffect(() => {
     if (inactivityTimeoutRef.current) {
       window.clearTimeout(inactivityTimeoutRef.current);
@@ -500,6 +564,7 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
       (!hasWheelInteraction || Boolean(landedWheelResult)) &&
       !exerciseAwaitingCompletion &&
       !musicAwaitingCompletion &&
+      !autoAdvanceInteraction &&
       !inactivityRemindedRef.current;
     const expectedActivityRevision = activityRevisionRef.current;
     if (!sessionId || !inputExpected || !Number.isInteger(expectedActivityRevision)) {
@@ -580,6 +645,7 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
     landedWheelResult,
     exerciseAwaitingCompletion,
     musicAwaitingCompletion,
+    autoAdvanceInteraction,
     inactivityResetToken,
     lipSyncMode,
   ]);

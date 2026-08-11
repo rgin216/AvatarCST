@@ -3,7 +3,12 @@ import Session from '../models/Session.js';
 import User from '../models/User.js';
 import Memory from '../models/Memory.js';
 import { buildAvatarResponse } from './avatarService.js';
-import { getScriptStep, renderScriptFollowUp, renderScriptReply } from './cstScriptService.js';
+import {
+  getScriptStep,
+  getScriptStepIndex,
+  renderScriptFollowUp,
+  renderScriptReply,
+} from './cstScriptService.js';
 import {
   buildCstAdaptiveResponseInstructions,
   buildCstAdaptiveTurnInstructions,
@@ -207,6 +212,21 @@ const getExpectedOrientationAnswer = (type) => {
   return '';
 };
 
+const getRoutedNextStepIndex = ({ scriptId, step, boundedIndex, totalSteps }) => {
+  let nextStepId = step?.nextStepId;
+  if (step?.seasonBranches) {
+    const expectedSeason = getExpectedOrientationAnswer('season')?.toLowerCase();
+    nextStepId = step.seasonBranches[expectedSeason] || nextStepId;
+  }
+
+  if (nextStepId) {
+    const routedIndex = getScriptStepIndex(scriptId, nextStepId);
+    if (routedIndex >= 0) return routedIndex;
+  }
+
+  return Math.min(boundedIndex + 1, totalSteps - 1);
+};
+
 const isDontKnowAnswer = (content = '') =>
   /\b(don'?t know|not sure|unsure|can't remember|cannot remember|no idea)\b/i.test(content);
 
@@ -265,6 +285,9 @@ const isMusicCompletionProtocol = (content = '') =>
 
 const isVideoCompletionProtocol = (content = '') =>
   /^\[\[video-complete\]\]$/i.test(content.trim());
+
+const isAutoAdvanceProtocol = (content = '') =>
+  /^\[\[auto-advance\]\]$/i.test(content.trim());
 
 const isNaturalMediaCompletionAnswer = (content = '') => {
   const normalized = normalizeAnswer(content);
@@ -353,6 +376,23 @@ export const isNewsElaborationRequest = (content = '') => {
   );
 };
 
+const evaluateAutoAdvance = ({ step, content, effectiveTurnIndex }) => {
+  if (
+    step?.interaction?.type !== 'autoAdvance' ||
+    effectiveTurnIndex !== 1 ||
+    !isAutoAdvanceProtocol(content)
+  ) {
+    return null;
+  }
+
+  return { answered: true, response: '' };
+};
+
+const evaluateAcceptedAnswer = ({ step, content }) =>
+  step?.acceptAnyAnswer && content
+    ? { answered: true, response: '' }
+    : null;
+
 export const buildNewsElaboration = (currentAffairs) => {
   const article = currentAffairs?.status === 'available' ? currentAffairs.article : null;
   if (!article) {
@@ -374,7 +414,7 @@ export const buildNewsElaboration = (currentAffairs) => {
 };
 
 const evaluateNewsElaborationRequest = ({ step, content, currentAffairs }) => {
-  if (step?.id !== 'childhood_current_affairs' || !isNewsElaborationRequest(content)) {
+  if (step?.interaction?.type !== 'positiveNews' || !isNewsElaborationRequest(content)) {
     return null;
   }
 
@@ -492,11 +532,7 @@ const isRecordableSessionAnswer = ({ step, content, wheelEvent }) =>
     content &&
     !wheelEvent &&
     step?.id &&
-    ![
-      'childhood_exercise_follow_along',
-      'childhood_summary_song',
-      'childhood_closing',
-    ].includes(step.id)
+    step.recordAnswer !== false
   );
 
 const toSessionAnswer = ({ step, content }) => ({
@@ -665,6 +701,10 @@ const SUMMARY_TOPIC_RULES = [
     pattern: /\b(?:beach|holiday|journey|trip|travel(?:led|ed)?|visit(?:ed)?)\b/i,
     label: 'recalling places and journeys',
   },
+  {
+    pattern: /\b(?:active|activity|athlete|dance|dancing|exercise|game|olympic|rugby|sport|swim|swimming|team|walk|walking|yoga)\b/i,
+    label: 'exploring sports, movement, and ways of staying active',
+  },
 ];
 
 const isMeaningfulSummaryAnswer = (item = {}) => {
@@ -727,7 +767,6 @@ export const buildTopicSessionSummary = (answers = [], { themeSong = null } = {}
   if (meaningful.some((item) => item.stepId === 'childhood_spin_question')) {
     addTopic('reflecting on a topic from the question wheel');
   }
-
   const selectedTopics = topics.slice(0, 3);
   return selectedTopics.length > 0
     ? `Today, you spent time ${joinSummaryTopics(selectedTopics)}.`
@@ -873,7 +912,7 @@ export const generateSessionSummary = async ({
 };
 
 const renderContextualScriptReply = (step, context) =>
-  step?.id === 'childhood_current_affairs' &&
+  step?.interaction?.type === 'positiveNews' &&
   context?.currentAffairs?.reason === 'no-new-headline'
     ? `There are no new positive New Zealand stories available right now. ${PLEASANT_NEWS_PROMPT}`
     : renderScriptReply(step, context);
@@ -1259,11 +1298,19 @@ export const getSessionTurnContext = async (sessionId, existingSession = null) =
     session.scriptStepIndex || 0
   );
   const slide = toSlide({ step, index: boundedIndex, total: totalSteps });
-  const nextStep = isFinalStep ? null : getScriptStep(session.scriptId, boundedIndex + 1).step;
+  const nextStepIndex = isFinalStep
+    ? boundedIndex
+    : getRoutedNextStepIndex({
+        scriptId: session.scriptId,
+        step,
+        boundedIndex,
+        totalSteps,
+      });
+  const nextStep = isFinalStep ? null : getScriptStep(session.scriptId, nextStepIndex).step;
   const nextSlide = nextStep
     ? toSlide({
         step: nextStep,
-        index: boundedIndex + 1,
+        index: nextStepIndex,
         total: totalSteps,
       })
     : null;
@@ -1376,7 +1423,7 @@ export const getSessionInactivityReminder = async (sessionId, expectedActivityRe
   const expectedLine =
     activeAdaptiveFollowUp?.question ||
     getAskedScriptLine(step, effectiveTurnIndex, scriptContext);
-  const newsQuestion = step.id === 'childhood_current_affairs'
+  const newsQuestion = step.interaction?.type === 'positiveNews'
     ? currentAffairs?.status === 'available'
       ? 'What do you think about that story?'
       : PLEASANT_NEWS_PROMPT
@@ -1414,6 +1461,7 @@ export const respondToSessionTurn = async ({ sessionId, content }) => {
 
   const hasMusicCompletionProtocol = isMusicCompletionProtocol(userContent || '');
   const hasVideoCompletionProtocol = isVideoCompletionProtocol(userContent || '');
+  const hasAutoAdvanceProtocol = isAutoAdvanceProtocol(userContent || '');
   const hasWheelProtocol = isQuestionWheelProtocol(userContent || '');
   const wheelEvent = parseQuestionWheelEvent(userContent || '', step);
   if (hasWheelProtocol && !wheelEvent) {
@@ -1448,6 +1496,14 @@ export const respondToSessionTurn = async ({ sessionId, content }) => {
     err.status = 409;
     throw err;
   }
+  if (
+    hasAutoAdvanceProtocol &&
+    (step.interaction?.type !== 'autoAdvance' || effectiveTurnIndex !== 1)
+  ) {
+    const err = new Error('Automatic slide progression is not expected at this point');
+    err.status = 409;
+    throw err;
+  }
   const currentRetryCount = session.scriptStepRetryCount || 0;
   const llmProvider = getLlmProviderForSession(session);
   const useFastScriptedTurn = isOpenAIFastScriptedPipeline(session.pipelineMode);
@@ -1467,7 +1523,7 @@ export const respondToSessionTurn = async ({ sessionId, content }) => {
   }
 
   let userMessage = null;
-  if (userContent) {
+  if (userContent && !hasAutoAdvanceProtocol) {
     const messageContent = wheelEvent
       ? `Question wheel landed on ${wheelEvent.label}.`
       : hasMusicCompletionProtocol
@@ -1479,7 +1535,7 @@ export const respondToSessionTurn = async ({ sessionId, content }) => {
   }
 
   const needsCurrentAffairs = [step, nextStep].some(
-    (candidate) => candidate?.id === 'childhood_current_affairs'
+    (candidate) => candidate?.interaction?.type === 'positiveNews'
   );
   const previouslyShownNews =
     needsCurrentAffairs && !session.interactionState?.currentAffairs
@@ -1518,9 +1574,11 @@ export const respondToSessionTurn = async ({ sessionId, content }) => {
     userContent: userContent || '',
   });
   let promptedMemoryEntries = [];
-  const isQuestionWheelEvent = Boolean(wheelEvent && step.id === 'childhood_spin_question');
+  const isQuestionWheelEvent = Boolean(
+    wheelEvent && step.interaction?.type === 'questionWheel'
+  );
   const newsElaborationRequested = Boolean(
-    step.id === 'childhood_current_affairs' &&
+    step.interaction?.type === 'positiveNews' &&
     hasDeliveredQuestion &&
     isNewsElaborationRequest(userContent || '')
   );
@@ -1551,6 +1609,13 @@ export const respondToSessionTurn = async ({ sessionId, content }) => {
       step,
       content: userContent,
       effectiveTurnIndex,
+    }) || evaluateAutoAdvance({
+      step,
+      content: userContent,
+      effectiveTurnIndex,
+    }) || evaluateAcceptedAnswer({
+      step,
+      content: userContent,
     }) || evaluateNewsElaborationRequest({
       step,
       content: userContent,
@@ -1641,6 +1706,7 @@ export const respondToSessionTurn = async ({ sessionId, content }) => {
   if (
     hasUserContent &&
     requiresMusicCompletion &&
+    step.interaction?.summarizeOnComplete &&
     (answeredCurrentQuestion || shouldForceProgress)
   ) {
     scriptContext.sessionSummary = await generateSessionSummary({
@@ -1692,7 +1758,7 @@ export const respondToSessionTurn = async ({ sessionId, content }) => {
     : 'answered';
 
   let assistantText = scriptedNextLine;
-  if (userContent && !adaptiveText && !isQuestionWheelEvent) {
+  if (userContent && !adaptiveText && !isQuestionWheelEvent && !hasAutoAdvanceProtocol) {
     promptedMemoryEntries = selectedMemoryEntries;
     const systemPrompt = buildCstAdaptiveResponseInstructions({
       user,
@@ -1716,7 +1782,7 @@ export const respondToSessionTurn = async ({ sessionId, content }) => {
     });
   }
 
-  if (userContent) {
+  if (userContent && !hasAutoAdvanceProtocol) {
     if (hasSubstantialSpeechOverlap(adaptiveText, scriptedNextLine)) {
       adaptiveText = '';
     }
@@ -1724,7 +1790,7 @@ export const respondToSessionTurn = async ({ sessionId, content }) => {
   }
 
   const assistantMessage = await Message.create({ sessionId, role: 'assistant', content: assistantText });
-  const nextStepIndex = shouldAdvance ? boundedIndex + 1 : boundedIndex;
+  const nextStepIndex = shouldAdvance ? nextSlide.index : boundedIndex;
   const nextTurnIndex = !hasUserContent
     ? Math.max(currentTurnIndex, 1)
     : shouldRepeatQuestion
@@ -1779,7 +1845,7 @@ export const respondToSessionTurn = async ({ sessionId, content }) => {
   } else {
     delete nextInteractionState.questionWheel;
   }
-  if (displaySlide.id === 'childhood_current_affairs') {
+  if (displaySlide.interaction?.type === 'positiveNews') {
     nextInteractionState.currentAffairs = currentAffairs;
     const newsUrl = currentAffairs?.status === 'available' ? currentAffairs.article?.url : null;
     const newsTitle = currentAffairs?.status === 'available' ? currentAffairs.article?.title : null;
@@ -1799,7 +1865,7 @@ export const respondToSessionTurn = async ({ sessionId, content }) => {
   } else {
     delete nextInteractionState.exercisePlayback;
   }
-  if (displaySlide.id === 'childhood_summary_song') {
+  if (displaySlide.interaction?.type === 'spotifySong') {
     nextInteractionState.musicPlayback =
       !hasUserContent && currentTurnIndex === 0
         ? { status: 'awaiting-completion' }
@@ -1811,7 +1877,10 @@ export const respondToSessionTurn = async ({ sessionId, content }) => {
   } else {
     delete nextInteractionState.musicPlayback;
   }
-  if (step.id === 'childhood_summary_song' && displaySlide.id !== 'childhood_summary_song') {
+  if (
+    step.interaction?.summarizeOnComplete &&
+    displaySlide.id !== step.id
+  ) {
     delete nextInteractionState.sessionAnswers;
   }
   session.interactionState = nextInteractionState;
@@ -1823,7 +1892,7 @@ export const respondToSessionTurn = async ({ sessionId, content }) => {
       userId: session.userId,
       sessionId: session._id,
       suggestions:
-        wheelEvent || hasMusicCompletionProtocol || hasVideoCompletionProtocol || !answeredCurrentQuestion
+        wheelEvent || hasMusicCompletionProtocol || hasVideoCompletionProtocol || hasAutoAdvanceProtocol || !answeredCurrentQuestion
           ? []
           : inferMemorySuggestions(userContent),
     });
@@ -1850,14 +1919,14 @@ export const respondToSessionTurn = async ({ sessionId, content }) => {
       total: totalSteps,
     },
     slide: displaySlide,
-    currentAffairs: displaySlide.id === 'childhood_current_affairs' ? currentAffairs : null,
+    currentAffairs: displaySlide.interaction?.type === 'positiveNews' ? currentAffairs : null,
     exercisePlayback:
       displaySlide.interaction?.type === 'youtubeShort'
         ? session.interactionState?.exercisePlayback || null
         : null,
-    themeSong: displaySlide.id === 'childhood_summary_song' ? themeSong : null,
+    themeSong: displaySlide.interaction?.type === 'spotifySong' ? themeSong : null,
     musicPlayback:
-      displaySlide.id === 'childhood_summary_song'
+      displaySlide.interaction?.type === 'spotifySong'
         ? session.interactionState?.musicPlayback || null
         : null,
     questionWheel: session.interactionState?.questionWheel || null,
