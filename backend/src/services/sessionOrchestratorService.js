@@ -527,10 +527,11 @@ const parseQuestionWheelEvent = (content = '', step = null) => {
   }
 };
 
-const isRecordableSessionAnswer = ({ step, content, wheelEvent }) =>
+export const isRecordableSessionAnswer = ({ step, content, wheelEvent }) =>
   Boolean(
     content &&
     !wheelEvent &&
+    !isAutoAdvanceProtocol(content) &&
     step?.id &&
     step.recordAnswer !== false
   );
@@ -600,7 +601,10 @@ export const buildSessionSummary = (answers = []) => {
 
   const byStep = new Map(meaningful.map((item) => [item.stepId, item]));
   const primaryAnswer = (stepId) => byStep.get(stepId)?.answer || '';
-  const deeperAnswer = (stepId) => byStep.get(stepId)?.adaptiveFollowUp?.answer || '';
+  const deeperAnswer = (stepId) => {
+    const answer = byStep.get(stepId)?.adaptiveFollowUp?.answer?.trim() || '';
+    return answer && !LOW_VALUE_SUMMARY_ANSWER.test(answer) ? answer : '';
+  };
   const highlights = [];
 
   if (byStep.has('theme_song_choice')) {
@@ -767,7 +771,7 @@ export const buildTopicSessionSummary = (answers = [], { themeSong = null } = {}
   if (meaningful.some((item) => item.stepId === 'childhood_spin_question')) {
     addTopic('reflecting on a topic from the question wheel');
   }
-  const selectedTopics = topics.slice(0, 3);
+  const selectedTopics = topics.slice(0, 4);
   return selectedTopics.length > 0
     ? `Today, you spent time ${joinSummaryTopics(selectedTopics)}.`
     : 'Today, you explored a few memories and ideas together.';
@@ -875,7 +879,7 @@ export const generateSessionSummary = async ({
           content: [
             'Create a brief, warm recap of a Cognitive Stimulation Therapy session.',
             'Return only one or two sentences beginning exactly with "Today, you".',
-            'Summarise at most three topics, memories, interests, or ideas at a high level.',
+            'Summarise three or four topics, memories, interests, or ideas at a high level when that many meaningful points are available; otherwise include only the meaningful points provided.',
             'Paraphrase; never quote or closely copy a participant response.',
             'Do not use first-person words such as I, me, or my, including inside a song title.',
             'Do not mention acknowledgements, uncertainty, refusals, media controls, or answers such as yes, no, or never heard of it.',
@@ -931,6 +935,17 @@ const getProgressScriptLine = ({ step, nextStep, currentTurnIndex, stepTurns, co
 const hasPriorAssistantTurn = (messages = []) => messages.some((message) => message.role === 'assistant');
 
 const ACTIVE_SESSION_STATUSES = ['active', 'pending'];
+const sessionWriteQueues = new Map();
+
+const serializeSessionWrite = (sessionId, operation) => {
+  const key = String(sessionId);
+  const previous = sessionWriteQueues.get(key) || Promise.resolve();
+  const queued = previous.catch(() => undefined).then(operation);
+  sessionWriteQueues.set(key, queued);
+  return queued.finally(() => {
+    if (sessionWriteQueues.get(key) === queued) sessionWriteQueues.delete(key);
+  });
+};
 
 const assertCanUseSession = (session, action) => {
   if (ACTIVE_SESSION_STATUSES.includes(session.status)) return;
@@ -940,7 +955,7 @@ const assertCanUseSession = (session, action) => {
   throw err;
 };
 
-const registerSessionActivity = async (sessionId) => {
+const registerSessionActivityWrite = async (sessionId) => {
   const session = await Session.findOneAndUpdate(
     { _id: sessionId, status: { $in: ACTIVE_SESSION_STATUSES } },
     { $inc: { activityRevision: 1 } },
@@ -959,6 +974,9 @@ const registerSessionActivity = async (sessionId) => {
   err.status = 409;
   throw err;
 };
+
+export const registerSessionActivity = (sessionId) =>
+  serializeSessionWrite(sessionId, () => registerSessionActivityWrite(sessionId));
 
 const getLlmProviderForSession = (session) =>
   usesOpenAITextPipeline(session.pipelineMode) ? 'openai' : 'groq';
@@ -1371,7 +1389,7 @@ export const buildInactivityReminderText = (question = '') => {
   );
 };
 
-export const getSessionInactivityReminder = async (sessionId, expectedActivityRevision) => {
+const getSessionInactivityReminderWrite = async (sessionId, expectedActivityRevision) => {
   const activityRevision = Number(expectedActivityRevision);
   if (!Number.isInteger(activityRevision) || activityRevision < 0) {
     const err = new Error('A valid activity revision is required');
@@ -1387,7 +1405,7 @@ export const getSessionInactivityReminder = async (sessionId, expectedActivityRe
       lastReminderRevision: { $ne: activityRevision },
     },
     { $set: { lastReminderRevision: activityRevision } },
-    { new: true }
+    { new: false }
   );
   if (!claimedSession) {
     const currentSession = await Session.findById(sessionId)
@@ -1404,41 +1422,54 @@ export const getSessionInactivityReminder = async (sessionId, expectedActivityRe
     throw err;
   }
 
-  const context = await getSessionTurnContext(sessionId, claimedSession);
-  const { session, user, recentMessages, step } = context;
-  assertCanUseSession(session, 'respond');
+  let context;
+  let assistantText;
+  let assistantMessage;
+  try {
+    context = await getSessionTurnContext(sessionId, claimedSession);
+    const { session, user, recentMessages, step } = context;
+    assertCanUseSession(session, 'respond');
 
-  const currentTurnIndex = session.scriptStepTurnIndex || 0;
-  const effectiveTurnIndex = currentTurnIndex || (hasPriorAssistantTurn(recentMessages) ? 1 : 0);
-  const persistedAdaptiveFollowUp = session.interactionState?.adaptiveFollowUp;
-  const activeAdaptiveFollowUp =
-    persistedAdaptiveFollowUp?.stepId === step.id ? persistedAdaptiveFollowUp : null;
-  const currentAffairs = session.interactionState?.currentAffairs || null;
-  const scriptContext = {
-    name: getDisplayName(user),
-    wheelQuestion: session.interactionState?.questionWheel?.question,
-    currentAffairs,
-    themeSong: getThemeSongForSession(session, user),
-  };
-  const expectedLine =
-    activeAdaptiveFollowUp?.question ||
-    getAskedScriptLine(step, effectiveTurnIndex, scriptContext);
-  const newsQuestion = step.interaction?.type === 'positiveNews'
-    ? currentAffairs?.status === 'available'
-      ? 'What do you think about that story?'
-      : PLEASANT_NEWS_PROMPT
-    : '';
-  const question =
-    newsQuestion ||
-    extractLastQuestion(expectedLine) ||
-    extractLastQuestion(step.prompt) ||
-    step.prompt;
-  const assistantText = buildInactivityReminderText(question);
-  const assistantMessage = await Message.create({
-    sessionId,
-    role: 'assistant',
-    content: assistantText,
-  });
+    const currentTurnIndex = session.scriptStepTurnIndex || 0;
+    const effectiveTurnIndex = currentTurnIndex || (hasPriorAssistantTurn(recentMessages) ? 1 : 0);
+    const persistedAdaptiveFollowUp = session.interactionState?.adaptiveFollowUp;
+    const activeAdaptiveFollowUp =
+      persistedAdaptiveFollowUp?.stepId === step.id ? persistedAdaptiveFollowUp : null;
+    const currentAffairs = session.interactionState?.currentAffairs || null;
+    const scriptContext = {
+      name: getDisplayName(user),
+      wheelQuestion: session.interactionState?.questionWheel?.question,
+      currentAffairs,
+      themeSong: getThemeSongForSession(session, user),
+    };
+    const expectedLine =
+      activeAdaptiveFollowUp?.question ||
+      getAskedScriptLine(step, effectiveTurnIndex, scriptContext);
+    const newsQuestion = step.interaction?.type === 'positiveNews'
+      ? currentAffairs?.status === 'available'
+        ? 'What do you think about that story?'
+        : PLEASANT_NEWS_PROMPT
+      : '';
+    const question =
+      newsQuestion ||
+      extractLastQuestion(expectedLine) ||
+      extractLastQuestion(step.prompt) ||
+      step.prompt;
+    assistantText = buildInactivityReminderText(question);
+    assistantMessage = await Message.create({
+      sessionId,
+      role: 'assistant',
+      content: assistantText,
+    });
+  } catch (err) {
+    await Session.updateOne(
+      { _id: sessionId, activityRevision, lastReminderRevision: activityRevision },
+      { $set: { lastReminderRevision: claimedSession.lastReminderRevision ?? -1 } }
+    );
+    throw err;
+  }
+
+  const { session } = context;
 
   return {
     sessionId: session._id,
@@ -1451,11 +1482,16 @@ export const getSessionInactivityReminder = async (sessionId, expectedActivityRe
   };
 };
 
+export const getSessionInactivityReminder = (sessionId, expectedActivityRevision) =>
+  serializeSessionWrite(sessionId, () =>
+    getSessionInactivityReminderWrite(sessionId, expectedActivityRevision)
+  );
+
 // TODO: wrap writes in a MongoDB transaction when upgrading to Atlas M10+ (replica set required)
-export const respondToSessionTurn = async ({ sessionId, content }) => {
+const respondToSessionTurnWrite = async ({ sessionId, content }) => {
   const userContent = content?.trim();
 
-  const activitySession = await registerSessionActivity(sessionId);
+  const activitySession = await registerSessionActivityWrite(sessionId);
   const context = await getSessionTurnContext(sessionId, activitySession);
   const { session, user, memoryEntries, recentMessages, step, nextStep, slide, nextSlide, boundedIndex, isFinalStep, totalSteps } = context;
 
@@ -1945,3 +1981,6 @@ export const respondToSessionTurn = async ({ sessionId, content }) => {
     suggestedMemoryUpdates,
   };
 };
+
+export const respondToSessionTurn = ({ sessionId, content }) =>
+  serializeSessionWrite(sessionId, () => respondToSessionTurnWrite({ sessionId, content }));

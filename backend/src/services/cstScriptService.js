@@ -365,15 +365,15 @@ const scripts = {
       deckSlide: 16,
       title: 'Modern Family',
       subtitle: 'Your opinion',
-      prompt: 'Have you seen the television show Modern Family? If so, what do you think of it?',
+      prompt: 'Have you seen the television show Modern Family, or have you only heard of it? If you have seen it, what did you think of it? If not, is there another television comedy you remember enjoying?',
       bullets: ['Television comedy', 'Characters and stories', 'Your opinion'],
       visualHint: 'Source deck: NZ02. Getting to Know You (Childhood), slide 16',
       accent: '#7A9DAD',
       adaptiveFollowUp: adaptiveReminiscence(
-        'If they know the show, invite one thought about its characters, stories, or humour. If they do not know it, acknowledge that and optionally ask about another television comedy they remember enjoying.'
+        'Distinguish viewers from people who have only heard of the show. Only ask viewers about its characters, stories, or humour. For non-viewers, acknowledge that gently and optionally invite another television comedy they remember enjoying.'
       ),
       reply: () =>
-        'There is a television comedy called Modern Family. Have you seen or heard of it? If you have, what do you think of the show?',
+        'There is a television comedy called Modern Family. Have you seen it, or have you only heard of it? If you have seen it, what did you think? If not, is there another television comedy you remember enjoying?',
     },
     {
       id: 'childhood_about_aria',

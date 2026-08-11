@@ -6,6 +6,7 @@ import {
   canRequestAdaptiveFollowUp,
   getRetryDecision,
   inferMemorySuggestions,
+  isRecordableSessionAnswer,
   isMusicCompletionAnswer,
   isNewsElaborationRequest,
   isVideoCompletionAnswer,
@@ -15,6 +16,17 @@ import {
 } from './sessionOrchestratorService.js';
 import { buildCstAdaptiveTurnInstructions } from './promptService.js';
 import { getScriptStep, renderScriptFollowUp } from './cstScriptService.js';
+
+test('does not record the auto-advance protocol as a session answer', () => {
+  const sessionAnswers = [{ stepId: 'previous', answer: 'A meaningful memory' }];
+  const step = { id: 'automatic_transition', interaction: { type: 'autoAdvance' } };
+
+  if (isRecordableSessionAnswer({ step, content: '[[auto-advance]]', wheelEvent: null })) {
+    sessionAnswers.push({ stepId: step.id, answer: '[[auto-advance]]' });
+  }
+
+  assert.deepEqual(sessionAnswers, [{ stepId: 'previous', answer: 'A meaningful memory' }]);
+});
 
 test('recognises button, typed, and spoken music completion answers', () => {
   for (const answer of [
@@ -103,9 +115,13 @@ test('treats Modern Family as the television show', () => {
 
   assert.equal(step.id, 'childhood_modern_family');
   assert.match(step.prompt, /television show Modern Family/i);
+  assert.match(step.prompt, /only heard of it/i);
   assert.match(opening, /television comedy called Modern Family/i);
+  assert.match(opening, /If you have seen it, what did you think/i);
+  assert.match(opening, /another television comedy you remember enjoying/i);
   assert.doesNotMatch(opening, /families can look|family life then and now/i);
   assert.match(step.adaptiveFollowUp.guidance, /characters, stories, or humour/i);
+  assert.match(step.adaptiveFollowUp.guidance, /Only ask viewers/i);
 });
 
 test('converts first-person answers into clean second-person clauses', () => {
@@ -171,6 +187,22 @@ test('prefers a richer adaptive follow-up memory in the session summary', () => 
     summary,
     'Today, you remembered how your grandmother made roast lamb, and the smell filled the whole house.'
   );
+});
+
+test('keeps a meaningful initial answer when an adaptive follow-up is low-value', () => {
+  const summary = buildSessionSummary([
+    {
+      stepId: 'childhood_birthplace',
+      answer: 'I grew up near the harbour in Wellington.',
+      adaptiveFollowUp: {
+        question: 'What do you remember most clearly?',
+        answer: "  I don't know.  ",
+      },
+    },
+  ]);
+
+  assert.match(summary, /grew up near the harbour in Wellington/i);
+  assert.doesNotMatch(summary, /don['’]t know/i);
 });
 
 test('retains early named highlights in a full session summary', () => {
