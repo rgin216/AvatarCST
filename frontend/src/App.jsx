@@ -35,6 +35,12 @@ const TEST_SESSIONS = [
     title: "Getting to Know You: Childhood",
     theme: "Childhood",
   },
+  {
+    id: "cst_physical_games",
+    label: "Session 3",
+    title: "Physical Games",
+    theme: "Physical Games",
+  },
 ];
 
 export default function App() {

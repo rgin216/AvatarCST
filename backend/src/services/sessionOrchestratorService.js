@@ -71,6 +71,10 @@ const ORIENTATION_STEP_TYPES = {
   childhood_orientation_month: 'month',
   childhood_orientation_year: 'year',
   childhood_orientation_season: 'season',
+  physical_games_orientation_day: 'weekday',
+  physical_games_orientation_month: 'month',
+  physical_games_orientation_year: 'year',
+  physical_games_orientation_season: 'season',
 };
 const SEASON_BY_MONTH = [
   'summer',
@@ -767,6 +771,13 @@ export const buildTopicSessionSummary = (answers = [], { themeSong = null } = {}
   if (meaningful.some((item) => item.stepId === 'childhood_spin_question')) {
     addTopic('reflecting on a topic from the question wheel');
   }
+  if (meaningful.some((item) => item.stepId === 'physical_games_scattergories')) {
+    addTopic('playing a physical-games word activity');
+  }
+  if (meaningful.some((item) => item.stepId === 'physical_games_spin_question')) {
+    addTopic('reflecting on a physical-games question from the wheel');
+  }
+
   const selectedTopics = topics.slice(0, 3);
   return selectedTopics.length > 0
     ? `Today, you spent time ${joinSummaryTopics(selectedTopics)}.`
