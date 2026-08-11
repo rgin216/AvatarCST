@@ -234,6 +234,81 @@ const getRoutedNextStepIndex = ({ scriptId, step, boundedIndex, totalSteps }) =>
 const isDontKnowAnswer = (content = '') =>
   /\b(don'?t know|not sure|unsure|can't remember|cannot remember|no idea)\b/i.test(content);
 
+export const isThemeSongSkipAnswer = (content = '') => {
+  const normalized = normalizeAnswer(content);
+  return Boolean(
+    isDontKnowAnswer(content) ||
+    /^(?:skip|no thanks|not today|none|no song|i (?:do not|don t|would not|wouldn t) (?:have|want|choose) (?:a |any )?song)$/i.test(normalized)
+  );
+};
+
+export const resolveThemeSongSelectionAnswer = (content = '', themeSong = {}) => {
+  const suggestions = Array.isArray(themeSong.suggestions) ? themeSong.suggestions : [];
+  if (themeSong.status !== 'needs-selection' || suggestions.length === 0) return content;
+
+  const normalized = normalizeAnswer(content);
+  const ordinalPatterns = [
+    /\b(?:first|1st|number one|number 1|option one|option 1)\b/,
+    /\b(?:second|two|2nd|number 2|option 2)\b/,
+    /\b(?:third|three|3rd|number 3|option 3)\b/,
+  ];
+  let selectedIndex = ordinalPatterns.findIndex((pattern) => pattern.test(normalized));
+
+  if (selectedIndex < 0) {
+    selectedIndex = suggestions.findIndex((suggestion) => {
+      const songName = normalizeAnswer(suggestion?.name || '');
+      return songName && (normalized.includes(songName) || (
+        normalized.length >= 3 && songName.includes(normalized)
+      ));
+    });
+  }
+
+  const selected = suggestions[selectedIndex];
+  if (!selected?.name) return content;
+  return selected.artistLabel
+    ? `${selected.name} by ${selected.artistLabel}`
+    : selected.name;
+};
+
+export const buildThemeSongLookupFeedback = (themeSong = {}) => {
+  if (themeSong.status === 'available' && themeSong.track) {
+    return `I found ${themeSong.track.name} by ${themeSong.track.artistLabel}. I will keep it ready to play near the end of our session.`;
+  }
+
+  if (themeSong.status === 'needs-selection' && Array.isArray(themeSong.suggestions)) {
+    const ordinalLabels = ['first', 'second', 'third'];
+    const choices = themeSong.suggestions
+      .slice(0, ordinalLabels.length)
+      .map((track, index) => `${ordinalLabels[index]}, ${track.name}`)
+      .join('; ');
+    if (choices) {
+      return `I found a few clean songs by ${themeSong.artist || 'that artist'}: ${choices}. Which one would you like? You can say the song title, or first, second, or third.`;
+    }
+  }
+
+  if (themeSong.reason === 'skipped') {
+    return 'No problem. We can continue without a theme song today.';
+  }
+
+  if (themeSong.reason === 'explicit-content' && themeSong.candidate) {
+    return `I found ${themeSong.candidate.name} by ${themeSong.candidate.artistLabel}, but Spotify marks it as explicit, so I cannot play it in this session. Please choose another song, or say skip.`;
+  }
+
+  if (themeSong.reason === 'ambiguous-query' || themeSong.reason === 'missing-query') {
+    return 'I could not identify a specific song title. Please tell me the song name, and the artist if you know it, or say skip.';
+  }
+
+  if (themeSong.reason === 'no-match') {
+    return `I could not find a safe Spotify match for ${themeSong.query || 'that song'}. Please check the title or artist, choose another song, or say skip.`;
+  }
+
+  if (themeSong.reason === 'not-configured' || themeSong.reason === 'request-failed') {
+    return 'I could not reach Spotify to prepare that song right now. You can try another song, or say skip.';
+  }
+
+  return 'I could not prepare that song. Please choose another song, or say skip.';
+};
+
 const isCorrectOrientationAnswer = (content = '', expected = '') => {
   const normalized = normalizeAnswer(content);
   const normalizedExpected = normalizeAnswer(expected);
@@ -397,6 +472,11 @@ const evaluateAcceptedAnswer = ({ step, content }) =>
     ? { answered: true, response: '' }
     : null;
 
+const evaluateThemeSongChoiceAnswer = ({ step, content }) =>
+  step?.id === 'theme_song_choice' && content
+    ? { answered: true, response: '' }
+    : null;
+
 export const buildNewsElaboration = (currentAffairs) => {
   const article = currentAffairs?.status === 'available' ? currentAffairs.article : null;
   if (!article) {
@@ -531,10 +611,11 @@ const parseQuestionWheelEvent = (content = '', step = null) => {
   }
 };
 
-const isRecordableSessionAnswer = ({ step, content, wheelEvent }) =>
+export const isRecordableSessionAnswer = ({ step, content, wheelEvent }) =>
   Boolean(
     content &&
     !wheelEvent &&
+    !isAutoAdvanceProtocol(content) &&
     step?.id &&
     step.recordAnswer !== false
   );
@@ -604,7 +685,10 @@ export const buildSessionSummary = (answers = []) => {
 
   const byStep = new Map(meaningful.map((item) => [item.stepId, item]));
   const primaryAnswer = (stepId) => byStep.get(stepId)?.answer || '';
-  const deeperAnswer = (stepId) => byStep.get(stepId)?.adaptiveFollowUp?.answer || '';
+  const deeperAnswer = (stepId) => {
+    const answer = byStep.get(stepId)?.adaptiveFollowUp?.answer?.trim() || '';
+    return answer && !LOW_VALUE_SUMMARY_ANSWER.test(answer) ? answer : '';
+  };
   const highlights = [];
 
   if (byStep.has('theme_song_choice')) {
@@ -778,7 +862,7 @@ export const buildTopicSessionSummary = (answers = [], { themeSong = null } = {}
     addTopic('reflecting on a physical-games question from the wheel');
   }
 
-  const selectedTopics = topics.slice(0, 3);
+  const selectedTopics = topics.slice(0, 4);
   return selectedTopics.length > 0
     ? `Today, you spent time ${joinSummaryTopics(selectedTopics)}.`
     : 'Today, you explored a few memories and ideas together.';
@@ -886,7 +970,7 @@ export const generateSessionSummary = async ({
           content: [
             'Create a brief, warm recap of a Cognitive Stimulation Therapy session.',
             'Return only one or two sentences beginning exactly with "Today, you".',
-            'Summarise at most three topics, memories, interests, or ideas at a high level.',
+            'Summarise three or four topics, memories, interests, or ideas at a high level when that many meaningful points are available; otherwise include only the meaningful points provided.',
             'Paraphrase; never quote or closely copy a participant response.',
             'Do not use first-person words such as I, me, or my, including inside a song title.',
             'Do not mention acknowledgements, uncertainty, refusals, media controls, or answers such as yes, no, or never heard of it.',
@@ -942,6 +1026,17 @@ const getProgressScriptLine = ({ step, nextStep, currentTurnIndex, stepTurns, co
 const hasPriorAssistantTurn = (messages = []) => messages.some((message) => message.role === 'assistant');
 
 const ACTIVE_SESSION_STATUSES = ['active', 'pending'];
+const sessionWriteQueues = new Map();
+
+const serializeSessionWrite = (sessionId, operation) => {
+  const key = String(sessionId);
+  const previous = sessionWriteQueues.get(key) || Promise.resolve();
+  const queued = previous.catch(() => undefined).then(operation);
+  sessionWriteQueues.set(key, queued);
+  return queued.finally(() => {
+    if (sessionWriteQueues.get(key) === queued) sessionWriteQueues.delete(key);
+  });
+};
 
 const assertCanUseSession = (session, action) => {
   if (ACTIVE_SESSION_STATUSES.includes(session.status)) return;
@@ -951,7 +1046,7 @@ const assertCanUseSession = (session, action) => {
   throw err;
 };
 
-const registerSessionActivity = async (sessionId) => {
+const registerSessionActivityWrite = async (sessionId) => {
   const session = await Session.findOneAndUpdate(
     { _id: sessionId, status: { $in: ACTIVE_SESSION_STATUSES } },
     { $inc: { activityRevision: 1 } },
@@ -970,6 +1065,9 @@ const registerSessionActivity = async (sessionId) => {
   err.status = 409;
   throw err;
 };
+
+export const registerSessionActivity = (sessionId) =>
+  serializeSessionWrite(sessionId, () => registerSessionActivityWrite(sessionId));
 
 const getLlmProviderForSession = (session) =>
   usesOpenAITextPipeline(session.pipelineMode) ? 'openai' : 'groq';
@@ -1382,7 +1480,7 @@ export const buildInactivityReminderText = (question = '') => {
   );
 };
 
-export const getSessionInactivityReminder = async (sessionId, expectedActivityRevision) => {
+const getSessionInactivityReminderWrite = async (sessionId, expectedActivityRevision) => {
   const activityRevision = Number(expectedActivityRevision);
   if (!Number.isInteger(activityRevision) || activityRevision < 0) {
     const err = new Error('A valid activity revision is required');
@@ -1398,7 +1496,7 @@ export const getSessionInactivityReminder = async (sessionId, expectedActivityRe
       lastReminderRevision: { $ne: activityRevision },
     },
     { $set: { lastReminderRevision: activityRevision } },
-    { new: true }
+    { new: false }
   );
   if (!claimedSession) {
     const currentSession = await Session.findById(sessionId)
@@ -1415,41 +1513,54 @@ export const getSessionInactivityReminder = async (sessionId, expectedActivityRe
     throw err;
   }
 
-  const context = await getSessionTurnContext(sessionId, claimedSession);
-  const { session, user, recentMessages, step } = context;
-  assertCanUseSession(session, 'respond');
+  let context;
+  let assistantText;
+  let assistantMessage;
+  try {
+    context = await getSessionTurnContext(sessionId, claimedSession);
+    const { session, user, recentMessages, step } = context;
+    assertCanUseSession(session, 'respond');
 
-  const currentTurnIndex = session.scriptStepTurnIndex || 0;
-  const effectiveTurnIndex = currentTurnIndex || (hasPriorAssistantTurn(recentMessages) ? 1 : 0);
-  const persistedAdaptiveFollowUp = session.interactionState?.adaptiveFollowUp;
-  const activeAdaptiveFollowUp =
-    persistedAdaptiveFollowUp?.stepId === step.id ? persistedAdaptiveFollowUp : null;
-  const currentAffairs = session.interactionState?.currentAffairs || null;
-  const scriptContext = {
-    name: getDisplayName(user),
-    wheelQuestion: session.interactionState?.questionWheel?.question,
-    currentAffairs,
-    themeSong: getThemeSongForSession(session, user),
-  };
-  const expectedLine =
-    activeAdaptiveFollowUp?.question ||
-    getAskedScriptLine(step, effectiveTurnIndex, scriptContext);
-  const newsQuestion = step.interaction?.type === 'positiveNews'
-    ? currentAffairs?.status === 'available'
-      ? 'What do you think about that story?'
-      : PLEASANT_NEWS_PROMPT
-    : '';
-  const question =
-    newsQuestion ||
-    extractLastQuestion(expectedLine) ||
-    extractLastQuestion(step.prompt) ||
-    step.prompt;
-  const assistantText = buildInactivityReminderText(question);
-  const assistantMessage = await Message.create({
-    sessionId,
-    role: 'assistant',
-    content: assistantText,
-  });
+    const currentTurnIndex = session.scriptStepTurnIndex || 0;
+    const effectiveTurnIndex = currentTurnIndex || (hasPriorAssistantTurn(recentMessages) ? 1 : 0);
+    const persistedAdaptiveFollowUp = session.interactionState?.adaptiveFollowUp;
+    const activeAdaptiveFollowUp =
+      persistedAdaptiveFollowUp?.stepId === step.id ? persistedAdaptiveFollowUp : null;
+    const currentAffairs = session.interactionState?.currentAffairs || null;
+    const scriptContext = {
+      name: getDisplayName(user),
+      wheelQuestion: session.interactionState?.questionWheel?.question,
+      currentAffairs,
+      themeSong: getThemeSongForSession(session, user),
+    };
+    const expectedLine =
+      activeAdaptiveFollowUp?.question ||
+      getAskedScriptLine(step, effectiveTurnIndex, scriptContext);
+    const newsQuestion = step.interaction?.type === 'positiveNews'
+      ? currentAffairs?.status === 'available'
+        ? 'What do you think about that story?'
+        : PLEASANT_NEWS_PROMPT
+      : '';
+    const question =
+      newsQuestion ||
+      extractLastQuestion(expectedLine) ||
+      extractLastQuestion(step.prompt) ||
+      step.prompt;
+    assistantText = buildInactivityReminderText(question);
+    assistantMessage = await Message.create({
+      sessionId,
+      role: 'assistant',
+      content: assistantText,
+    });
+  } catch (err) {
+    await Session.updateOne(
+      { _id: sessionId, activityRevision, lastReminderRevision: activityRevision },
+      { $set: { lastReminderRevision: claimedSession.lastReminderRevision ?? -1 } }
+    );
+    throw err;
+  }
+
+  const { session } = context;
 
   return {
     sessionId: session._id,
@@ -1462,11 +1573,16 @@ export const getSessionInactivityReminder = async (sessionId, expectedActivityRe
   };
 };
 
+export const getSessionInactivityReminder = (sessionId, expectedActivityRevision) =>
+  serializeSessionWrite(sessionId, () =>
+    getSessionInactivityReminderWrite(sessionId, expectedActivityRevision)
+  );
+
 // TODO: wrap writes in a MongoDB transaction when upgrading to Atlas M10+ (replica set required)
-export const respondToSessionTurn = async ({ sessionId, content }) => {
+const respondToSessionTurnWrite = async ({ sessionId, content }) => {
   const userContent = content?.trim();
 
-  const activitySession = await registerSessionActivity(sessionId);
+  const activitySession = await registerSessionActivityWrite(sessionId);
   const context = await getSessionTurnContext(sessionId, activitySession);
   const { session, user, memoryEntries, recentMessages, step, nextStep, slide, nextSlide, boundedIndex, isFinalStep, totalSteps } = context;
 
@@ -1624,6 +1740,9 @@ export const respondToSessionTurn = async ({ sessionId, content }) => {
       step,
       content: userContent,
       effectiveTurnIndex,
+    }) || evaluateThemeSongChoiceAnswer({
+      step,
+      content: userContent,
     }) || evaluateAcceptedAnswer({
       step,
       content: userContent,
@@ -1667,13 +1786,15 @@ export const respondToSessionTurn = async ({ sessionId, content }) => {
       answeredCurrentQuestion && allowAdaptiveFollowUp ? adaptiveTurn.followUp : null;
   }
 
+  let themeSongFeedback = '';
+  let themeSongRequiresRetry = false;
   if (
     hasDeliveredQuestion &&
     answeredCurrentQuestion &&
     !newsElaborationRequested &&
     isRecordableSessionAnswer({ step, content: userContent, wheelEvent })
   ) {
-    sessionAnswers = activeAdaptiveFollowUp
+    const recordedAnswers = activeAdaptiveFollowUp
       ? attachAdaptiveFollowUpAnswer({
           answers: storedAnswers,
           step,
@@ -1681,21 +1802,43 @@ export const respondToSessionTurn = async ({ sessionId, content }) => {
           content: userContent,
         })
       : [...storedAnswers, toSessionAnswer({ step, content: userContent })];
-    scriptContext.sessionSummary = buildTopicSessionSummary(sessionAnswers, { themeSong });
+
     if (step.id === 'theme_song_choice' && !activeAdaptiveFollowUp) {
-      themeSong = await searchSpotifyTrack(userContent);
+      const themeSongSearchAnswer = resolveThemeSongSelectionAnswer(userContent, themeSong);
+      themeSong = isThemeSongSkipAnswer(userContent)
+        ? {
+            status: 'unavailable',
+            query: '',
+            track: null,
+            reason: 'skipped',
+          }
+        : await searchSpotifyTrack(themeSongSearchAnswer);
       scriptContext.themeSong = themeSong;
-      const savedThemeSong = buildSavedThemeSong(themeSong, {
-        sourceSessionId: session._id,
-      });
-      if (savedThemeSong) {
-        await User.findByIdAndUpdate(
-          session.userId,
-          { $set: { savedThemeSong } },
-          { runValidators: true }
-        );
-        user.savedThemeSong = savedThemeSong;
+      themeSongFeedback = buildThemeSongLookupFeedback(themeSong);
+      adaptiveText = '';
+      adaptiveFollowUpQuestion = null;
+
+      if (themeSong.status === 'available') {
+        sessionAnswers = recordedAnswers;
+        scriptContext.sessionSummary = buildTopicSessionSummary(sessionAnswers, { themeSong });
+        const savedThemeSong = buildSavedThemeSong(themeSong, {
+          sourceSessionId: session._id,
+        });
+        if (savedThemeSong) {
+          await User.findByIdAndUpdate(
+            session.userId,
+            { $set: { savedThemeSong } },
+            { runValidators: true }
+          );
+          user.savedThemeSong = savedThemeSong;
+        }
+      } else if (themeSong.reason !== 'skipped') {
+        answeredCurrentQuestion = false;
+        themeSongRequiresRetry = true;
       }
+    } else {
+      sessionAnswers = recordedAnswers;
+      scriptContext.sessionSummary = buildTopicSessionSummary(sessionAnswers, { themeSong });
     }
   }
 
@@ -1708,12 +1851,16 @@ export const respondToSessionTurn = async ({ sessionId, content }) => {
   const requiresMediaCompletion = requiresMusicCompletion || requiresVideoCompletion;
   const unansweredAttemptCount =
     hasUserContent && hasDeliveredQuestion && !answeredCurrentQuestion ? currentRetryCount + 1 : 0;
-  const { shouldRepeatQuestion, shouldForceProgress } = getRetryDecision({
+  let { shouldRepeatQuestion, shouldForceProgress } = getRetryDecision({
     hasUserContent,
     hasDeliveredQuestion,
     answeredCurrentQuestion,
     unansweredAttemptCount,
   });
+  if (themeSongRequiresRetry) {
+    shouldRepeatQuestion = true;
+    shouldForceProgress = false;
+  }
   if (
     hasUserContent &&
     requiresMusicCompletion &&
@@ -1745,7 +1892,20 @@ export const respondToSessionTurn = async ({ sessionId, content }) => {
     !shouldElaborateNews &&
     !isFinalStep &&
     effectiveTurnIndex >= stepTurns;
-  const scriptedNextLine = shouldRepeatQuestion
+  const scriptedNextLine = themeSongFeedback
+    ? themeSongRequiresRetry
+      ? themeSongFeedback
+      : joinSpeechParts(
+          themeSongFeedback,
+          getProgressScriptLine({
+            step,
+            nextStep,
+            currentTurnIndex: effectiveTurnIndex,
+            stepTurns,
+            context: scriptContext,
+          })
+        )
+    : shouldRepeatQuestion
     ? requiresMediaCompletion
       ? requiresMusicCompletion
         ? 'When you have finished or want to skip the music, press Done, or say or type done.'
@@ -1769,7 +1929,13 @@ export const respondToSessionTurn = async ({ sessionId, content }) => {
     : 'answered';
 
   let assistantText = scriptedNextLine;
-  if (userContent && !adaptiveText && !isQuestionWheelEvent && !hasAutoAdvanceProtocol) {
+  if (
+    userContent &&
+    !adaptiveText &&
+    !themeSongFeedback &&
+    !isQuestionWheelEvent &&
+    !hasAutoAdvanceProtocol
+  ) {
     promptedMemoryEntries = selectedMemoryEntries;
     const systemPrompt = buildCstAdaptiveResponseInstructions({
       user,
@@ -1956,3 +2122,6 @@ export const respondToSessionTurn = async ({ sessionId, content }) => {
     suggestedMemoryUpdates,
   };
 };
+
+export const respondToSessionTurn = ({ sessionId, content }) =>
+  serializeSessionWrite(sessionId, () => respondToSessionTurnWrite({ sessionId, content }));

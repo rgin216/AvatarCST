@@ -41,7 +41,7 @@ export const parseSongExtraction = (raw = '') => {
   const title = cleanExtractedText(parsed?.title, 120);
   const artist = cleanExtractedText(parsed?.artist, 100);
   const confidence = Number(parsed?.confidence);
-  if (!title || !Number.isFinite(confidence) || confidence < MIN_EXTRACTION_CONFIDENCE) {
+  if ((!title && !artist) || !Number.isFinite(confidence) || confidence < MIN_EXTRACTION_CONFIDENCE) {
     return null;
   }
 
@@ -70,6 +70,7 @@ export const extractSongRequest = async (answer = '') => {
           'Do not use world knowledge to invent a title or artist.',
           'Treat hesitations and filler words as conversation unless the grammar clearly identifies them as a title.',
           'Set title to null when no song title is identifiable. Artist may be null.',
+          'An artist-only request, such as "any song by Daniel Caesar", is valid: set title to null and artist to the named artist.',
           'Confidence measures how clearly the transcript identifies the song.',
         ].join(' '),
       },

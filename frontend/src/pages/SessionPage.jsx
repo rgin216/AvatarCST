@@ -142,6 +142,25 @@ function formatPlaybackDuration(seconds) {
   return `${seconds} seconds`;
 }
 
+function getUnavailableThemeSongMessage(themeSong) {
+  if (themeSong?.reason === "explicit-content" && themeSong.candidate) {
+    return `${themeSong.candidate.name} by ${themeSong.candidate.artistLabel} is marked explicit on Spotify, so it cannot be played in this session.`;
+  }
+  if (themeSong?.reason === "skipped") {
+    return "You chose to continue without a theme song today.";
+  }
+  if (themeSong?.reason === "ambiguous-query" || themeSong?.reason === "missing-query") {
+    return "A specific song title was not identified.";
+  }
+  if (themeSong?.reason === "no-match") {
+    return `Spotify could not find a safe match for ${themeSong.query || "the requested song"}.`;
+  }
+  if (themeSong?.reason === "not-configured" || themeSong?.reason === "request-failed") {
+    return "Spotify could not be reached when the song was requested.";
+  }
+  return "The requested song could not be prepared this time.";
+}
+
 // Strips '/api' suffix so the frontend can build full backend URLs for audio files.
 function getBackendBase() {
   const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
@@ -166,6 +185,7 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
   const [lipSyncMode, setLipSyncMode] = useState("rhubarb");
   const [pendingPlay, setPendingPlay] = useState(false);
   const [avatarNarrationActive, setAvatarNarrationActive] = useState(false);
+  const [autoAdvanceFailedSlideId, setAutoAdvanceFailedSlideId] = useState(null);
   const [inactivityResetToken, setInactivityResetToken] = useState(0);
   const [currentAffairs, setCurrentAffairs] = useState(null);
   const [exercisePlayback, setExercisePlayback] = useState(null);
@@ -214,6 +234,7 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
   const inactivityTimeoutRef = useRef(null);
   const inactivityRemindedRef = useRef(false);
   const inactivityRequestRef = useRef(null);
+  const inactivityRequestControllersRef = useRef(new Set());
   const inactivityRequestGenerationRef = useRef(0);
   const activityRevisionRef = useRef(null);
   const assistantTurnRef = useRef(0);
@@ -277,7 +298,8 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
   useEffect(() => () => {
     if (inactivityTimeoutRef.current) window.clearTimeout(inactivityTimeoutRef.current);
     inactivityRequestGenerationRef.current += 1;
-    inactivityRequestRef.current?.abort();
+    inactivityRequestControllersRef.current.forEach((controller) => controller.abort());
+    inactivityRequestControllersRef.current.clear();
     inactivityRequestRef.current = null;
   }, []);
 
@@ -309,6 +331,7 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
       slideIdRef.current = slideData.id;
       autoAdvanceRequestedSlideRef.current = null;
       autoAdvanceRetryCountRef.current = 0;
+      setAutoAdvanceFailedSlideId(null);
       setWheelSpinning(false);
       wheelResultPendingRef.current = false;
       setWheelResultPending(false);
@@ -466,14 +489,15 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
   function handleAvatarAudioUnavailable() {
     avatarNarrationActiveRef.current = false;
     setAvatarNarrationActive(false);
+    setPendingPlay(false);
+    handleAudioPause();
     attemptSpotifyAutoplay();
     attemptVideoAutoplay();
   }
 
-  function cancelInFlightInactivityReminder() {
+  function invalidateInFlightInactivityReminder() {
     const hadInFlightRequest = Boolean(inactivityRequestRef.current);
     inactivityRequestGenerationRef.current += 1;
-    inactivityRequestRef.current?.abort();
     inactivityRequestRef.current = null;
     return hadInFlightRequest;
   }
@@ -483,7 +507,7 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
       window.clearTimeout(inactivityTimeoutRef.current);
       inactivityTimeoutRef.current = null;
     }
-    if (cancelInFlightInactivityReminder()) {
+    if (invalidateInFlightInactivityReminder()) {
       inactivityRemindedRef.current = false;
     }
     setInactivityResetToken((value) => value + 1);
@@ -506,6 +530,7 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
         lipSyncMode,
       });
       applyTurn(data);
+      setAutoAdvanceFailedSlideId(null);
     } catch (err) {
       console.error("Failed to advance an automatic slide", err);
       autoAdvanceRetryCountRef.current += 1;
@@ -516,6 +541,9 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
             setInactivityResetToken((value) => value + 1);
           }
         }, 1500);
+      } else if (slideIdRef.current === currentSlideId) {
+        autoAdvanceRequestedSlideRef.current = null;
+        setAutoAdvanceFailedSlideId(currentSlideId);
       }
     } finally {
       setTyping(false);
@@ -530,6 +558,7 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
       typing ||
       avatarNarrationActive ||
       pendingPlay ||
+      autoAdvanceFailedSlideId === slide.id ||
       autoAdvanceRequestedSlideRef.current === slide.id
     ) return undefined;
 
@@ -542,6 +571,7 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
     autoAdvanceInteraction,
     avatarNarrationActive,
     pendingPlay,
+    autoAdvanceFailedSlideId,
     slide.id,
     typing,
     inactivityResetToken,
@@ -577,6 +607,7 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
       const requestGeneration = inactivityRequestGenerationRef.current + 1;
       inactivityRequestGenerationRef.current = requestGeneration;
       const controller = new AbortController();
+      inactivityRequestControllersRef.current.add(controller);
       inactivityRequestRef.current = controller;
 
       try {
@@ -587,16 +618,18 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
         }, {
           signal: controller.signal,
         });
-        if (
-          controller.signal.aborted ||
-          requestGeneration !== inactivityRequestGenerationRef.current ||
-          data.activityRevision !== expectedActivityRevision ||
-          activityRevisionRef.current !== expectedActivityRevision
-        ) return;
-        if (data.assistantText) {
-          setMessages((items) => [...items, { from: "avatar", text: data.assistantText }]);
+        if (controller.signal.aborted) return;
+        const reminderText = data.messages?.assistant?.content || data.assistantText;
+        if (reminderText) {
+          setMessages((items) => [...items, { from: "avatar", text: reminderText }]);
         }
 
+        const requestIsCurrent =
+          !controller.signal.aborted &&
+          requestGeneration === inactivityRequestGenerationRef.current &&
+          data.activityRevision === expectedActivityRevision &&
+          activityRevisionRef.current === expectedActivityRevision;
+        if (!requestIsCurrent) return;
         const hasReminderNarration = Boolean(data.avatar?.audio?.url);
         avatarNarrationActiveRef.current = hasReminderNarration;
         setAvatarNarrationActive(hasReminderNarration);
@@ -608,6 +641,7 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
       } catch (err) {
         if (
           controller.signal.aborted ||
+          requestGeneration !== inactivityRequestGenerationRef.current ||
           err.code === "ERR_CANCELED" ||
           err.name === "CanceledError" ||
           err.response?.status === 409
@@ -621,7 +655,8 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
           },
         ]);
       } finally {
-        if (requestGeneration === inactivityRequestGenerationRef.current) {
+        inactivityRequestControllersRef.current.delete(controller);
+        if (inactivityRequestRef.current === controller) {
           inactivityRequestRef.current = null;
         }
       }
@@ -1389,6 +1424,7 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
                 <section className="slide-music-unavailable">
                   <p className="slide-music-eyebrow">Your theme song</p>
                   <h1>We could not prepare the music this time</h1>
+                  <p>{getUnavailableThemeSongMessage(themeSong)}</p>
                   <p>Your conversation summary is still ready to enjoy together.</p>
                   <button
                     type="button"
@@ -1435,6 +1471,21 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
                 <span className="typing-dot" />
                 <span className="typing-dot" />
                 <span className="typing-dot" />
+              </div>
+            )}
+            {autoAdvanceFailedSlideId === slide.id && (
+              <div className="session-bubble avatar">
+                <span>I could not move to the next slide automatically.</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    autoAdvanceRetryCountRef.current = 0;
+                    setAutoAdvanceFailedSlideId(null);
+                    requestAutomaticSlideAdvanceRef.current?.();
+                  }}
+                >
+                  Retry
+                </button>
               </div>
             )}
           </div>

@@ -12,11 +12,12 @@ const REQUEST_TIMEOUT_MS = 8_000;
 let accessToken = null;
 let accessTokenExpiresAt = 0;
 
-const unavailableResult = (reason, query) => ({
+const unavailableResult = (reason, query, candidate = null) => ({
   status: 'unavailable',
   query,
   track: null,
   reason,
+  ...(candidate ? { candidate } : {}),
 });
 
 const cleanText = (value = '', maxLength = 160) =>
@@ -44,6 +45,14 @@ export const normalizeSongQuery = (value = '') => {
     .replace(/[?!.]+$/, '')
     .trim();
   return query;
+};
+
+export const extractArtistOnlyRequest = (value = '') => {
+  const query = normalizeSongQuery(value);
+  const match = query.match(
+    /^(?:i\s+(?:want|would like)(?:\s+to\s+(?:hear|listen to))?\s+)?(?:(?:(?:any|a|some|one)\s+(?:song|track))|(?:(?:any|some)\s+music)|something)\s+by\s+(.+)$/i
+  );
+  return match ? cleanText(match[1], 100) : '';
 };
 
 const MATCH_STOP_WORDS = new Set([
@@ -103,11 +112,24 @@ const textSimilarity = (left, right) => {
   return Math.max(diceScore, editScore);
 };
 
-const parseSongRequest = (query) => {
+export const parseSongRequest = (query) => {
   const parts = query.split(/\s+by\s+/i);
   if (parts.length < 2) return { title: query, artist: '' };
   const artist = parts.pop().trim();
   return { title: parts.join(' by ').trim(), artist };
+};
+
+export const buildSpotifySearchQueries = (query = '') => {
+  const { title, artist } = parseSongRequest(cleanText(query, 180));
+  const searches = artist
+    ? [
+        `track:${title} artist:${artist}`,
+        `${title} ${artist}`,
+        `track:${title}`,
+      ]
+    : [`track:${title}`, title];
+
+  return [...new Set(searches.map((search) => cleanText(search, 220)).filter(Boolean))];
 };
 
 const getTrackItems = (payload = {}) => {
@@ -165,17 +187,91 @@ export const scoreSpotifyTrackMatch = (track, query) => {
 
 export const selectSpotifyTrack = (payload = {}, query = '') => {
   const tracks = getTrackItems(payload);
-  const nonExplicitTracks = tracks.filter((track) => track && track.explicit === false);
-  const normalizedTracks = nonExplicitTracks.map(normalizeSpotifyTrack).filter(Boolean);
-  if (!query) return normalizedTracks[0] || null;
-
-  return normalizedTracks
-    .map((track, index) => ({
-      track,
-      score: scoreSpotifyTrackMatch(track, query) - index * 0.1,
+  const candidates = tracks
+    .map((rawTrack, index) => ({
+      track: normalizeSpotifyTrack(rawTrack),
+      explicit: rawTrack?.explicit,
+      index,
+    }))
+    .filter((candidate) => candidate.track)
+    .map((candidate) => ({
+      ...candidate,
+      score: query
+        ? scoreSpotifyTrackMatch(candidate.track, query) - candidate.index * 0.1
+        : -candidate.index * 0.1,
     }))
     .filter((candidate) => Number.isFinite(candidate.score))
-    .sort((left, right) => right.score - left.score)[0]?.track || null;
+    .sort((left, right) => right.score - left.score);
+
+  return candidates.find((candidate) => candidate.explicit === false)?.track || null;
+};
+
+export const inspectSpotifyTrackMatch = (payload = {}, query = '') => {
+  const tracks = getTrackItems(payload);
+  const candidates = tracks
+    .map((rawTrack, index) => ({
+      track: normalizeSpotifyTrack(rawTrack),
+      explicit: rawTrack?.explicit,
+      index,
+    }))
+    .filter((candidate) => candidate.track)
+    .map((candidate) => ({
+      ...candidate,
+      score: query
+        ? scoreSpotifyTrackMatch(candidate.track, query) - candidate.index * 0.1
+        : -candidate.index * 0.1,
+    }))
+    .filter((candidate) => Number.isFinite(candidate.score))
+    .sort((left, right) => right.score - left.score);
+
+  const cleanMatch = candidates.find((candidate) => candidate.explicit === false);
+  if (cleanMatch) return { status: 'available', track: cleanMatch.track };
+
+  const explicitMatch = candidates.find((candidate) => candidate.explicit === true);
+  if (explicitMatch) {
+    return {
+      status: 'unavailable',
+      reason: 'explicit-content',
+      candidate: explicitMatch.track,
+    };
+  }
+
+  return { status: 'unavailable', reason: 'no-match', candidate: null };
+};
+
+export const selectSpotifyArtistSuggestions = (payload = {}, artist = '', limit = 3) => {
+  const requestedArtist = cleanText(artist, 100);
+  if (!requestedArtist) return [];
+
+  const seenTracks = new Set();
+  return getTrackItems(payload)
+    .map((rawTrack, index) => ({
+      track: normalizeSpotifyTrack(rawTrack),
+      explicit: rawTrack?.explicit,
+      index,
+    }))
+    .filter((candidate) => candidate.track && candidate.explicit === false)
+    .map((candidate) => ({
+      ...candidate,
+      artistScore: Math.max(
+        ...candidate.track.artists.map((trackArtist) =>
+          textSimilarity(requestedArtist, trackArtist)
+        )
+      ),
+    }))
+    .filter((candidate) => candidate.artistScore >= 0.7)
+    .sort((left, right) =>
+      (right.artistScore - right.index * 0.01) -
+      (left.artistScore - left.index * 0.01)
+    )
+    .filter((candidate) => {
+      const key = `${candidate.track.name}|${candidate.track.artistLabel}`.toLowerCase();
+      if (seenTracks.has(key)) return false;
+      seenTracks.add(key);
+      return true;
+    })
+    .slice(0, Math.max(0, limit))
+    .map((candidate) => candidate.track);
 };
 
 const getAccessToken = async ({ clientId, clientSecret, signal }) => {
@@ -208,11 +304,22 @@ export const resolveSongQuery = async (
 ) => {
   const fallbackQuery = normalizeSongQuery(songAnswer);
   if (!fallbackQuery) return { query: '', reason: 'missing-query' };
+  const deterministicArtist = extractArtistOnlyRequest(fallbackQuery);
+  if (deterministicArtist) {
+    return { query: '', artist: deterministicArtist, reason: 'artist-only' };
+  }
   if (!process.env.OPENAI_API_KEY) return { query: fallbackQuery, reason: null };
 
   try {
     const extractedSong = await extractor(songAnswer);
     const query = formatExtractedSongQuery(extractedSong || {});
+    if (!query && extractedSong?.artist) {
+      return {
+        query: '',
+        artist: cleanText(extractedSong.artist, 100),
+        reason: 'artist-only',
+      };
+    }
     return query
       ? { query, reason: null }
       : { query: '', reason: 'ambiguous-query' };
@@ -230,8 +337,10 @@ export const searchSpotifyTrack = async (songAnswer = '') => {
   const clientSecret = process.env.SPOTIFY_CLIENT_SECRET?.trim();
   if (!clientId || !clientSecret) return unavailableResult('not-configured', fallbackQuery);
 
-  const { query, reason } = await resolveSongQuery(songAnswer);
-  if (!query) return unavailableResult(reason || 'missing-query', fallbackQuery);
+  const { query, artist, reason } = await resolveSongQuery(songAnswer);
+  if (!query && reason !== 'artist-only') {
+    return unavailableResult(reason || 'missing-query', fallbackQuery);
+  }
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
@@ -242,26 +351,72 @@ export const searchSpotifyTrack = async (songAnswer = '') => {
       clientSecret,
       signal: controller.signal,
     });
-    const requestUrl = new URL(SPOTIFY_SEARCH_URL);
-    requestUrl.searchParams.set('q', query);
-    requestUrl.searchParams.set('type', 'track');
-    requestUrl.searchParams.set('market', process.env.SPOTIFY_MARKET?.trim() || 'NZ');
-    requestUrl.searchParams.set('limit', '10');
+    if (reason === 'artist-only' && artist) {
+      const suggestions = [];
+      const seenTrackIds = new Set();
+      for (const artistSearchQuery of [`artist:${artist}`, artist]) {
+        const requestUrl = new URL(SPOTIFY_SEARCH_URL);
+        requestUrl.searchParams.set('q', artistSearchQuery);
+        requestUrl.searchParams.set('type', 'track');
+        requestUrl.searchParams.set('market', process.env.SPOTIFY_MARKET?.trim() || 'NZ');
+        requestUrl.searchParams.set('limit', '10');
 
-    const response = await fetch(requestUrl, {
-      headers: { Authorization: `Bearer ${token}` },
-      signal: controller.signal,
-    });
-    if (!response.ok) throw new Error(`Spotify search failed with ${response.status}`);
+        const response = await fetch(requestUrl, {
+          headers: { Authorization: `Bearer ${token}` },
+          signal: controller.signal,
+        });
+        if (!response.ok) throw new Error(`Spotify search failed with ${response.status}`);
 
-    const track = selectSpotifyTrack(await response.json(), query);
-    return track
-      ? {
+        for (const suggestion of selectSpotifyArtistSuggestions(await response.json(), artist)) {
+          if (!seenTrackIds.has(suggestion.id)) {
+            seenTrackIds.add(suggestion.id);
+            suggestions.push(suggestion);
+          }
+        }
+        if (suggestions.length >= 3) break;
+      }
+
+      return suggestions.length > 0
+        ? {
+            status: 'needs-selection',
+            reason: 'artist-only',
+            query: artist,
+            artist,
+            suggestions: suggestions.slice(0, 3),
+          }
+        : unavailableResult('no-match', artist);
+    }
+
+    let explicitCandidate = null;
+    for (const searchQuery of buildSpotifySearchQueries(query)) {
+      const requestUrl = new URL(SPOTIFY_SEARCH_URL);
+      requestUrl.searchParams.set('q', searchQuery);
+      requestUrl.searchParams.set('type', 'track');
+      requestUrl.searchParams.set('market', process.env.SPOTIFY_MARKET?.trim() || 'NZ');
+      requestUrl.searchParams.set('limit', '10');
+
+      const response = await fetch(requestUrl, {
+        headers: { Authorization: `Bearer ${token}` },
+        signal: controller.signal,
+      });
+      if (!response.ok) throw new Error(`Spotify search failed with ${response.status}`);
+
+      const match = inspectSpotifyTrackMatch(await response.json(), query);
+      if (match.status === 'available') {
+        return {
           status: 'available',
           query,
-          track,
+          track: match.track,
           matchedAt: new Date().toISOString(),
-        }
+        };
+      }
+      if (!explicitCandidate && match.reason === 'explicit-content') {
+        explicitCandidate = match.candidate;
+      }
+    }
+
+    return explicitCandidate
+      ? unavailableResult('explicit-content', query, explicitCandidate)
       : unavailableResult('no-match', query);
   } catch (error) {
     console.warn('[spotify] Theme song unavailable:', error.message);

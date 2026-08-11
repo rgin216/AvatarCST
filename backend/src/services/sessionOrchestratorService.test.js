@@ -3,18 +3,33 @@ import assert from 'node:assert/strict';
 import {
   buildSessionSummary,
   buildNewsElaboration,
+  buildThemeSongLookupFeedback,
   canRequestAdaptiveFollowUp,
   getRetryDecision,
   inferMemorySuggestions,
+  isRecordableSessionAnswer,
   isMusicCompletionAnswer,
   isNewsElaborationRequest,
+  isThemeSongSkipAnswer,
   isVideoCompletionAnswer,
   parseAdaptiveTurn,
+  resolveThemeSongSelectionAnswer,
   selectRelevantMemoryEntries,
   toSecondPersonSummaryClause,
 } from './sessionOrchestratorService.js';
 import { buildCstAdaptiveTurnInstructions } from './promptService.js';
 import { getScriptStep, renderScriptFollowUp } from './cstScriptService.js';
+
+test('does not record the auto-advance protocol as a session answer', () => {
+  const sessionAnswers = [{ stepId: 'previous', answer: 'A meaningful memory' }];
+  const step = { id: 'automatic_transition', interaction: { type: 'autoAdvance' } };
+
+  if (isRecordableSessionAnswer({ step, content: '[[auto-advance]]', wheelEvent: null })) {
+    sessionAnswers.push({ stepId: step.id, answer: '[[auto-advance]]' });
+  }
+
+  assert.deepEqual(sessionAnswers, [{ stepId: 'previous', answer: 'A meaningful memory' }]);
+});
 
 test('recognises button, typed, and spoken music completion answers', () => {
   for (const answer of [
@@ -33,6 +48,80 @@ test('recognises button, typed, and spoken music completion answers', () => {
   }
 
   assert.equal(isMusicCompletionAnswer('I like this song'), false);
+});
+
+test('confirms a selected theme song immediately', () => {
+  const feedback = buildThemeSongLookupFeedback({
+    status: 'available',
+    track: {
+      name: 'Adventure of a Lifetime',
+      artistLabel: 'Coldplay',
+    },
+  });
+
+  assert.match(feedback, /I found Adventure of a Lifetime by Coldplay/i);
+  assert.match(feedback, /ready to play near the end/i);
+});
+
+test('explains why an explicit theme song cannot be used', () => {
+  const feedback = buildThemeSongLookupFeedback({
+    status: 'unavailable',
+    reason: 'explicit-content',
+    candidate: {
+      name: 'oh yeah?',
+      artistLabel: 'Steve Lacy',
+    },
+  });
+
+  assert.match(feedback, /Spotify marks it as explicit/i);
+  assert.match(feedback, /choose another song, or say skip/i);
+});
+
+test('lists clean artist suggestions and resolves ordinal or title choices', () => {
+  const pendingSong = {
+    status: 'needs-selection',
+    reason: 'artist-only',
+    artist: 'Daniel Caesar',
+    suggestions: [
+      { name: 'Always', artistLabel: 'Daniel Caesar' },
+      { name: 'Best Part', artistLabel: 'Daniel Caesar, H.E.R.' },
+      { name: 'Japanese Denim', artistLabel: 'Daniel Caesar' },
+    ],
+  };
+
+  const feedback = buildThemeSongLookupFeedback(pendingSong);
+  assert.match(feedback, /first, Always; second, Best Part; third, Japanese Denim/i);
+  assert.match(feedback, /Which one would you like/i);
+  assert.equal(
+    resolveThemeSongSelectionAnswer('the second one please', pendingSong),
+    'Best Part by Daniel Caesar, H.E.R.'
+  );
+  assert.equal(
+    resolveThemeSongSelectionAnswer('Japanese Denim', pendingSong),
+    'Japanese Denim by Daniel Caesar'
+  );
+});
+
+test('distinguishes ambiguous and missing theme-song searches', () => {
+  assert.match(
+    buildThemeSongLookupFeedback({ status: 'unavailable', reason: 'ambiguous-query' }),
+    /specific song title/i
+  );
+  assert.match(
+    buildThemeSongLookupFeedback({
+      status: 'unavailable',
+      reason: 'no-match',
+      query: 'Unknown Song by Unknown Artist',
+    }),
+    /could not find a safe Spotify match for Unknown Song by Unknown Artist/i
+  );
+});
+
+test('recognises when the participant wants to skip choosing a theme song', () => {
+  for (const answer of ["I don't know", 'skip', 'no thanks', 'I do not want a song']) {
+    assert.equal(isThemeSongSkipAnswer(answer), true, answer);
+  }
+  assert.equal(isThemeSongSkipAnswer('Adventure of a Lifetime by Coldplay'), false);
 });
 
 test('recognises button, typed, and spoken video completion answers', () => {
@@ -103,9 +192,13 @@ test('treats Modern Family as the television show', () => {
 
   assert.equal(step.id, 'childhood_modern_family');
   assert.match(step.prompt, /television show Modern Family/i);
+  assert.match(step.prompt, /only heard of it/i);
   assert.match(opening, /television comedy called Modern Family/i);
+  assert.match(opening, /If you have seen it, what did you think/i);
+  assert.match(opening, /another television comedy you remember enjoying/i);
   assert.doesNotMatch(opening, /families can look|family life then and now/i);
   assert.match(step.adaptiveFollowUp.guidance, /characters, stories, or humour/i);
+  assert.match(step.adaptiveFollowUp.guidance, /Only ask viewers/i);
 });
 
 test('converts first-person answers into clean second-person clauses', () => {
@@ -171,6 +264,22 @@ test('prefers a richer adaptive follow-up memory in the session summary', () => 
     summary,
     'Today, you remembered how your grandmother made roast lamb, and the smell filled the whole house.'
   );
+});
+
+test('keeps a meaningful initial answer when an adaptive follow-up is low-value', () => {
+  const summary = buildSessionSummary([
+    {
+      stepId: 'childhood_birthplace',
+      answer: 'I grew up near the harbour in Wellington.',
+      adaptiveFollowUp: {
+        question: 'What do you remember most clearly?',
+        answer: "  I don't know.  ",
+      },
+    },
+  ]);
+
+  assert.match(summary, /grew up near the harbour in Wellington/i);
+  assert.doesNotMatch(summary, /don['’]t know/i);
 });
 
 test('retains early named highlights in a full session summary', () => {
