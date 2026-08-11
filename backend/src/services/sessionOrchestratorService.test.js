@@ -3,14 +3,17 @@ import assert from 'node:assert/strict';
 import {
   buildSessionSummary,
   buildNewsElaboration,
+  buildThemeSongLookupFeedback,
   canRequestAdaptiveFollowUp,
   getRetryDecision,
   inferMemorySuggestions,
   isRecordableSessionAnswer,
   isMusicCompletionAnswer,
   isNewsElaborationRequest,
+  isThemeSongSkipAnswer,
   isVideoCompletionAnswer,
   parseAdaptiveTurn,
+  resolveThemeSongSelectionAnswer,
   selectRelevantMemoryEntries,
   toSecondPersonSummaryClause,
 } from './sessionOrchestratorService.js';
@@ -45,6 +48,80 @@ test('recognises button, typed, and spoken music completion answers', () => {
   }
 
   assert.equal(isMusicCompletionAnswer('I like this song'), false);
+});
+
+test('confirms a selected theme song immediately', () => {
+  const feedback = buildThemeSongLookupFeedback({
+    status: 'available',
+    track: {
+      name: 'Adventure of a Lifetime',
+      artistLabel: 'Coldplay',
+    },
+  });
+
+  assert.match(feedback, /I found Adventure of a Lifetime by Coldplay/i);
+  assert.match(feedback, /ready to play near the end/i);
+});
+
+test('explains why an explicit theme song cannot be used', () => {
+  const feedback = buildThemeSongLookupFeedback({
+    status: 'unavailable',
+    reason: 'explicit-content',
+    candidate: {
+      name: 'oh yeah?',
+      artistLabel: 'Steve Lacy',
+    },
+  });
+
+  assert.match(feedback, /Spotify marks it as explicit/i);
+  assert.match(feedback, /choose another song, or say skip/i);
+});
+
+test('lists clean artist suggestions and resolves ordinal or title choices', () => {
+  const pendingSong = {
+    status: 'needs-selection',
+    reason: 'artist-only',
+    artist: 'Daniel Caesar',
+    suggestions: [
+      { name: 'Always', artistLabel: 'Daniel Caesar' },
+      { name: 'Best Part', artistLabel: 'Daniel Caesar, H.E.R.' },
+      { name: 'Japanese Denim', artistLabel: 'Daniel Caesar' },
+    ],
+  };
+
+  const feedback = buildThemeSongLookupFeedback(pendingSong);
+  assert.match(feedback, /first, Always; second, Best Part; third, Japanese Denim/i);
+  assert.match(feedback, /Which one would you like/i);
+  assert.equal(
+    resolveThemeSongSelectionAnswer('the second one please', pendingSong),
+    'Best Part by Daniel Caesar, H.E.R.'
+  );
+  assert.equal(
+    resolveThemeSongSelectionAnswer('Japanese Denim', pendingSong),
+    'Japanese Denim by Daniel Caesar'
+  );
+});
+
+test('distinguishes ambiguous and missing theme-song searches', () => {
+  assert.match(
+    buildThemeSongLookupFeedback({ status: 'unavailable', reason: 'ambiguous-query' }),
+    /specific song title/i
+  );
+  assert.match(
+    buildThemeSongLookupFeedback({
+      status: 'unavailable',
+      reason: 'no-match',
+      query: 'Unknown Song by Unknown Artist',
+    }),
+    /could not find a safe Spotify match for Unknown Song by Unknown Artist/i
+  );
+});
+
+test('recognises when the participant wants to skip choosing a theme song', () => {
+  for (const answer of ["I don't know", 'skip', 'no thanks', 'I do not want a song']) {
+    assert.equal(isThemeSongSkipAnswer(answer), true, answer);
+  }
+  assert.equal(isThemeSongSkipAnswer('Adventure of a Lifetime by Coldplay'), false);
 });
 
 test('recognises button, typed, and spoken video completion answers', () => {

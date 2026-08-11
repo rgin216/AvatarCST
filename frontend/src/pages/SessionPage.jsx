@@ -142,6 +142,25 @@ function formatPlaybackDuration(seconds) {
   return `${seconds} seconds`;
 }
 
+function getUnavailableThemeSongMessage(themeSong) {
+  if (themeSong?.reason === "explicit-content" && themeSong.candidate) {
+    return `${themeSong.candidate.name} by ${themeSong.candidate.artistLabel} is marked explicit on Spotify, so it cannot be played in this session.`;
+  }
+  if (themeSong?.reason === "skipped") {
+    return "You chose to continue without a theme song today.";
+  }
+  if (themeSong?.reason === "ambiguous-query" || themeSong?.reason === "missing-query") {
+    return "A specific song title was not identified.";
+  }
+  if (themeSong?.reason === "no-match") {
+    return `Spotify could not find a safe match for ${themeSong.query || "the requested song"}.`;
+  }
+  if (themeSong?.reason === "not-configured" || themeSong?.reason === "request-failed") {
+    return "Spotify could not be reached when the song was requested.";
+  }
+  return "The requested song could not be prepared this time.";
+}
+
 // Strips '/api' suffix so the frontend can build full backend URLs for audio files.
 function getBackendBase() {
   const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
@@ -1405,6 +1424,7 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
                 <section className="slide-music-unavailable">
                   <p className="slide-music-eyebrow">Your theme song</p>
                   <h1>We could not prepare the music this time</h1>
+                  <p>{getUnavailableThemeSongMessage(themeSong)}</p>
                   <p>Your conversation summary is still ready to enjoy together.</p>
                   <button
                     type="button"

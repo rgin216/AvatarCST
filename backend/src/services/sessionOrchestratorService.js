@@ -230,6 +230,81 @@ const getRoutedNextStepIndex = ({ scriptId, step, boundedIndex, totalSteps }) =>
 const isDontKnowAnswer = (content = '') =>
   /\b(don'?t know|not sure|unsure|can't remember|cannot remember|no idea)\b/i.test(content);
 
+export const isThemeSongSkipAnswer = (content = '') => {
+  const normalized = normalizeAnswer(content);
+  return Boolean(
+    isDontKnowAnswer(content) ||
+    /^(?:skip|no thanks|not today|none|no song|i (?:do not|don t|would not|wouldn t) (?:have|want|choose) (?:a |any )?song)$/i.test(normalized)
+  );
+};
+
+export const resolveThemeSongSelectionAnswer = (content = '', themeSong = {}) => {
+  const suggestions = Array.isArray(themeSong.suggestions) ? themeSong.suggestions : [];
+  if (themeSong.status !== 'needs-selection' || suggestions.length === 0) return content;
+
+  const normalized = normalizeAnswer(content);
+  const ordinalPatterns = [
+    /\b(?:first|1st|number one|number 1|option one|option 1)\b/,
+    /\b(?:second|two|2nd|number 2|option 2)\b/,
+    /\b(?:third|three|3rd|number 3|option 3)\b/,
+  ];
+  let selectedIndex = ordinalPatterns.findIndex((pattern) => pattern.test(normalized));
+
+  if (selectedIndex < 0) {
+    selectedIndex = suggestions.findIndex((suggestion) => {
+      const songName = normalizeAnswer(suggestion?.name || '');
+      return songName && (normalized.includes(songName) || (
+        normalized.length >= 3 && songName.includes(normalized)
+      ));
+    });
+  }
+
+  const selected = suggestions[selectedIndex];
+  if (!selected?.name) return content;
+  return selected.artistLabel
+    ? `${selected.name} by ${selected.artistLabel}`
+    : selected.name;
+};
+
+export const buildThemeSongLookupFeedback = (themeSong = {}) => {
+  if (themeSong.status === 'available' && themeSong.track) {
+    return `I found ${themeSong.track.name} by ${themeSong.track.artistLabel}. I will keep it ready to play near the end of our session.`;
+  }
+
+  if (themeSong.status === 'needs-selection' && Array.isArray(themeSong.suggestions)) {
+    const ordinalLabels = ['first', 'second', 'third'];
+    const choices = themeSong.suggestions
+      .slice(0, ordinalLabels.length)
+      .map((track, index) => `${ordinalLabels[index]}, ${track.name}`)
+      .join('; ');
+    if (choices) {
+      return `I found a few clean songs by ${themeSong.artist || 'that artist'}: ${choices}. Which one would you like? You can say the song title, or first, second, or third.`;
+    }
+  }
+
+  if (themeSong.reason === 'skipped') {
+    return 'No problem. We can continue without a theme song today.';
+  }
+
+  if (themeSong.reason === 'explicit-content' && themeSong.candidate) {
+    return `I found ${themeSong.candidate.name} by ${themeSong.candidate.artistLabel}, but Spotify marks it as explicit, so I cannot play it in this session. Please choose another song, or say skip.`;
+  }
+
+  if (themeSong.reason === 'ambiguous-query' || themeSong.reason === 'missing-query') {
+    return 'I could not identify a specific song title. Please tell me the song name, and the artist if you know it, or say skip.';
+  }
+
+  if (themeSong.reason === 'no-match') {
+    return `I could not find a safe Spotify match for ${themeSong.query || 'that song'}. Please check the title or artist, choose another song, or say skip.`;
+  }
+
+  if (themeSong.reason === 'not-configured' || themeSong.reason === 'request-failed') {
+    return 'I could not reach Spotify to prepare that song right now. You can try another song, or say skip.';
+  }
+
+  return 'I could not prepare that song. Please choose another song, or say skip.';
+};
+
 const isCorrectOrientationAnswer = (content = '', expected = '') => {
   const normalized = normalizeAnswer(content);
   const normalizedExpected = normalizeAnswer(expected);
@@ -390,6 +465,11 @@ const evaluateAutoAdvance = ({ step, content, effectiveTurnIndex }) => {
 
 const evaluateAcceptedAnswer = ({ step, content }) =>
   step?.acceptAnyAnswer && content
+    ? { answered: true, response: '' }
+    : null;
+
+const evaluateThemeSongChoiceAnswer = ({ step, content }) =>
+  step?.id === 'theme_song_choice' && content
     ? { answered: true, response: '' }
     : null;
 
@@ -1649,6 +1729,9 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
       step,
       content: userContent,
       effectiveTurnIndex,
+    }) || evaluateThemeSongChoiceAnswer({
+      step,
+      content: userContent,
     }) || evaluateAcceptedAnswer({
       step,
       content: userContent,
@@ -1692,13 +1775,15 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
       answeredCurrentQuestion && allowAdaptiveFollowUp ? adaptiveTurn.followUp : null;
   }
 
+  let themeSongFeedback = '';
+  let themeSongRequiresRetry = false;
   if (
     hasDeliveredQuestion &&
     answeredCurrentQuestion &&
     !newsElaborationRequested &&
     isRecordableSessionAnswer({ step, content: userContent, wheelEvent })
   ) {
-    sessionAnswers = activeAdaptiveFollowUp
+    const recordedAnswers = activeAdaptiveFollowUp
       ? attachAdaptiveFollowUpAnswer({
           answers: storedAnswers,
           step,
@@ -1706,21 +1791,43 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
           content: userContent,
         })
       : [...storedAnswers, toSessionAnswer({ step, content: userContent })];
-    scriptContext.sessionSummary = buildTopicSessionSummary(sessionAnswers, { themeSong });
+
     if (step.id === 'theme_song_choice' && !activeAdaptiveFollowUp) {
-      themeSong = await searchSpotifyTrack(userContent);
+      const themeSongSearchAnswer = resolveThemeSongSelectionAnswer(userContent, themeSong);
+      themeSong = isThemeSongSkipAnswer(userContent)
+        ? {
+            status: 'unavailable',
+            query: '',
+            track: null,
+            reason: 'skipped',
+          }
+        : await searchSpotifyTrack(themeSongSearchAnswer);
       scriptContext.themeSong = themeSong;
-      const savedThemeSong = buildSavedThemeSong(themeSong, {
-        sourceSessionId: session._id,
-      });
-      if (savedThemeSong) {
-        await User.findByIdAndUpdate(
-          session.userId,
-          { $set: { savedThemeSong } },
-          { runValidators: true }
-        );
-        user.savedThemeSong = savedThemeSong;
+      themeSongFeedback = buildThemeSongLookupFeedback(themeSong);
+      adaptiveText = '';
+      adaptiveFollowUpQuestion = null;
+
+      if (themeSong.status === 'available') {
+        sessionAnswers = recordedAnswers;
+        scriptContext.sessionSummary = buildTopicSessionSummary(sessionAnswers, { themeSong });
+        const savedThemeSong = buildSavedThemeSong(themeSong, {
+          sourceSessionId: session._id,
+        });
+        if (savedThemeSong) {
+          await User.findByIdAndUpdate(
+            session.userId,
+            { $set: { savedThemeSong } },
+            { runValidators: true }
+          );
+          user.savedThemeSong = savedThemeSong;
+        }
+      } else if (themeSong.reason !== 'skipped') {
+        answeredCurrentQuestion = false;
+        themeSongRequiresRetry = true;
       }
+    } else {
+      sessionAnswers = recordedAnswers;
+      scriptContext.sessionSummary = buildTopicSessionSummary(sessionAnswers, { themeSong });
     }
   }
 
@@ -1733,12 +1840,16 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
   const requiresMediaCompletion = requiresMusicCompletion || requiresVideoCompletion;
   const unansweredAttemptCount =
     hasUserContent && hasDeliveredQuestion && !answeredCurrentQuestion ? currentRetryCount + 1 : 0;
-  const { shouldRepeatQuestion, shouldForceProgress } = getRetryDecision({
+  let { shouldRepeatQuestion, shouldForceProgress } = getRetryDecision({
     hasUserContent,
     hasDeliveredQuestion,
     answeredCurrentQuestion,
     unansweredAttemptCount,
   });
+  if (themeSongRequiresRetry) {
+    shouldRepeatQuestion = true;
+    shouldForceProgress = false;
+  }
   if (
     hasUserContent &&
     requiresMusicCompletion &&
@@ -1770,7 +1881,20 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
     !shouldElaborateNews &&
     !isFinalStep &&
     effectiveTurnIndex >= stepTurns;
-  const scriptedNextLine = shouldRepeatQuestion
+  const scriptedNextLine = themeSongFeedback
+    ? themeSongRequiresRetry
+      ? themeSongFeedback
+      : joinSpeechParts(
+          themeSongFeedback,
+          getProgressScriptLine({
+            step,
+            nextStep,
+            currentTurnIndex: effectiveTurnIndex,
+            stepTurns,
+            context: scriptContext,
+          })
+        )
+    : shouldRepeatQuestion
     ? requiresMediaCompletion
       ? requiresMusicCompletion
         ? 'When you have finished or want to skip the music, press Done, or say or type done.'
@@ -1794,7 +1918,13 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
     : 'answered';
 
   let assistantText = scriptedNextLine;
-  if (userContent && !adaptiveText && !isQuestionWheelEvent && !hasAutoAdvanceProtocol) {
+  if (
+    userContent &&
+    !adaptiveText &&
+    !themeSongFeedback &&
+    !isQuestionWheelEvent &&
+    !hasAutoAdvanceProtocol
+  ) {
     promptedMemoryEntries = selectedMemoryEntries;
     const systemPrompt = buildCstAdaptiveResponseInstructions({
       user,
