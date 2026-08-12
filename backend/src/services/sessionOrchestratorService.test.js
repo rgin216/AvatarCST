@@ -5,8 +5,12 @@ import {
   buildNewsElaboration,
   buildThemeSongLookupFeedback,
   canRequestAdaptiveFollowUp,
+  collapseRepeatedAdjacentSpeech,
   getRetryDecision,
   extractPreferredNameAnswer,
+  evaluateAdaptiveFollowUpAnswer,
+  evaluateOrientationAnswer,
+  hasSubstantialSpeechOverlap,
   inferMemorySuggestions,
   isRecordableSessionAnswer,
   isMusicCompletionAnswer,
@@ -117,8 +121,74 @@ test('asks for a preferred name on Session 1 slide 2 and then moves to location'
 test('extracts a clearly stated preferred name without replacing a name that is already fine', () => {
   assert.equal(extractPreferredNameAnswer('Please call me Ry', 'Ryan'), 'Ry');
   assert.equal(extractPreferredNameAnswer('My nickname is Ryno', 'Ryan'), 'Ryno');
+  assert.equal(extractPreferredNameAnswer('Call me Nick from now on', 'Ryan'), 'Nick');
   assert.equal(extractPreferredNameAnswer('Ryan is fine', 'Ryan'), '');
   assert.equal(extractPreferredNameAnswer('No, I do not have a nickname', 'Ryan'), '');
+});
+
+test('keeps a specific acknowledgement even when it shares a couple of topic words with the next script line', () => {
+  assert.equal(
+    hasSubstantialSpeechOverlap(
+      'Sharing thoughts and ideas sounds like the most interesting part for you.',
+      'CST explores new ideas, thoughts, and associations.'
+    ),
+    false
+  );
+  assert.equal(
+    hasSubstantialSpeechOverlap(
+      'The next session focuses on childhood memories and getting to know you.',
+      'Our next session focuses on childhood memories and getting to know you.'
+    ),
+    true
+  );
+});
+
+test('collapses a verbatim repeated acknowledgement without removing distinct sentences', () => {
+  assert.equal(
+    collapseRepeatedAdjacentSpeech(
+      'That sounds lovely. That sounds lovely. Cognitive Stimulation Therapy can be supportive.'
+    ),
+    'That sounds lovely. Cognitive Stimulation Therapy can be supportive.'
+  );
+});
+
+test('accepts a substantive response to an active adaptive follow-up without asking it twice', () => {
+  assert.deepEqual(
+    evaluateAdaptiveFollowUpAnswer({
+      activeAdaptiveFollowUp: { question: 'What did you enjoy about House?' },
+      content: 'I enjoyed the unusual diagnoses and the patients they saved.',
+    }),
+    { answered: true, response: '' }
+  );
+});
+
+test('uses distinct confirmations for the Session 2 orientation questions', () => {
+  const steps = [
+    { id: 'childhood_orientation_day' },
+    { id: 'childhood_orientation_month' },
+    { id: 'childhood_orientation_year' },
+    { id: 'childhood_orientation_season' },
+  ];
+  const responses = steps.map((step) => {
+    const type = {
+      childhood_orientation_day: 'weekday',
+      childhood_orientation_month: 'month',
+      childhood_orientation_year: 'year',
+      childhood_orientation_season: 'season',
+    }[step.id];
+    const expected = type === 'season'
+      ? ['summer', 'autumn', 'winter', 'spring'][Math.floor((new Date(new Date().toLocaleString('en-US', { timeZone: 'Pacific/Auckland' })).getMonth() + 1) / 3) % 4]
+      : new Intl.DateTimeFormat('en-NZ', {
+          ...(type === 'weekday' ? { weekday: 'long' } : {}),
+          ...(type === 'month' ? { month: 'long' } : {}),
+          ...(type === 'year' ? { year: 'numeric' } : {}),
+          timeZone: 'Pacific/Auckland',
+        }).format(new Date());
+    return evaluateOrientationAnswer({ step, content: expected, retryCount: 0 }).response;
+  });
+
+  assert.equal(new Set(responses).size, responses.length);
+  assert.equal(responses.every((response) => response !== "Yes, that's right"), true);
 });
 
 test('Session 1 closing slide includes the discussion recap', () => {
@@ -130,6 +200,20 @@ test('Session 1 closing slide includes the discussion recap', () => {
   assert.match(reply, /Today, you spent time sharing a little about your home and daily life/i);
   assert.match(reply, /what is one part of today/i);
   assert.doesNotMatch(reply, /^Ryan,/i);
+});
+
+test('does not mistake using a working computer for a work-life discussion', () => {
+  const summary = buildSessionSummary([
+    { stepId: 'introduce_yourself', title: 'Introduce Yourself', answer: 'The computer is working well today.' },
+    { stepId: 'cst_interests', title: 'What is CST?', answer: 'Sharing thoughts and ideas.' },
+  ]);
+
+  assert.doesNotMatch(summary, /working life/i);
+});
+
+test('marks the Session 2 closing slide for completion after its narration', () => {
+  const closingStep = getScriptStep('cst_childhood', 19).step;
+  assert.equal(closingStep.autoCompleteAfterNarration, true);
 });
 
 test('accepts a first-time song choice when no theme-song state exists yet', () => {
