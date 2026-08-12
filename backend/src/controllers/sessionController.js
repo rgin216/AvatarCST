@@ -218,29 +218,31 @@ async function createAudioForTurn(assistantText, pipelineMode, avatarMode, lipSy
   return createRhubarbAudioForTurn(assistantText, pipelineMode, avatarMode, timings);
 }
 
-async function attachAudioToTurn(turn, pipelineMode, avatarMode, lipSyncMode, timings) {
   const segmentDefinitions = Array.isArray(turn.speechSegments) && turn.speechSegments.length > 0
     ? turn.speechSegments
     : [{ text: turn.assistantText, role: 'script' }];
   const audioSegments = [];
+  const outputPaths = [];
 
-  for (const segment of segmentDefinitions) {
-    const audio = await createAudioForTurn(
-      segment.text,
-      pipelineMode,
-      avatarMode,
-      lipSyncMode,
-      timings
-    );
-    audioSegments.push({
-      text: segment.text,
-      role: segment.role,
-      advanceSlideAfter: Boolean(segment.advanceSlideAfter),
-      url: audio.audioUrl,
-      streaming: Boolean(audio.streaming),
-      lipsyncEngine: audio.lipsyncEngine,
-      rhubarbJson: audio.rhubarbJson || null,
-    });
+  try {
+    for (const segment of segmentDefinitions) {
+      const audio = await createAudioForTurn(
+        segment.text, pipelineMode, avatarMode, lipSyncMode, timings
+      );
+      outputPaths.push(audio.audioOutputPath);
+      audioSegments.push({
+        text: segment.text,
+        role: segment.role,
+        advanceSlideAfter: Boolean(segment.advanceSlideAfter),
+        url: audio.audioUrl,
+        streaming: Boolean(audio.streaming),
+        lipsyncEngine: audio.lipsyncEngine,
+        rhubarbJson: audio.rhubarbJson || null,
+      });
+    }
+  } catch (error) {
+    await Promise.all(outputPaths.map((filePath) => fs.promises.unlink(filePath).catch(() => {})));
+    throw error;
   }
 
   const firstAudio = audioSegments[0];
