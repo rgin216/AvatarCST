@@ -15,7 +15,7 @@ import {
 } from '../services/ttsService.js';
 import { generateLipSync, getRhubarbStatus } from '../services/rhubarbService.js';
 import { buildAvatarResponse } from '../services/avatarService.js';
-import { createSpeechStreamToken, getSpeechStream } from '../services/speechStreamService.js';
+import { getSpeechStream } from '../services/speechStreamService.js';
 import { GENERATED_AUDIO_DIR } from '../config/storage.js';
 import {
   getSessionPipelineMode,
@@ -151,24 +151,11 @@ function getSpeechOptions(pipelineMode, avatarMode) {
   };
 }
 
-function createStreamedAudioForTurn(assistantText, pipelineMode, avatarMode) {
-  const speechOptions = getSpeechOptions(pipelineMode, avatarMode);
-  const token = createSpeechStreamToken({
-    text: assistantText,
-    provider: speechOptions.provider,
-    voice: speechOptions.voice,
-    lipsync: 'audio-energy',
-  });
-
-  return {
-    audioUrl: `/api/sessions/speech-stream/${token}`,
-    streaming: true,
-  };
-}
-
 async function createRhubarbAudioForTurn(assistantText, pipelineMode, avatarMode, timings) {
   const speechOptions = getSpeechOptions(pipelineMode, avatarMode);
-  const responseFormat = speechOptions.provider === 'openai' ? 'wav' : 'mp3';
+  // Rhubarb converts this file to WAV internally, so serve the much smaller MP3
+  // to the browser to reduce mid-sentence buffering on long narration.
+  const responseFormat = 'mp3';
   const audioFileName = `${uuidv4()}.${responseFormat}`;
   const audioOutputPath = path.join(GENERATED_AUDIO_DIR, audioFileName);
   try {
@@ -196,15 +183,77 @@ async function createRhubarbAudioForTurn(assistantText, pipelineMode, avatarMode
   }
 }
 
-async function createAudioForTurn(assistantText, pipelineMode, avatarMode, lipSyncMode, timings) {
-  if (!shouldUseRhubarbForAvatar(avatarMode) || lipSyncMode === 'energy') {
+async function createBufferedAudioForTurn(assistantText, pipelineMode, avatarMode, timings) {
+  const speechOptions = getSpeechOptions(pipelineMode, avatarMode);
+  const audioFileName = `${uuidv4()}.mp3`;
+  const audioOutputPath = path.join(GENERATED_AUDIO_DIR, audioFileName);
+  try {
+    await timeAsync(
+      'ttsMs',
+      () => synthesizeSpeech(assistantText, audioOutputPath, {
+        ...speechOptions,
+        responseFormat: 'mp3',
+      }),
+      timings
+    );
     return {
-      ...createStreamedAudioForTurn(assistantText, pipelineMode, avatarMode),
+      audioUrl: `/generated-audio/${audioFileName}`,
+      audioOutputPath,
+      streaming: false,
       lipsyncEngine: 'audio-energy',
     };
+  } catch (error) {
+    await fs.promises.unlink(audioOutputPath).catch(() => {});
+    throw error;
+  }
+}
+
+async function createAudioForTurn(assistantText, pipelineMode, avatarMode, lipSyncMode, timings) {
+  if (!shouldUseRhubarbForAvatar(avatarMode) || lipSyncMode === 'energy') {
+    // Fully buffer narration before responding. This trades a little initial latency
+    // for uninterrupted playback on slower or variable connections.
+    return createBufferedAudioForTurn(assistantText, pipelineMode, avatarMode, timings);
   }
 
   return createRhubarbAudioForTurn(assistantText, pipelineMode, avatarMode, timings);
+}
+
+  const segmentDefinitions = Array.isArray(turn.speechSegments) && turn.speechSegments.length > 0
+    ? turn.speechSegments
+    : [{ text: turn.assistantText, role: 'script' }];
+  const audioSegments = [];
+  const outputPaths = [];
+
+  try {
+    for (const segment of segmentDefinitions) {
+      const audio = await createAudioForTurn(
+        segment.text, pipelineMode, avatarMode, lipSyncMode, timings
+      );
+      outputPaths.push(audio.audioOutputPath);
+      audioSegments.push({
+        text: segment.text,
+        role: segment.role,
+        advanceSlideAfter: Boolean(segment.advanceSlideAfter),
+        url: audio.audioUrl,
+        streaming: Boolean(audio.streaming),
+        lipsyncEngine: audio.lipsyncEngine,
+        rhubarbJson: audio.rhubarbJson || null,
+      });
+    }
+  } catch (error) {
+    await Promise.all(outputPaths.map((filePath) => fs.promises.unlink(filePath).catch(() => {})));
+    throw error;
+  }
+
+  const firstAudio = audioSegments[0];
+  turn.avatar = buildAvatarResponse({
+    text: turn.assistantText,
+    audioUrl: firstAudio?.url,
+    rhubarbJson: firstAudio?.rhubarbJson,
+    lipsyncEngine: firstAudio?.lipsyncEngine,
+  });
+  turn.avatar.audio.segments = audioSegments;
+  if (firstAudio?.streaming) turn.avatar.audio.streaming = true;
 }
 
 export const respondToSession = async (req, res, next) => {
@@ -223,14 +272,7 @@ export const respondToSession = async (req, res, next) => {
     );
 
     try {
-      const audio = await createAudioForTurn(turn.assistantText, turn.pipelineMode, avatarMode, lipSyncMode, timings);
-      turn.avatar = buildAvatarResponse({
-        text: turn.assistantText,
-        audioUrl: audio.audioUrl,
-        rhubarbJson: audio.rhubarbJson,
-        lipsyncEngine: audio.lipsyncEngine,
-      });
-      if (audio.streaming) turn.avatar.audio.streaming = true;
+      await attachAudioToTurn(turn, turn.pipelineMode, avatarMode, lipSyncMode, timings);
     } catch (ttsErr) {
       console.error('[tts] Skipping audio for this turn:', ttsErr.message);
     }
@@ -255,20 +297,7 @@ export const remindSession = async (req, res, next) => {
     );
 
     try {
-      const audio = await createAudioForTurn(
-        turn.assistantText,
-        turn.pipelineMode,
-        avatarMode,
-        lipSyncMode,
-        timings
-      );
-      turn.avatar = buildAvatarResponse({
-        text: turn.assistantText,
-        audioUrl: audio.audioUrl,
-        rhubarbJson: audio.rhubarbJson,
-        lipsyncEngine: audio.lipsyncEngine,
-      });
-      if (audio.streaming) turn.avatar.audio.streaming = true;
+      await attachAudioToTurn(turn, turn.pipelineMode, avatarMode, lipSyncMode, timings);
     } catch (ttsErr) {
       console.error('[tts] Skipping reminder audio:', ttsErr.message);
     }
@@ -329,14 +358,7 @@ export const respondAudioToSession = async (req, res, next) => {
     );
 
     try {
-      const audio = await createAudioForTurn(turn.assistantText, session.pipelineMode, avatarMode, lipSyncMode, timings);
-      turn.avatar = buildAvatarResponse({
-        text: turn.assistantText,
-        audioUrl: audio.audioUrl,
-        rhubarbJson: audio.rhubarbJson,
-        lipsyncEngine: audio.lipsyncEngine,
-      });
-      if (audio.streaming) turn.avatar.audio.streaming = true;
+      await attachAudioToTurn(turn, session.pipelineMode, avatarMode, lipSyncMode, timings);
     } catch (ttsErr) {
       console.error('[tts] Skipping audio for this turn:', ttsErr.message);
     }

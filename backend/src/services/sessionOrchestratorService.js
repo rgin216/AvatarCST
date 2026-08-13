@@ -111,7 +111,7 @@ export const extractPreferredNameAnswer = (content = '', currentName = '') => {
   }
 
   const explicitMatch = answer.match(
-    /\b(?:call me|nickname(?: is|'s)|go by|prefer(?: the name| to be called)?)\s+["']?([a-z][a-z'-]{0,39}(?:\s+[a-z][a-z'-]{0,39})?)/i
+    /\b(?:call me|nickname(?: is|'s)|go by|prefer(?: the name| to be called)?)\s+["']?([a-z][a-z'-]{0,39}(?:\s+(?!from\b|please\b|now\b)[a-z][a-z'-]{0,39})?)/i
   );
   const bareMatch = answer.match(/^([a-z][a-z'-]{0,39}(?:\s+[a-z][a-z'-]{0,39})?)[.!]?$/i);
   const preferredName = String(explicitMatch?.[1] || bareMatch?.[1] || '')
@@ -138,12 +138,29 @@ const getDistinctSpeechTerms = (text = '') => [...new Set(
     .filter((term) => term.length > 2 && !SPEECH_OVERLAP_STOP_WORDS.has(term))
 )];
 
-const hasSubstantialSpeechOverlap = (adaptiveText = '', scriptedText = '') => {
+export const hasSubstantialSpeechOverlap = (adaptiveText = '', scriptedText = '') => {
   if (!adaptiveText || !scriptedText) return false;
+  const adaptiveTerms = getDistinctSpeechTerms(adaptiveText);
   const scriptedTerms = new Set(getDistinctSpeechTerms(scriptedText));
-  const sharedTerms = getDistinctSpeechTerms(adaptiveText)
+  const sharedTerms = adaptiveTerms
     .filter((term) => scriptedTerms.has(term));
-  return sharedTerms.length >= 2;
+  return sharedTerms.length >= 5 && sharedTerms.length / Math.max(adaptiveTerms.length, 1) >= 0.75;
+};
+
+export const collapseRepeatedAdjacentSpeech = (text = '') => {
+  const sentences = String(text).match(/[^.!?]+[.!?]+|[^.!?]+$/g) || [];
+  return sentences
+    .reduce((parts, sentence) => {
+      const cleaned = sentence.trim();
+      const normalized = normalizeAnswer(cleaned);
+      const previous = parts.at(-1);
+      if (!normalized || previous?.normalized !== normalized) {
+        parts.push({ text: cleaned, normalized });
+      }
+      return parts;
+    }, [])
+    .map((part) => part.text)
+    .join(' ');
 };
 const PLEASANT_NEWS_PROMPT = 'Have you heard anything pleasant or interesting lately?';
 
@@ -353,7 +370,7 @@ const isCorrectOrientationAnswer = (content = '', expected = '') => {
   return false;
 };
 
-const evaluateOrientationAnswer = ({ step, content, retryCount }) => {
+export const evaluateOrientationAnswer = ({ step, content, retryCount }) => {
   const type = ORIENTATION_STEP_TYPES[step.id];
   if (!type || !content) return null;
 
@@ -368,9 +385,16 @@ const evaluateOrientationAnswer = ({ step, content, retryCount }) => {
   }
 
   if (isCorrectOrientationAnswer(content, expected)) {
+    const correctResponses = {
+      weekday: `Exactly, today is ${expected}.`,
+      date: `You have got the date right: ${expected}.`,
+      month: `That is correct, we are in ${expected}.`,
+      year: `Spot on, the year is ${expected}.`,
+      season: `Yes, ${expected} is the season we are enjoying.`,
+    };
     return {
       answered: true,
-      response: `Yes, that's right, it is ${expected}.`,
+      response: correctResponses[type] || `That is right, it is ${expected}.`,
     };
   }
 
@@ -497,6 +521,11 @@ const evaluateAutoAdvance = ({ step, content, effectiveTurnIndex }) => {
 
 const evaluateAcceptedAnswer = ({ step, content }) =>
   step?.acceptAnyAnswer && content
+    ? { answered: true, response: '' }
+    : null;
+
+export const evaluateAdaptiveFollowUpAnswer = ({ activeAdaptiveFollowUp, content }) =>
+  activeAdaptiveFollowUp && content
     ? { answered: true, response: '' }
     : null;
 
@@ -806,7 +835,7 @@ const SUMMARY_TOPIC_RULES = [
     label: 'talking about stories from books or the screen',
   },
   {
-    pattern: /\b(?:career|first job|profession|retire(?:d|ment)?|work(?:ed|ing)?)\b/i,
+    pattern: /\b(?:career|first job|profession|retire(?:d|ment)?|working life|work(?:ed)?\s+(?:as|at|for|in))\b/i,
     label: 'reflecting on your working life',
   },
   {
@@ -1810,6 +1839,9 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
     }) || evaluateThemeSongChoiceAnswer({
       step,
       content: userContent,
+    }) || evaluateAdaptiveFollowUpAnswer({
+      activeAdaptiveFollowUp,
+      content: userContent,
     }) || evaluateAcceptedAnswer({
       step,
       content: userContent,
@@ -1959,6 +1991,21 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
     !shouldElaborateNews &&
     !isFinalStep &&
     effectiveTurnIndex >= stepTurns;
+  const completionReply = typeof step.completionReply === 'function'
+    ? step.completionReply(scriptContext)
+    : step.completionReply;
+  const sessionCompleteAfterResponse = Boolean(
+    (
+      isFinalStep &&
+      hasUserContent &&
+      hasDeliveredQuestion &&
+      answeredCurrentQuestion &&
+      !shouldRepeatQuestion
+    ) || (
+      shouldAdvance &&
+      nextStep?.autoCompleteAfterNarration
+    )
+  );
   const scriptedNextLine = themeSongFeedback
     ? themeSongRequiresRetry
       ? themeSongFeedback
@@ -1985,7 +2032,9 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
       ? 'What part of that story stands out to you?'
       : PLEASANT_NEWS_PROMPT
     : hasUserContent && hasDeliveredQuestion
-    ? getProgressScriptLine({ step, nextStep, currentTurnIndex: effectiveTurnIndex, stepTurns, context: scriptContext })
+    ? sessionCompleteAfterResponse && completionReply
+      ? completionReply
+      : getProgressScriptLine({ step, nextStep, currentTurnIndex: effectiveTurnIndex, stepTurns, context: scriptContext })
     : expectedQuestion || renderScriptReply(step, scriptContext);
   const answerState = shouldRepeatQuestion
     ? 'repeat_question'
@@ -2027,11 +2076,22 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
   }
 
   if (userContent && !hasAutoAdvanceProtocol) {
+    adaptiveText = collapseRepeatedAdjacentSpeech(adaptiveText);
     if (hasSubstantialSpeechOverlap(adaptiveText, scriptedNextLine)) {
       adaptiveText = '';
     }
     assistantText = joinSpeechParts(adaptiveText, scriptedNextLine);
   }
+
+  const shouldDeferSlideTransition = Boolean(
+    shouldAdvance && adaptiveText && scriptedNextLine && !hasSubstantialSpeechOverlap(adaptiveText, scriptedNextLine)
+  );
+  const speechSegments = shouldDeferSlideTransition
+    ? [
+        { text: adaptiveText, role: 'acknowledgement', advanceSlideAfter: true },
+        { text: scriptedNextLine, role: 'script' },
+      ]
+    : [{ text: assistantText, role: 'script' }];
 
   const assistantMessage = await Message.create({ sessionId, role: 'assistant', content: assistantText });
   const nextStepIndex = shouldAdvance ? nextSlide.index : boundedIndex;
@@ -2163,6 +2223,9 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
       total: totalSteps,
     },
     slide: displaySlide,
+    slideTransition: shouldDeferSlideTransition
+      ? { deferUntilAcknowledgementEnds: true, from: slide, to: displaySlide }
+      : null,
     currentAffairs: displaySlide.interaction?.type === 'positiveNews' ? currentAffairs : null,
     exercisePlayback:
       displaySlide.interaction?.type === 'youtubeShort'
@@ -2175,6 +2238,8 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
         : null,
     questionWheel: session.interactionState?.questionWheel || null,
     assistantText,
+    speechSegments,
+    sessionCompleteAfterResponse,
     avatar: buildAvatarResponse({ text: assistantText }),
     messages: {
       user: userMessage,

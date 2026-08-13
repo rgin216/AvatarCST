@@ -129,7 +129,7 @@ If they pick a theme, show curiosity in one short statement. Do not ask a follow
 "This has been a lovely first session. Thank you for your company and for sharing your thoughts. [Briefly recap the main topics discussed today.] Next time, our theme will be Getting To Know You, with a focus on childhood. Before we finish, what is one part of today that you would like to remember?"
 
 **Adapt:**
-Reflect their closing thought warmly. End gently with a see-you-soon tone. Do not start another activity after this slide.
+Reflect their closing thought warmly, then say the scripted goodbye without waiting for another reply. The app ends the session ten seconds after narration finishes.
 
 ---
 

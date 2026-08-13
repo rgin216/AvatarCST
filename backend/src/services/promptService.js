@@ -74,7 +74,7 @@ const getDisplayNameFromContext = ({ user, recentMessages = [] }) => {
     .filter((m) => m.role === 'user')
     .map((m) => m.content)
     .join(' ')
-    .match(/\bcall me\s+([a-z][a-z' -]{0,39})\b/i);
+    .match(/\bcall me\s+([a-z][a-z'-]{0,39}(?:\s+(?!from\b|please\b|now\b)[a-z][a-z'-]{0,39})?)/i);
   return sessionNameMatch?.[1] || user?.preferredName || user?.name || 'there';
 };
 

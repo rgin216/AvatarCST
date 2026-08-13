@@ -50,6 +50,7 @@ const scripts = {
     {
       id: 'welcome_opening',
       turns: 1,
+      acceptAnyAnswer: true,
       deckSlide: 1,
       title: 'AI-supported Individual Cognitive Stimulation Therapy',
       subtitle: 'Session 1: Introduction & Welcome',
@@ -63,6 +64,7 @@ const scripts = {
     {
       id: 'facilitator_role',
       turns: 1,
+      acceptAnyAnswer: true,
       deckSlide: 2,
       title: 'Your AI-supported CST Facilitator',
       subtitle: 'What I am here to do',
@@ -76,6 +78,7 @@ const scripts = {
     {
       id: 'introduce_yourself',
       turns: 3,
+      acceptAnyAnswer: true,
       deckSlide: 3,
       title: 'Introduce Yourself',
       subtitle: 'Getting to know you',
@@ -93,6 +96,7 @@ const scripts = {
     {
       id: 'what_is_cst',
       turns: 1,
+      acceptAnyAnswer: true,
       deckSlide: 4,
       title: 'What is CST?',
       subtitle: 'Cognitive Stimulation Therapy',
@@ -106,6 +110,7 @@ const scripts = {
     {
       id: 'cst_interests',
       turns: 1,
+      acceptAnyAnswer: true,
       deckSlide: 5,
       title: 'What is CST?',
       subtitle: 'What you may be interested in',
@@ -119,6 +124,7 @@ const scripts = {
     {
       id: 'cst_nutshell',
       turns: 1,
+      acceptAnyAnswer: true,
       deckSlide: 6,
       title: 'CST in a Nutshell',
       subtitle: 'The spirit of our sessions',
@@ -132,6 +138,7 @@ const scripts = {
     {
       id: 'session_themes',
       turns: 1,
+      acceptAnyAnswer: true,
       deckSlide: 7,
       title: 'CST Session Themes',
       subtitle: 'What we will explore',
@@ -145,6 +152,7 @@ const scripts = {
     {
       id: 'next_session',
       turns: 1,
+      acceptAnyAnswer: true,
       deckSlide: 8,
       title: 'The Theme of the Next Session',
       subtitle: 'Session 2: Getting To Know You (Childhood)',
@@ -154,6 +162,8 @@ const scripts = {
       accent: '#4472C4',
       reply: ({ sessionSummary }) =>
         `This has been a lovely first session. Thank you for your company and for sharing your thoughts. ${sessionSummary || 'Today, we got to know a little about you and introduced what CST will be like.'} Next time, our theme will be Getting To Know You, with a focus on childhood. Before we finish, what is one part of today that you would like to remember?`,
+      completionReply: () =>
+        'It was great sharing thoughts and ideas with you, and I am looking forward to our next session on Getting To Know You, focusing on childhood.',
     },
   ],
   cst_childhood: [
@@ -479,6 +489,7 @@ const scripts = {
     {
       id: 'childhood_closing',
       turns: 1,
+      autoCompleteAfterNarration: true,
       deckSlide: 20,
       title: 'The Theme of the Next Session',
       subtitle: 'Session 3: Physical Games',

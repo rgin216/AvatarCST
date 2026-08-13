@@ -33,6 +33,9 @@ const lipSyncModes = [
 ];
 const wheelColors = ["#7A9DAD", "#F47C20", "#A8C5A0", "#4472C4", "#F4C8B0"];
 const INACTIVITY_TIMEOUT_MS = 60_000;
+const SESSION_END_DELAY_MS = 10_000;
+const MIN_RECORDING_MS = 700;
+const RECORDING_TAIL_MS = 250;
 const SPOTIFY_IFRAME_API_URL = "https://open.spotify.com/embed/iframe-api/v1";
 const YOUTUBE_IFRAME_API_URL = "https://www.youtube.com/iframe_api";
 
@@ -216,6 +219,8 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
   const mediaRecorderRef = useRef(null);
   const mediaStreamRef = useRef(null);
   const recordingChunksRef = useRef([]);
+  const recordingStartedAtRef = useRef(0);
+  const recordingStopTimeoutRef = useRef(null);
   const voicePlaceholderIdRef = useRef(null);
   const wheelTimeoutRef = useRef(null);
   const wheelResultPendingRef = useRef(false);
@@ -231,6 +236,11 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
   const videoAutoplayFallbackRef = useRef(null);
   const avatarNarrationActiveRef = useRef(false);
   const playLiveAudioRef = useRef(null);
+  const narrationQueueRef = useRef([]);
+  const activeNarrationSegmentRef = useRef(null);
+  const pendingSlideTransitionRef = useRef(null);
+  const endAfterNarrationRef = useRef(false);
+  const sessionEndTimeoutRef = useRef(null);
   const inactivityTimeoutRef = useRef(null);
   const inactivityRemindedRef = useRef(false);
   const inactivityRequestRef = useRef(null);
@@ -258,7 +268,8 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
   const hasSlideInteraction =
     hasWheelInteraction || Boolean(exerciseVideo) || hasPositiveNewsInteraction || Boolean(musicInteraction);
   const landedWheelResult = questionWheel?.status === "landed" ? questionWheel : null;
-  const sessionInputDisabled = typing || wheelResultPending || autoAdvanceInteraction;
+  const sessionInputDisabled =
+    typing || wheelResultPending || autoAdvanceInteraction || avatarNarrationActive || pendingPlay;
   const wheelSliceDegrees = wheelOptions.length ? 360 / wheelOptions.length : 0;
   const wheelGradient = wheelOptions.length
     ? wheelOptions
@@ -308,6 +319,7 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
   }, []);
 
   useEffect(() => () => {
+    if (recordingStopTimeoutRef.current) window.clearTimeout(recordingStopTimeoutRef.current);
     if (mediaRecorderRef.current?.state === "recording") {
       mediaRecorderRef.current.stop();
     }
@@ -315,18 +327,12 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
     mediaStreamRef.current = null;
   }, []);
 
-  function applyTurn(turn) {
-    if (Number.isInteger(turn.activityRevision)) {
-      activityRevisionRef.current = turn.activityRevision;
-    }
-    const slideData = turn.slide || defaultSlide;
-    const shouldAutoplayThemeSong =
-      slideData.interaction?.type === "spotifySong" &&
-      turn.themeSong?.status === "available" &&
-      turn.musicPlayback?.status !== "complete";
-    const shouldAutoplayExercise =
-      slideData.interaction?.type === "youtubeShort" &&
-      turn.exercisePlayback?.status !== "complete";
+  useEffect(() => () => {
+    if (sessionEndTimeoutRef.current) window.clearTimeout(sessionEndTimeoutRef.current);
+  }, []);
+
+  function commitSlide(slideData) {
+    if (!slideData) return;
     if (slideData.id !== slideIdRef.current) {
       slideIdRef.current = slideData.id;
       autoAdvanceRequestedSlideRef.current = null;
@@ -347,6 +353,25 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
       );
     }
     setSlide(slideData);
+  }
+
+  function applyTurn(turn) {
+    if (Number.isInteger(turn.activityRevision)) {
+      activityRevisionRef.current = turn.activityRevision;
+    }
+    const slideData = turn.slide || defaultSlide;
+    const shouldAutoplayThemeSong =
+      slideData.interaction?.type === "spotifySong" &&
+      turn.themeSong?.status === "available" &&
+      turn.musicPlayback?.status !== "complete";
+    const shouldAutoplayExercise =
+      slideData.interaction?.type === "youtubeShort" &&
+      turn.exercisePlayback?.status !== "complete";
+    const deferredTransition = turn.slideTransition?.deferUntilAcknowledgementEnds
+      ? turn.slideTransition
+      : null;
+    pendingSlideTransitionRef.current = deferredTransition;
+    commitSlide(deferredTransition?.from || slideData);
     setCurrentAffairs(turn.currentAffairs || null);
     setExercisePlayback(turn.exercisePlayback || null);
     setThemeSong(turn.themeSong || null);
@@ -361,7 +386,19 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
     setQuestionWheel(turn.questionWheel || null);
     spotifyAutoplayPendingRef.current = shouldAutoplayThemeSong;
     videoAutoplayPendingRef.current = shouldAutoplayExercise;
-    const hasAvatarNarration = Boolean(turn.avatar?.audio?.url);
+    const audioSegments = Array.isArray(turn.avatar?.audio?.segments)
+      ? turn.avatar.audio.segments.filter((segment) => segment?.url)
+      : turn.avatar?.audio?.url
+      ? [{
+          url: turn.avatar.audio.url,
+          rhubarbJson: turn.avatar?.lipsync?.rhubarbJson,
+          advanceSlideAfter: false,
+        }]
+      : [];
+    const hasAvatarNarration = audioSegments.length > 0;
+    narrationQueueRef.current = audioSegments.slice(1);
+    activeNarrationSegmentRef.current = audioSegments[0] || null;
+    endAfterNarrationRef.current = Boolean(turn.sessionCompleteAfterResponse);
     avatarNarrationActiveRef.current = hasAvatarNarration;
     setAvatarNarrationActive(hasAvatarNarration);
 
@@ -387,11 +424,15 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
     }
 
     // Real audio from free pipeline — load and auto-play
-    if (turn.avatar?.audio?.url) {
-      const audioUrl = getBackendBase() + turn.avatar.audio.url;
+    if (audioSegments[0]) {
+      const audioUrl = getBackendBase() + audioSegments[0].url;
       playLiveAudio(audioUrl, {
-        rhubarbJson: turn.avatar?.lipsync?.rhubarbJson,
+        rhubarbJson: audioSegments[0].rhubarbJson,
       });
+    } else {
+      if (deferredTransition?.to) commitSlide(deferredTransition.to);
+      pendingSlideTransitionRef.current = null;
+      finishNarrationSequence();
     }
   }
 
@@ -478,21 +519,55 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
   }
 
   function handleAvatarAudioEnded() {
-    avatarNarrationActiveRef.current = false;
-    setAvatarNarrationActive(false);
     handleAudioPause();
     setPendingPlay(false);
-    attemptSpotifyAutoplay();
-    attemptVideoAutoplay();
+    continueNarrationSequence();
   }
 
   function handleAvatarAudioUnavailable() {
-    avatarNarrationActiveRef.current = false;
-    setAvatarNarrationActive(false);
     setPendingPlay(false);
     handleAudioPause();
+    continueNarrationSequence();
+  }
+
+  function continueNarrationSequence() {
+    const completedSegment = activeNarrationSegmentRef.current;
+    if (completedSegment?.advanceSlideAfter && pendingSlideTransitionRef.current?.to) {
+      commitSlide(pendingSlideTransitionRef.current.to);
+      pendingSlideTransitionRef.current = null;
+    }
+
+    const nextSegment = narrationQueueRef.current.shift();
+    activeNarrationSegmentRef.current = nextSegment || null;
+    if (nextSegment) {
+      avatarNarrationActiveRef.current = true;
+      setAvatarNarrationActive(true);
+      playLiveAudio(getBackendBase() + nextSegment.url, {
+        rhubarbJson: nextSegment.rhubarbJson,
+      });
+      return;
+    }
+
+    if (pendingSlideTransitionRef.current?.to) {
+      commitSlide(pendingSlideTransitionRef.current.to);
+      pendingSlideTransitionRef.current = null;
+    }
+    finishNarrationSequence();
+  }
+
+  function finishNarrationSequence() {
+    activeNarrationSegmentRef.current = null;
+    narrationQueueRef.current = [];
+    avatarNarrationActiveRef.current = false;
+    setAvatarNarrationActive(false);
     attemptSpotifyAutoplay();
     attemptVideoAutoplay();
+    if (endAfterNarrationRef.current && !sessionEndTimeoutRef.current) {
+      sessionEndTimeoutRef.current = window.setTimeout(() => {
+        sessionEndTimeoutRef.current = null;
+        onEnd();
+      }, SESSION_END_DELAY_MS);
+    }
   }
 
   function invalidateInFlightInactivityReminder() {
@@ -634,6 +709,13 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
         avatarNarrationActiveRef.current = hasReminderNarration;
         setAvatarNarrationActive(hasReminderNarration);
         if (hasReminderNarration) {
+          narrationQueueRef.current = [];
+          pendingSlideTransitionRef.current = null;
+          endAfterNarrationRef.current = false;
+          activeNarrationSegmentRef.current = {
+            url: data.avatar.audio.url,
+            rhubarbJson: data.avatar?.lipsync?.rhubarbJson,
+          };
           playLiveAudioRef.current?.(getBackendBase() + data.avatar.audio.url, {
             rhubarbJson: data.avatar?.lipsync?.rhubarbJson,
           });
@@ -937,7 +1019,11 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
   // --- Mic recording (free pipeline) ---
 
   async function startRecording() {
-    if (wheelResultPendingRef.current) return;
+    if (
+      wheelResultPendingRef.current ||
+      avatarNarrationActiveRef.current ||
+      pendingPlay
+    ) return;
 
     try {
       setIsRecording(true);
@@ -954,6 +1040,7 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
       };
 
       recorder.onstop = async () => {
+        setIsRecording(false);
         stream.getTracks().forEach((t) => t.stop());
         mediaStreamRef.current = null;
         const blob = new Blob(recordingChunksRef.current, { type: mimeType });
@@ -961,6 +1048,7 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
       };
 
       recorder.start(100);
+      recordingStartedAtRef.current = Date.now();
       mediaRecorderRef.current = recorder;
       mediaStreamRef.current = stream;
       setIsRecording(true);
@@ -971,10 +1059,16 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
   }
 
   function stopRecording() {
-    if (mediaRecorderRef.current?.state === "recording") {
-      mediaRecorderRef.current.stop();
-    }
-    setIsRecording(false);
+    if (recordingStopTimeoutRef.current || mediaRecorderRef.current?.state !== "recording") return;
+    const elapsedRecordingMs = Date.now() - recordingStartedAtRef.current;
+    const stopDelayMs = Math.max(RECORDING_TAIL_MS, MIN_RECORDING_MS - elapsedRecordingMs);
+    recordingStopTimeoutRef.current = window.setTimeout(() => {
+      recordingStopTimeoutRef.current = null;
+      if (mediaRecorderRef.current?.state === "recording") {
+        mediaRecorderRef.current.requestData();
+        mediaRecorderRef.current.stop();
+      }
+    }, stopDelayMs);
   }
 
   async function sendAudioToBackend(blob) {
@@ -1009,7 +1103,10 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
   }
 
   function handleMicClick() {
-    if (wheelResultPendingRef.current && !isRecording) return;
+    if (
+      !isRecording &&
+      (wheelResultPendingRef.current || avatarNarrationActiveRef.current || pendingPlay)
+    ) return;
     registerUserActivity();
 
     if (isRecording) {
@@ -1329,9 +1426,6 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
                 {currentAffairs?.status === "available" ? (
                   <>
                     <h1>{currentAffairs.article.title}</h1>
-                    {currentAffairs.article.description && (
-                      <p className="slide-news-summary">{currentAffairs.article.description}</p>
-                    )}
                     <div className="slide-news-meta">
                       <span>{currentAffairs.article.source}</span>
                       {currentAffairs.article.publishedAt && (
@@ -1537,7 +1631,7 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
             onEnded={handleAvatarAudioEnded}
             onError={handleAvatarAudioUnavailable}
             onSeeked={() => publishLipSyncFrame(Boolean(audioRef.current && !audioRef.current.paused))}
-            preload="metadata"
+            preload="auto"
             hidden
           />
         </section>
@@ -1549,8 +1643,14 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
           onClick={handleMicClick}
           className={`mic-btn${isRecording ? " mic-btn-active" : ""}`}
           aria-label={isRecording ? "Stop recording" : "Start microphone"}
-          disabled={sessionInputDisabled && !isRecording}
-          title={pipelineMode === "openai-fast-scripted" ? "Recorded transcription with streaming scripted responses" : undefined}
+          disabled={(sessionInputDisabled || avatarNarrationActive || pendingPlay) && !isRecording}
+          title={
+            avatarNarrationActive || pendingPlay
+              ? "Please wait until Aria finishes speaking"
+              : pipelineMode === "openai-fast-scripted"
+              ? "Recorded transcription"
+              : undefined
+          }
         >
           {isRecording ? (
             // Stop square
