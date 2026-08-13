@@ -93,6 +93,34 @@ const SEASON_BY_MONTH = [
 
 const getDisplayName = (user) => user?.preferredName || user?.name || 'there';
 
+export const extractPreferredNameAnswer = (content = '', currentName = '') => {
+  const answer = String(content).replace(/[“”]/g, '"').replace(/[‘’]/g, "'").trim();
+  if (!answer) return '';
+
+  const normalized = normalizeAnswer(answer);
+  const normalizedCurrentName = normalizeAnswer(currentName);
+  if (
+    /\b(?:no nickname|don t have a nickname|do not have a nickname|no preferred name)\b/i.test(normalized) ||
+    (normalizedCurrentName && (
+      normalized === normalizedCurrentName ||
+      normalized.includes(`${normalizedCurrentName} is fine`) ||
+      normalized.includes(`just ${normalizedCurrentName}`)
+    ))
+  ) {
+    return '';
+  }
+
+  const explicitMatch = answer.match(
+    /\b(?:call me|nickname(?: is|'s)|go by|prefer(?: the name| to be called)?)\s+["']?([a-z][a-z'-]{0,39}(?:\s+[a-z][a-z'-]{0,39})?)/i
+  );
+  const bareMatch = answer.match(/^([a-z][a-z'-]{0,39}(?:\s+[a-z][a-z'-]{0,39})?)[.!]?$/i);
+  const preferredName = String(explicitMatch?.[1] || bareMatch?.[1] || '')
+    .replace(/\s+(?:please|thanks?)$/i, '')
+    .trim();
+  if (!preferredName || /^(?:no|none|nothing|same)$/i.test(preferredName)) return '';
+  return preferredName;
+};
+
 const joinSpeechParts = (...parts) => parts.map((part) => part?.trim()).filter(Boolean).join(' ');
 
 const SPEECH_OVERLAP_STOP_WORDS = new Set([
@@ -243,8 +271,8 @@ export const isThemeSongSkipAnswer = (content = '') => {
 };
 
 export const resolveThemeSongSelectionAnswer = (content = '', themeSong = {}) => {
-  const suggestions = Array.isArray(themeSong.suggestions) ? themeSong.suggestions : [];
-  if (themeSong.status !== 'needs-selection' || suggestions.length === 0) return content;
+  const suggestions = Array.isArray(themeSong?.suggestions) ? themeSong.suggestions : [];
+  if (themeSong?.status !== 'needs-selection' || suggestions.length === 0) return content;
 
   const normalized = normalizeAnswer(content);
   const ordinalPatterns = [
@@ -831,6 +859,20 @@ export const buildTopicSessionSummary = (answers = [], { themeSong = null } = {}
     );
   }
 
+  if (meaningful.some((item) => item.stepId === 'introduce_yourself')) {
+    addTopic('sharing a little about your home and daily life');
+  }
+  if (meaningful.some((item) => [
+    'what_is_cst',
+    'cst_interests',
+    'cst_nutshell',
+  ].includes(item.stepId))) {
+    addTopic('discussing what CST is and what you would like from it');
+  }
+  if (meaningful.some((item) => item.stepId === 'session_themes')) {
+    addTopic('looking ahead to future session themes');
+  }
+
   const childhoodStepIds = new Set([
     'childhood_birthplace',
     'childhood_parents',
@@ -841,6 +883,15 @@ export const buildTopicSessionSummary = (answers = [], { themeSong = null } = {}
   }
 
   for (const item of meaningful) {
+    if ([
+      'introduce_yourself',
+      'what_is_cst',
+      'cst_interests',
+      'cst_nutshell',
+      'session_themes',
+    ].includes(item.stepId)) {
+      continue;
+    }
     const text = `${item.answer || ''} ${item.adaptiveFollowUp?.answer || ''}`;
     const matchedTopic = SUMMARY_TOPIC_RULES.find(({ pattern }) => pattern.test(text));
     if (matchedTopic) addTopic(matchedTopic.label);
@@ -1659,6 +1710,22 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
       ? 'Exercise video completed.'
       : userContent;
     userMessage = await Message.create({ sessionId, role: 'user', content: messageContent });
+  }
+
+  if (step.id === 'facilitator_role' && userContent) {
+    const preferredName = extractPreferredNameAnswer(userContent, getDisplayName(user));
+    if (preferredName && preferredName.toLowerCase() !== getDisplayName(user).toLowerCase()) {
+      try {
+        await User.findByIdAndUpdate(
+          session.userId,
+          { $set: { preferredName } },
+          { runValidators: true }
+        );
+        user.preferredName = preferredName;
+      } catch (error) {
+        console.warn('[session] Could not save preferred name:', error.message);
+      }
+    }
   }
 
   const needsCurrentAffairs = [step, nextStep].some(

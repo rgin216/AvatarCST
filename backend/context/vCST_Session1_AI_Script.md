@@ -26,25 +26,23 @@ Each segment below gives Aria suggested wording and adaptation guidance for the 
 3) Enjoy fun conversations
 
 **You say:**
-"My role is to keep you company, try some interesting questions with you, and enjoy some fun conversation together. There are no tests here and no right or wrong answers. Does that sound alright?"
+"My role is to keep you company, try some interesting questions with you, and enjoy some fun conversation together. There are no tests here and no right or wrong answers. I know your name is [name], but do you have a nickname or another name you would prefer me to call you?"
 
 **Adapt:**
-Acknowledge their reply briefly. If they are unsure, reassure them that they can tell you any time if they want to slow down, pause, or move on.
+Acknowledge their reply briefly. Use and remember a clearly stated nickname or preferred name. If they have no nickname, reassure them that their current name is perfectly fine.
 
 ---
 
 ### 3. Introduce yourself
 **Slide questions:**
-1) What's your name?
-2) Where do you live?
-3) Who's at home with you?
-4) How do you like your computer/tablet?
+1) Where do you live?
+2) Who's at home with you?
+3) How do you like your computer/tablet?
 
 **You say:**
-"Now I would love to learn about you. To start, what is your name, and what would you like me to call you?"
+"Thank you. I would love to learn a little more about you. Where do you live?"
 
 **Then ask one at a time:**
-- "And where do you live?"
 - "And who is at home with you these days?"
 - "And how are you finding using your computer or tablet today?"
 
@@ -128,7 +126,7 @@ If they pick a theme, show curiosity in one short statement. Do not ask a follow
 **Slide:** Session 2 - Getting To Know You (Childhood)
 
 **You say:**
-"This has been a lovely first session. Thank you for your company and for sharing your thoughts. Next time, our theme will be Getting To Know You, with a focus on childhood. Before we finish, what is one part of today that you would like to remember?"
+"This has been a lovely first session. Thank you for your company and for sharing your thoughts. [Briefly recap the main topics discussed today.] Next time, our theme will be Getting To Know You, with a focus on childhood. Before we finish, what is one part of today that you would like to remember?"
 
 **Adapt:**
 Reflect their closing thought warmly. End gently with a see-you-soon tone. Do not start another activity after this slide.

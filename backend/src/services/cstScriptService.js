@@ -66,27 +66,26 @@ const scripts = {
       deckSlide: 2,
       title: 'Your AI-supported CST Facilitator',
       subtitle: 'What I am here to do',
-      prompt: 'Does that sound alright?',
+      prompt: 'Do you have a nickname or preferred name?',
       bullets: ['Keep each other company', 'Try interesting questions', 'Enjoy fun conversations'],
       visualHint: 'Source deck: NZ01. Welcome, slide 2',
       accent: '#F47C20',
-      reply: () =>
-        'My role is to keep you company, try some interesting questions with you, and enjoy some fun conversation together. There are no tests here and no right or wrong answers. Does that sound alright?',
+      reply: ({ name }) =>
+        `My role is to keep you company, try some interesting questions with you, and enjoy some fun conversation together. There are no tests here and no right or wrong answers. I know your name is ${name}, but do you have a nickname or another name you would prefer me to call you?`,
     },
     {
       id: 'introduce_yourself',
-      turns: 4,
+      turns: 3,
       deckSlide: 3,
       title: 'Introduce Yourself',
       subtitle: 'Getting to know you',
-      prompt: "What's your name?",
-      bullets: ['Your name', 'Where you live', "Who's at home with you", 'Computer or tablet comfort'],
+      prompt: 'Where do you live?',
+      bullets: ['Where you live', "Who's at home with you", 'Computer or tablet comfort'],
       visualHint: 'Source deck: NZ01. Welcome, slide 3',
       accent: '#F4C8B0',
       reply: () =>
-        'Now I would love to learn about you. To start, what is your name, and what would you like me to call you?',
+        'Thank you. I would love to learn a little more about you. Where do you live?',
       followUps: [
-        () => 'And where do you live?',
         () => "And who is at home with you these days?",
         () => 'And how are you finding using your computer or tablet today?',
       ],
@@ -153,8 +152,8 @@ const scripts = {
       bullets: ['Session 2', 'Getting To Know You', 'Childhood'],
       visualHint: 'Source deck: NZ01. Welcome, slide 8',
       accent: '#4472C4',
-      reply: ({ name }) =>
-        `${name}, this has been a lovely first session. Thank you for your company and for sharing your thoughts. Next time, our theme will be Getting To Know You, with a focus on childhood. Before we finish, what is one part of today that you would like to remember?`,
+      reply: ({ sessionSummary }) =>
+        `This has been a lovely first session. Thank you for your company and for sharing your thoughts. ${sessionSummary || 'Today, we got to know a little about you and introduced what CST will be like.'} Next time, our theme will be Getting To Know You, with a focus on childhood. Before we finish, what is one part of today that you would like to remember?`,
     },
   ],
   cst_childhood: [

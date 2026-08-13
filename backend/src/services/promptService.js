@@ -143,6 +143,8 @@ ${answerState === 'repeat_question'
 # Output
 Return ONLY Aria's adaptive response to the latest user message.
 - Maximum 1 sentence.
+- Always acknowledge the latest answer; when possible, mention one concrete detail from it.
+- Do not address the person by name in this response. Scripted greetings handle their name separately.
 - Do not ask a question.
 - Do not introduce a new slide or future step.
 - Do not repeat the scripted next line.
@@ -215,6 +217,8 @@ Use answered=false when the message:
 
 # Adaptive Response Rules
 - Maximum 1 sentence.
+- Always acknowledge the latest answer; when possible, mention one concrete detail from it.
+- Do not address the person by name. Scripted greetings handle their name separately.
 - The response field must not ask a question.
 - Do not introduce a new slide or future step.
 - React only to the person's latest answer. Do not announce beginning, continuing, moving on, changing topic, or what Aria will ask next.
