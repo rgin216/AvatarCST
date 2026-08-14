@@ -31,6 +31,7 @@ const sessionSchema = new Schema({
     visualHint: { type: String },
     accent: { type: String },
     interaction: { type: Schema.Types.Mixed },
+    inactivityTimeoutMs: { type: Number, min: 60_000 },
   },
   startedAt: { type: Date },
   endedAt: { type: Date },

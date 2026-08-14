@@ -265,6 +265,10 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
   const musicAwaitingCompletion =
     Boolean(musicInteraction) && musicPlayback?.status !== "complete";
   const autoAdvanceInteraction = slide.interaction?.type === "autoAdvance";
+  const inactivityTimeoutMs = Math.max(
+    INACTIVITY_TIMEOUT_MS,
+    Number(slide.inactivityTimeoutMs) || 0
+  );
   const hasSlideInteraction =
     hasWheelInteraction || Boolean(exerciseVideo) || hasPositiveNewsInteraction || Boolean(musicInteraction);
   const landedWheelResult = questionWheel?.status === "landed" ? questionWheel : null;
@@ -742,7 +746,7 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
           inactivityRequestRef.current = null;
         }
       }
-    }, INACTIVITY_TIMEOUT_MS);
+    }, inactivityTimeoutMs);
 
     return () => {
       if (inactivityTimeoutRef.current) {
@@ -763,6 +767,7 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
     exerciseAwaitingCompletion,
     musicAwaitingCompletion,
     autoAdvanceInteraction,
+    inactivityTimeoutMs,
     inactivityResetToken,
     lipSyncMode,
   ]);

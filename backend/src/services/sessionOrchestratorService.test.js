@@ -20,6 +20,7 @@ import {
   parseAdaptiveTurn,
   resolveThemeSongSelectionAnswer,
   selectRelevantMemoryEntries,
+  shouldUseNextSlideResponseOnly,
   toSecondPersonSummaryClause,
 } from './sessionOrchestratorService.js';
 import { buildCstAdaptiveTurnInstructions } from './promptService.js';
@@ -34,6 +35,83 @@ test('does not record the auto-advance protocol as a session answer', () => {
   }
 
   assert.deepEqual(sessionAnswers, [{ stepId: 'previous', answer: 'A meaningful memory' }]);
+});
+
+test('uses a scripted answer reveal without prepending a duplicate acknowledgement', () => {
+  assert.equal(shouldUseNextSlideResponseOnly({
+    shouldAdvance: true,
+    nextStep: { interaction: { type: 'autoAdvance' }, isAnswerReveal: true },
+  }), true);
+  assert.equal(shouldUseNextSlideResponseOnly({
+    shouldAdvance: true,
+    nextStep: { interaction: { type: 'autoAdvance' } },
+  }), false);
+});
+
+test('configures Session 3 slide 20 for four minutes and an activity follow-up', () => {
+  const scattergoriesStep = getScriptStep('cst_physical_games', 19).step;
+
+  assert.equal(scattergoriesStep.id, 'physical_games_scattergories');
+  assert.equal(scattergoriesStep.inactivityTimeoutMs, 240_000);
+  assert.match(scattergoriesStep.adaptiveFollowUp.guidance, /played or done/i);
+});
+
+test('ports reusable ready-state and automatic closing behavior to Session 3', () => {
+  const welcomeStep = getScriptStep('cst_physical_games', 0).step;
+  const triviaIntroStep = getScriptStep('cst_physical_games', 20).step;
+  const closingStep = getScriptStep('cst_physical_games', 35).step;
+
+  assert.equal(welcomeStep.acceptAnyAnswer, true);
+  assert.equal(triviaIntroStep.acceptAnyAnswer, true);
+  assert.equal(closingStep.autoCompleteAfterNarration, true);
+});
+
+test('keeps Session 3 Olympic trivia answers precise and current through Paris 2024', () => {
+  const nextOlympicsQuestion = getScriptStep('cst_physical_games', 21).step;
+  const nextOlympicsAnswer = getScriptStep('cst_physical_games', 22).step;
+  const uniformQuestion = getScriptStep('cst_physical_games', 23).step;
+  const uniformAnswer = getScriptStep('cst_physical_games', 24).step;
+  const firstGoldQuestion = getScriptStep('cst_physical_games', 25).step;
+  const firstGoldAnswer = getScriptStep('cst_physical_games', 26).step;
+  const runnerQuestion = getScriptStep('cst_physical_games', 27).step;
+  const runnerAnswer = getScriptStep('cst_physical_games', 28).step;
+  const rowingQuestion = getScriptStep('cst_physical_games', 29).step;
+  const rowingAnswer = getScriptStep('cst_physical_games', 30).step;
+  const carringtonQuestion = getScriptStep('cst_physical_games', 31).step;
+  const carringtonAnswer = getScriptStep('cst_physical_games', 32).step;
+
+  assert.equal(
+    renderScriptReply(nextOlympicsQuestion, {}),
+    'When is the next Summer Olympics, and who is hosting the next Summer Olympics?'
+  );
+  assert.match(renderScriptReply(nextOlympicsAnswer, {}), /Los Angeles in 2028/i);
+  assert.equal(
+    renderScriptReply(uniformQuestion, {}),
+    "What colour has traditionally formed the base of New Zealand's Olympic sporting uniform?"
+  );
+  assert.match(renderScriptReply(uniformAnswer, {}), /answer is black/i);
+  assert.equal(
+    renderScriptReply(firstGoldQuestion, {}),
+    'Who was the first New Zealander to win an individual Olympic gold medal?'
+  );
+  assert.match(renderScriptReply(firstGoldAnswer, {}), /Ted Morgan.*welterweight boxing.*1928/i);
+  assert.match(renderScriptReply(runnerQuestion, {}), /800 metres in 1960/i);
+  assert.match(renderScriptReply(runnerQuestion, {}), /both the 800 and 1500 metres in 1964/i);
+  assert.match(renderScriptReply(runnerAnswer, {}), /answer is Peter Snell/i);
+  assert.match(renderScriptReply(rowingQuestion, {}), /Paris 2024/i);
+  assert.match(renderScriptReply(rowingAnswer, {}), /answer is rowing/i);
+  assert.match(renderScriptReply(carringtonQuestion, {}), /Tokyo 2020/i);
+  assert.match(renderScriptReply(carringtonAnswer, {}), /three gold medals/i);
+  for (const answerStep of [
+    nextOlympicsAnswer,
+    uniformAnswer,
+    firstGoldAnswer,
+    runnerAnswer,
+    rowingAnswer,
+    carringtonAnswer,
+  ]) {
+    assert.equal(answerStep.isAnswerReveal, true, answerStep.id);
+  }
 });
 
 test('recognises button, typed, and spoken music completion answers', () => {

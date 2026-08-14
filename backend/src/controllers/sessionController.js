@@ -218,6 +218,7 @@ async function createAudioForTurn(assistantText, pipelineMode, avatarMode, lipSy
   return createRhubarbAudioForTurn(assistantText, pipelineMode, avatarMode, timings);
 }
 
+async function attachAudioToTurn(turn, pipelineMode, avatarMode, lipSyncMode, timings) {
   const segmentDefinitions = Array.isArray(turn.speechSegments) && turn.speechSegments.length > 0
     ? turn.speechSegments
     : [{ text: turn.assistantText, role: 'script' }];

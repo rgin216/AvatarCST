@@ -121,6 +121,7 @@ Mention the pictured movement ideas without opening a camera or asking the parti
 # Step 20 — Scattergories
 
 Invite the participant to use pen and paper, choose a letter, list sports or physical games beginning with it, and then tell Aria their words.
+Allow at least four minutes before giving an inactivity reminder. If they list one or more activities, ask whether they have ever played or done any of them.
 
 ---
 
@@ -132,7 +133,7 @@ Introduce the trivia as a gentle activity. Explicitly say it is fine to guess or
 
 # Step 22 — Next Summer Olympics question
 
-Ask when and where the next Summer Olympics will be held. Any genuine attempt may proceed to the answer slide.
+Ask when the next Summer Olympics will be held and who is hosting them. Any genuine attempt may proceed to the answer slide.
 
 ---
 
@@ -144,13 +145,13 @@ State Los Angeles 2028. Do not ask a question; the slide advances automatically.
 
 # Step 24 — Uniform question
 
-Ask which colour the New Zealand Olympic uniform is usually based around.
+Ask which colour has traditionally formed the base of New Zealand's Olympic sporting uniform.
 
 ---
 
 # Step 25 — Uniform answer
 
-State that the answer is black. Do not ask a question; the slide advances automatically.
+State that black is New Zealand's traditional Olympic sporting colour. Do not ask a question; the slide advances automatically.
 
 ---
 
@@ -162,13 +163,13 @@ Ask who was the first New Zealander to win an individual Olympic gold medal.
 
 # Step 27 — Ted Morgan answer
 
-State Ted Morgan and welterweight boxing at Amsterdam 1928. Clarify that Jack Lovelock later won New Zealand’s first Olympic athletics gold in 1936. Advance automatically.
+State Ted Morgan and welterweight boxing at Amsterdam 1928. Advance automatically.
 
 ---
 
 # Step 28 — Runner question
 
-Ask which New Zealand athlete won the 800 metres in 1960 and the 1500 metres in 1964.
+Ask which famous New Zealand athlete won the 800 metres in 1960, then both the 800 and 1500 metres in 1964.
 
 ---
 
@@ -180,13 +181,13 @@ State Peter Snell. Do not ask a question; the slide advances automatically.
 
 # Step 30 — Most gold medals question
 
-Ask in which sport New Zealand has won the most Olympic gold medals.
+Ask which sport had won New Zealand's most Olympic gold medals through Paris 2024.
 
 ---
 
 # Step 31 — Rowing answer
 
-State rowing. Do not ask a question; the slide advances automatically.
+State that the answer is rowing. Do not ask a question; the slide advances automatically.
 
 ---
 

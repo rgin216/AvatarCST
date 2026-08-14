@@ -641,6 +641,9 @@ export const canRequestAdaptiveFollowUp = ({
     effectiveTurnIndex >= (step.turns || 1)
   );
 
+export const shouldUseNextSlideResponseOnly = ({ shouldAdvance, nextStep } = {}) =>
+  Boolean(shouldAdvance && nextStep?.isAnswerReveal);
+
 const isQuestionWheelProtocol = (content = '') => /^\[\[question-wheel:/i.test(content.trim());
 
 const parseQuestionWheelEvent = (content = '', step = null) => {
@@ -1172,6 +1175,7 @@ const toSlide = ({ step, index, total }) => ({
   visualHint: step.visualHint,
   accent: step.accent,
   interaction: step.interaction,
+  inactivityTimeoutMs: step.inactivityTimeoutMs,
 });
 
 const cleanMemoryField = (value = '', maxLength = 240) =>
@@ -2006,6 +2010,10 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
       nextStep?.autoCompleteAfterNarration
     )
   );
+  const nextSlideProvidesResponse = shouldUseNextSlideResponseOnly({
+    shouldAdvance,
+    nextStep,
+  });
   const scriptedNextLine = themeSongFeedback
     ? themeSongRequiresRetry
       ? themeSongFeedback
@@ -2050,7 +2058,8 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
     !adaptiveText &&
     !themeSongFeedback &&
     !isQuestionWheelEvent &&
-    !hasAutoAdvanceProtocol
+    !hasAutoAdvanceProtocol &&
+    !nextSlideProvidesResponse
   ) {
     promptedMemoryEntries = selectedMemoryEntries;
     const systemPrompt = buildCstAdaptiveResponseInstructions({
@@ -2077,7 +2086,10 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
 
   if (userContent && !hasAutoAdvanceProtocol) {
     adaptiveText = collapseRepeatedAdjacentSpeech(adaptiveText);
-    if (hasSubstantialSpeechOverlap(adaptiveText, scriptedNextLine)) {
+    if (
+      nextSlideProvidesResponse ||
+      hasSubstantialSpeechOverlap(adaptiveText, scriptedNextLine)
+    ) {
       adaptiveText = '';
     }
     assistantText = joinSpeechParts(adaptiveText, scriptedNextLine);
@@ -2121,6 +2133,7 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
     visualHint: displaySlide.visualHint,
     accent: displaySlide.accent,
     interaction: displaySlide.interaction,
+    inactivityTimeoutMs: displaySlide.inactivityTimeoutMs,
   };
   const nextInteractionState = {
     ...(session.interactionState || {}),
