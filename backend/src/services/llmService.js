@@ -1,7 +1,7 @@
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
 const OPENAI_RESPONSES_URL = 'https://api.openai.com/v1/responses';
 
-const GROQ_MODEL = process.env.GROQ_MODEL || 'llama-3.3-70b-versatile';
+const GROQ_MODEL = process.env.GROQ_MODEL || 'openai/gpt-oss-120b';
 const OPENAI_TEXT_MODEL = process.env.OPENAI_TEXT_MODEL || 'gpt-5.4-mini';
 
 const GROQ_TIMEOUT_MS = 10_000;
@@ -9,6 +9,14 @@ const OPENAI_TIMEOUT_MS = 15_000;
 
 const stripAssistantPrefix = (raw = '') =>
   raw.trim().replace(/^(here['']?s my response[^:]*:|response:|aria says:?|as aria,?)\s*/i, '');
+
+const getGroqGenerationOptions = (model) =>
+  /^openai\/gpt-oss-(?:20b|120b)$/.test(model)
+    ? {
+        reasoning_effort: 'low',
+        include_reasoning: false,
+      }
+    : {};
 
 const getResponsesInstructions = (messages = []) =>
   messages
@@ -54,7 +62,8 @@ const generateGroqResponse = async (messages, options = {}) => {
         model: GROQ_MODEL,
         messages,
         temperature,
-        max_tokens: maxTokens,
+        max_completion_tokens: maxTokens,
+        ...getGroqGenerationOptions(GROQ_MODEL),
       }),
     });
   } catch (err) {
