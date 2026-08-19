@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { Navigate, Route, Routes, useNavigate, useParams } from "react-router-dom";
 import api from "./services/api.js";
 import LoginPage from "./pages/LoginPage";
 import LandingPage from "./pages/LandingPage";
@@ -7,14 +8,6 @@ import EndPage from "./pages/EndPage";
 import CaregiverPage from "./pages/CaregiverPage";
 import { toTitleCase } from "./utils/formatName";
 
-const SCREENS = {
-  LOGIN: "login",
-  LANDING: "landing",
-  SESSION: "session",
-  END: "end",
-  CAREGIVER: "caregiver",
-};
-
 const devParams = new URLSearchParams(window.location.search);
 const devSessionEnabled = import.meta.env.DEV && devParams.get("devSession") === "1";
 const pipelineModes = new Set(["free", "openai-fast-scripted"]);
@@ -22,6 +15,26 @@ const getInitialPipelineMode = () => {
   const requestedMode = devParams.get("pipeline");
   return pipelineModes.has(requestedMode) ? requestedMode : "free";
 };
+
+const AUTH_STORAGE_KEY = "avatarcst.auth";
+
+function loadStoredAuth() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(AUTH_STORAGE_KEY));
+    if (!parsed?.userId || !parsed?.userName) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function storeAuth(userId, userName) {
+  try {
+    localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify({ userId, userName }));
+  } catch {
+    // Storage may be unavailable (private browsing, quota) — refresh persistence just degrades.
+  }
+}
 
 const TEST_SESSIONS = [
   {
@@ -48,23 +61,67 @@ const TEST_SESSIONS = [
   }),
 ];
 
+// Rehydrates the pipeline mode a session actually started with, since a page
+// refresh loses the in-memory value chosen on the landing page.
+function SessionRoute({ userName, fallbackPipelineMode, onSessionEnd }) {
+  const { sessionId } = useParams();
+  const [pipelineMode, setPipelineMode] = useState(fallbackPipelineMode);
+  const [invalid, setInvalid] = useState(false);
+
+  useEffect(() => {
+    if (sessionId === "dev-session") return undefined;
+    let cancelled = false;
+    api.get(`/sessions/${sessionId}`)
+      .then(({ data }) => {
+        if (!cancelled && data.pipelineMode) setPipelineMode(data.pipelineMode);
+      })
+      .catch(() => { if (!cancelled) setInvalid(true); });
+    return () => { cancelled = true; };
+  }, [sessionId]);
+
+  if (invalid) return <Navigate to="/landing" replace />;
+
+  return (
+    <SessionPage
+      key={sessionId}
+      sessionId={sessionId}
+      onEnd={() => onSessionEnd(sessionId)}
+      userName={userName}
+      pipelineMode={pipelineMode}
+    />
+  );
+}
+
+function EndRoute({ userId, userName }) {
+  const { sessionId } = useParams();
+  const navigate = useNavigate();
+  return (
+    <EndPage
+      onHome={() => navigate("/landing")}
+      userName={userName}
+      sessionId={sessionId}
+      userId={userId}
+    />
+  );
+}
+
 export default function App() {
-  const [screen, setScreen] = useState(devSessionEnabled ? SCREENS.SESSION : SCREENS.LOGIN);
-  const [userId, setUserId] = useState(devSessionEnabled ? "dev-user" : null);
-  const [userName, setUserName] = useState(devSessionEnabled ? "Ryan" : "");
-  const [sessionId, setSessionId] = useState(devSessionEnabled ? "dev-session" : null);
+  const navigate = useNavigate();
+  const storedAuth = devSessionEnabled ? null : loadStoredAuth();
+  const [userId, setUserId] = useState(devSessionEnabled ? "dev-user" : storedAuth?.userId ?? null);
+  const [userName, setUserName] = useState(devSessionEnabled ? "Ryan" : storedAuth?.userName ?? "");
   const [selectedPipelineMode, setSelectedPipelineMode] = useState(getInitialPipelineMode);
-  const [sessionPipelineMode, setSessionPipelineMode] = useState(getInitialPipelineMode);
 
   const handleLogin = (id, name) => {
+    const titled = toTitleCase(name);
     setUserId(id);
-    setUserName(toTitleCase(name));
-    setScreen(SCREENS.LANDING);
+    setUserName(titled);
+    storeAuth(id, titled);
+    navigate("/landing");
   };
 
   const handleStartSession = async (sessionOption = TEST_SESSIONS[0]) => {
     if (!userId || sessionOption.disabled) return;
-    setSessionId(null);
     try {
       const { data } = await api.post("/sessions", {
         userId,
@@ -73,52 +130,87 @@ export default function App() {
         scriptId: sessionOption.id,
         pipelineMode: selectedPipelineMode,
       });
-      setSessionId(data._id);
-      setSessionPipelineMode(data.pipelineMode || selectedPipelineMode);
-      setScreen(SCREENS.SESSION);
+      navigate(`/session/${data._id}`);
     } catch (err) {
       console.error("Failed to start session", err);
     }
   };
 
-  const handleEndSession = async () => {
-    if (sessionId) {
-      try {
-        await api.patch(`/sessions/${sessionId}/end`);
-      } catch (err) {
-        console.error("Failed to end session", err);
-      }
+  const handleEndSession = async (sessionId) => {
+    try {
+      await api.patch(`/sessions/${sessionId}/end`);
+    } catch (err) {
+      console.error("Failed to end session", err);
     }
-    // Keep sessionId alive so EndPage can fetch the summary; cleared on next session start.
-    setScreen(SCREENS.END);
+    navigate(`/end/${sessionId}`);
   };
 
   return (
-    <>
-      {screen === SCREENS.LOGIN && <LoginPage onLogin={handleLogin} />}
-      {screen === SCREENS.LANDING && (
-        <LandingPage
-          onStart={handleStartSession}
-          onCaregiver={() => setScreen(SCREENS.CAREGIVER)}
-          userName={userName}
-          userId={userId}
-          sessionOptions={TEST_SESSIONS}
-          pipelineMode={selectedPipelineMode}
-          onPipelineModeChange={setSelectedPipelineMode}
-        />
-      )}
-      {screen === SCREENS.SESSION && (
-        <SessionPage
-          sessionId={sessionId}
-          onEnd={handleEndSession}
-          userName={userName}
-          pipelineMode={sessionPipelineMode}
-        />
-      )}
-      {screen === SCREENS.END && <EndPage onHome={() => setScreen(SCREENS.LANDING)} userName={userName} sessionId={sessionId} userId={userId} />}
-      {screen === SCREENS.CAREGIVER && (
-        <CaregiverPage userId={userId} onBack={() => setScreen(SCREENS.LANDING)} userName={userName} />
-      )}
-    </>
+    <Routes>
+      <Route
+        path="/"
+        element={
+          <Navigate
+            to={
+              devSessionEnabled
+                ? { pathname: "/session/dev-session", search: window.location.search }
+                : { pathname: userId ? "/landing" : "/login" }
+            }
+            replace
+          />
+        }
+      />
+      <Route
+        path="/login"
+        element={userId ? <Navigate to="/landing" replace /> : <LoginPage onLogin={handleLogin} />}
+      />
+      <Route
+        path="/landing"
+        element={
+          userId ? (
+            <LandingPage
+              onStart={handleStartSession}
+              onCaregiver={() => navigate("/caregiver")}
+              userName={userName}
+              userId={userId}
+              sessionOptions={TEST_SESSIONS}
+              pipelineMode={selectedPipelineMode}
+              onPipelineModeChange={setSelectedPipelineMode}
+            />
+          ) : (
+            <Navigate to="/login" replace />
+          )
+        }
+      />
+      <Route
+        path="/session/:sessionId"
+        element={
+          userId ? (
+            <SessionRoute
+              userName={userName}
+              fallbackPipelineMode={selectedPipelineMode}
+              onSessionEnd={handleEndSession}
+            />
+          ) : (
+            <Navigate to="/login" replace />
+          )
+        }
+      />
+      <Route
+        path="/end/:sessionId"
+        element={userId ? <EndRoute userId={userId} userName={userName} /> : <Navigate to="/login" replace />}
+      />
+      <Route
+        path="/caregiver"
+        element={
+          userId ? (
+            <CaregiverPage userId={userId} onBack={() => navigate("/landing")} userName={userName} />
+          ) : (
+            <Navigate to="/login" replace />
+          )
+        }
+      />
+      <Route path="*" element={<Navigate to={userId ? "/landing" : "/login"} replace />} />
+    </Routes>
   );
 }
