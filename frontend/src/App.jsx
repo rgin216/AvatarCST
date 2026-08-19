@@ -5,6 +5,7 @@ import LandingPage from "./pages/LandingPage";
 import SessionPage from "./pages/SessionPage";
 import EndPage from "./pages/EndPage";
 import CaregiverPage from "./pages/CaregiverPage";
+import { toTitleCase } from "./utils/formatName";
 
 const SCREENS = {
   LOGIN: "login",
@@ -35,6 +36,16 @@ const TEST_SESSIONS = [
     title: "Getting to Know You: Childhood",
     theme: "Childhood",
   },
+  ...Array.from({ length: 13 }, (_, i) => {
+    const n = i + 3;
+    return {
+      id: `placeholder_session_${n}`,
+      label: `Session ${n}`,
+      title: "Coming soon",
+      theme: "",
+      disabled: true,
+    };
+  }),
 ];
 
 export default function App() {
@@ -47,12 +58,12 @@ export default function App() {
 
   const handleLogin = (id, name) => {
     setUserId(id);
-    setUserName(name);
+    setUserName(toTitleCase(name));
     setScreen(SCREENS.LANDING);
   };
 
   const handleStartSession = async (sessionOption = TEST_SESSIONS[0]) => {
-    if (!userId) return;
+    if (!userId || sessionOption.disabled) return;
     setSessionId(null);
     try {
       const { data } = await api.post("/sessions", {

@@ -44,6 +44,26 @@ body {
   from { opacity: 0; transform: translateX(-10px); }
   to   { opacity: 1; transform: translateX(0); }
 }
+@keyframes carouselSlideNext {
+  from { opacity: 0; transform: translateX(28px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+@keyframes panelDropIn {
+  from { opacity: 0; transform: translateY(-28px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes cardPopIn {
+  from { opacity: 0; transform: translateY(14px) scale(0.96); }
+  to   { opacity: var(--card-target-opacity, 1); transform: translateY(0) scale(1); }
+}
+@keyframes softFadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes carouselSlidePrev {
+  from { opacity: 0; transform: translateX(-28px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
 @keyframes pulseDot {
   0%, 100% { opacity: 1; }
   50%       { opacity: 0.4; }
@@ -108,6 +128,60 @@ body {
   transition: all 0.15s;
 }
 .btn-outline:hover { background: #F2E8D9; }
+
+.session-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  width: 100%;
+  min-height: 214px;
+  border: none;
+  border-radius: 22px;
+  padding: 22px 24px;
+  text-align: left;
+  cursor: pointer;
+  font-family: 'Nunito', sans-serif;
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+.session-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 18px 44px rgba(139, 107, 90, 0.18);
+}
+
+.carousel-slide-next { animation: carouselSlideNext 0.32s cubic-bezier(0.22, 0.68, 0.32, 1) both; }
+.carousel-slide-prev { animation: carouselSlidePrev 0.32s cubic-bezier(0.22, 0.68, 0.32, 1) both; }
+
+.panel-drop-in { animation: panelDropIn 0.55s cubic-bezier(0.22, 0.68, 0.32, 1) both; }
+
+.highlights-scroll:focus-visible {
+  outline: 2px solid #E8A090;
+  outline-offset: 2px;
+  border-radius: 8px;
+}
+.card-pop-in { animation: cardPopIn 0.45s cubic-bezier(0.22, 0.68, 0.32, 1) both; }
+.soft-fade-in { animation: softFadeIn 0.4s ease both; }
+
+.carousel-arrow {
+  border: 1px solid rgba(139, 107, 90, 0.18);
+  border-radius: 50%;
+  background: #FFFAF5;
+  color: #3D2B1F;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Nunito', sans-serif;
+  font-weight: 700;
+  box-shadow: 0 4px 16px rgba(139, 107, 90, 0.1);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.carousel-arrow:hover {
+  transform: scale(1.08);
+  box-shadow: 0 8px 22px rgba(139, 107, 90, 0.18);
+}
+.carousel-arrow:active {
+  transform: scale(0.92);
+}
 
 .btn-mist {
   background: linear-gradient(135deg, #B8CDD8, #7A9DAD);
