@@ -152,6 +152,12 @@ body {
 .carousel-slide-prev { animation: carouselSlidePrev 0.32s cubic-bezier(0.22, 0.68, 0.32, 1) both; }
 
 .panel-drop-in { animation: panelDropIn 0.55s cubic-bezier(0.22, 0.68, 0.32, 1) both; }
+
+.highlights-scroll:focus-visible {
+  outline: 2px solid #E8A090;
+  outline-offset: 2px;
+  border-radius: 8px;
+}
 .card-pop-in { animation: cardPopIn 0.45s cubic-bezier(0.22, 0.68, 0.32, 1) both; }
 .soft-fade-in { animation: softFadeIn 0.4s ease both; }
 

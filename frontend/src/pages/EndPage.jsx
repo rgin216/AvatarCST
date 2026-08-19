@@ -104,7 +104,13 @@ export default function EndPage({ onHome, userName, sessionId }) {
 
           <div className="fade-up delay-2" style={{ background: theme.white, borderRadius: 20, padding: "16px 20px", marginBottom: 20, boxShadow: "0 6px 20px rgba(139,107,90,0.08)" }}>
             <div style={{ fontSize: 13, fontWeight: 700, color: theme.textLight, marginBottom: 10, textTransform: "uppercase", letterSpacing: "0.08em" }}>Session Highlights</div>
-            <div style={{ maxHeight: isDesktop ? 230 : 190, overflowY: "auto", paddingRight: 4 }}>
+            <div
+              className="highlights-scroll"
+              tabIndex={0}
+              role="region"
+              aria-label="Session highlights"
+              style={{ maxHeight: isDesktop ? 230 : 190, overflowY: "auto", paddingRight: 4 }}
+            >
               {summaryLoading && (
                 <div style={{ fontSize: 14, color: theme.textLight }}>Generating highlights...</div>
               )}
