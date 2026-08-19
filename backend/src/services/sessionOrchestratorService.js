@@ -89,6 +89,13 @@ const SEASON_BY_MONTH = [
 
 const getDisplayName = (user) => user?.preferredName || user?.name || 'there';
 
+const toTitleCase = (str = '') =>
+  str
+    .trim()
+    .split(/\s+/)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(' ');
+
 export const extractPreferredNameAnswer = (content = '', currentName = '') => {
   const answer = String(content).replace(/[“”]/g, '"').replace(/[‘’]/g, "'").trim();
   if (!answer) return '';
@@ -114,7 +121,7 @@ export const extractPreferredNameAnswer = (content = '', currentName = '') => {
     .replace(/\s+(?:please|thanks?)$/i, '')
     .trim();
   if (!preferredName || /^(?:no|none|nothing|same)$/i.test(preferredName)) return '';
-  return preferredName;
+  return toTitleCase(preferredName);
 };
 
 const joinSpeechParts = (...parts) => parts.map((part) => part?.trim()).filter(Boolean).join(' ');

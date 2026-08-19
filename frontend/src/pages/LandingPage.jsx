@@ -130,8 +130,8 @@ export default function LandingPage({
               background: theme.white, borderRadius: 24, padding: "26px 28px",
               marginTop: isDesktop ? 0 : 24,
               boxShadow: "0 10px 40px rgba(139,107,90,0.10)",
-              display: "flex", alignItems: "center", gap: 14,
             }}>
+              <div key={lastSession?._id || "welcome"} className="soft-fade-in" style={{ display: "flex", alignItems: "center", gap: 14 }}>
               <div style={{ width: 52, height: 52, flexShrink: 0, background: heroChip, borderRadius: 16, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24 }}>
                 {heroIcon}
               </div>
@@ -159,12 +159,13 @@ export default function LandingPage({
                   </div>
                 )}
               </div>
+              </div>
             </div>
           </div>
         </div>
       </div>
 
-      <div style={{
+      <div className="panel-drop-in" style={{
         position: "relative", flex: 1,
         marginTop: isDesktop ? -32 : -20,
         background: `linear-gradient(180deg, ${theme.white} 0%, #E7EEF1 100%)`,
@@ -247,12 +248,13 @@ export default function LandingPage({
                     key={session.id}
                     onClick={() => onStart(session)}
                     disabled={session.disabled}
-                    className="session-card"
+                    className="session-card card-pop-in"
                     style={{
                       background: theme.white,
                       boxShadow: "0 6px 24px rgba(139,107,90,0.10)",
-                      opacity: session.disabled ? 0.55 : 1,
+                      "--card-target-opacity": session.disabled ? 0.55 : 1,
                       cursor: session.disabled ? "default" : "pointer",
+                      animationDelay: `${i * 60}ms`,
                     }}
                   >
                     <div>

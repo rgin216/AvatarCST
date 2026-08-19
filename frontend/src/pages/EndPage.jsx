@@ -2,7 +2,6 @@ import { useState, useEffect } from "react";
 import api from "../services/api.js";
 import theme from "../utils/theme";
 import useIsDesktop from "../hooks/useIsDesktop";
-import EmojiButton from "../components/ui/EmojiButton";
 
 const TONE_LABELS = { positive: "Happy", mixed: "Mixed", neutral: "Calm", low: "Low" };
 const LEVEL_LABELS = { high: "High", medium: "Medium", low: "Low" };
@@ -56,56 +55,73 @@ export default function EndPage({ onHome, userName, sessionId }) {
   const topicsCovered = sessionData?.scriptStepIndex ?? null;
 
   const stats = [
-    { label: "Duration", value: durationMins != null ? `${durationMins} min` : "—", icon: "⏱️" },
-    { label: "Topics Covered", value: topicsCovered != null ? String(topicsCovered) : "—", icon: "💬" },
-    { label: "Engagement", value: summary ? (LEVEL_LABELS[summary.engagementLevel] || "—") : "—", icon: "⭐" },
-    { label: "Mood", value: summary ? (TONE_LABELS[summary.emotionalTone] || "—") : "—", icon: "😊" },
+    { label: "Duration", value: durationMins != null ? `${durationMins} min` : "—", icon: "⏱️", chip: `linear-gradient(135deg, ${theme.sage}, ${theme.sageDark})` },
+    { label: "Topics Covered", value: topicsCovered != null ? String(topicsCovered) : "—", icon: "💬", chip: `linear-gradient(135deg, ${theme.mist}, ${theme.mistDark})` },
+    { label: "Engagement", value: summary ? (LEVEL_LABELS[summary.engagementLevel] || "—") : "—", icon: "⭐", chip: `linear-gradient(135deg, ${theme.blush}, ${theme.rose})` },
+    { label: "Mood", value: summary ? (TONE_LABELS[summary.emotionalTone] || "—") : "—", icon: "😊", chip: `linear-gradient(135deg, ${theme.rose}, ${theme.warm})` },
   ];
 
+  const contentMaxWidth = isDesktop ? 720 : 480;
+
   return (
-    <div style={{ minHeight: "100vh", background: `linear-gradient(160deg, ${theme.cream}, ${theme.sand})`, padding: "48px 28px 40px" }}>
-      <div style={{ maxWidth: isDesktop ? 700 : 480, margin: "0 auto" }}>
-        <div className="fade-up" style={{ textAlign: "center", marginBottom: 36 }}>
-          <div className="avatar-float" style={{ fontSize: 64, marginBottom: 16 }}>🌟</div>
-          <div style={{ fontFamily: "'Playfair Display', serif", fontSize: isDesktop ? 36 : 32, fontWeight: 600, color: theme.text }}>Great session, {userName}!</div>
-          <div style={{ fontSize: 16, color: theme.textLight, marginTop: 8, lineHeight: 1.6 }}>You did wonderfully today.<br />Keep up the wonderful work!</div>
-        </div>
+    <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", background: theme.cream }}>
+      <div style={{
+        position: "relative", overflow: "hidden", flexShrink: 0,
+        background: `linear-gradient(160deg, ${theme.cream} 0%, ${theme.sand} 60%, ${theme.blush}30 100%)`,
+        paddingBottom: isDesktop ? 48 : 36,
+      }}>
+        <div style={{ position: "absolute", top: -100, right: -100, width: 320, height: 320, borderRadius: "50%", background: `radial-gradient(circle, ${theme.blush}55 0%, transparent 70%)`, pointerEvents: "none" }} />
+        <div style={{ position: "absolute", top: "10%", left: -90, width: 240, height: 240, borderRadius: "50%", background: `radial-gradient(circle, ${theme.rose}30 0%, transparent 70%)`, pointerEvents: "none" }} />
 
-        <div className="fade-up delay-1" style={{ display: "grid", gridTemplateColumns: isDesktop ? "repeat(4, 1fr)" : "1fr 1fr", gap: 12, marginBottom: 28 }}>
-          {stats.map((s) => (
-            <div key={s.label} style={{ background: theme.white, borderRadius: 18, padding: "20px 16px", textAlign: "center", boxShadow: "0 4px 20px rgba(139,107,90,0.08)" }}>
-              <div style={{ fontSize: 26, marginBottom: 8 }}>{s.icon}</div>
-              <div style={{ fontSize: 22, fontWeight: 700, color: theme.text }}>{s.value}</div>
-              <div style={{ fontSize: 12, color: theme.textLight, marginTop: 2 }}>{s.label}</div>
-            </div>
-          ))}
-        </div>
-
-        <div className="fade-up delay-2" style={{ background: theme.white, borderRadius: 20, padding: "20px 22px", marginBottom: 28 }}>
-          <div style={{ fontSize: 14, fontWeight: 700, color: theme.textLight, marginBottom: 14, textTransform: "uppercase", letterSpacing: "0.06em" }}>Session Highlights</div>
-          {summaryLoading && (
-            <div style={{ fontSize: 14, color: theme.textLight, padding: "8px 0" }}>Generating highlights...</div>
-          )}
-          {!summaryLoading && highlights.length === 0 && (
-            <div style={{ fontSize: 14, color: theme.textLight, padding: "8px 0" }}>No highlights available for this session.</div>
-          )}
-          {!summaryLoading && highlights.map((h, i, arr) => (
-            <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 10, marginBottom: i < arr.length - 1 ? 12 : 0, fontSize: 15, color: theme.text, lineHeight: 1.5 }}>
-              <span style={{ color: theme.sageDark, fontWeight: 700, marginTop: 1 }}>✓</span>{h}
-            </div>
-          ))}
-        </div>
-
-        <div className="fade-up delay-3" style={{ background: `linear-gradient(135deg, ${theme.blush}44, ${theme.rose}22)`, borderRadius: 20, padding: "20px 22px", marginBottom: 28 }}>
-          <div style={{ fontSize: 15, fontWeight: 600, color: theme.text, marginBottom: 14 }}>How did today's session feel?</div>
-          <div style={{ display: "flex", gap: 10, justifyContent: "center" }}>
-            {["😞", "😐", "🙂", "😊", "😄"].map((e, i) => <EmojiButton key={i} emoji={e} />)}
+        <div style={{ maxWidth: contentMaxWidth, margin: "0 auto", padding: isDesktop ? "36px 32px 0" : "32px 24px 0", position: "relative" }}>
+          <div className="fade-up" style={{ textAlign: "center" }}>
+            <div className="avatar-float" style={{ fontSize: 52, marginBottom: 10 }}>🌟</div>
+            <div style={{ fontFamily: "'Playfair Display', serif", fontSize: isDesktop ? 36 : 30, fontWeight: 700, color: theme.text }}>Great session, {userName}!</div>
+            <div style={{ fontSize: 15, color: theme.textLight, marginTop: 6, lineHeight: 1.5 }}>You did wonderfully today. Keep up the wonderful work!</div>
           </div>
         </div>
+      </div>
 
-        <div className="fade-up delay-4" style={{ display: "flex", gap: 12 }}>
-          <button onClick={onHome} className="btn-outline" style={{ flex: 1, padding: "16px", fontSize: 16 }}>← Home</button>
-          <button onClick={onHome} className="btn-primary" style={{ flex: 2 }}>Book Next Session ▸</button>
+      <div style={{
+        position: "relative", flex: 1,
+        marginTop: isDesktop ? -28 : -18,
+        background: `linear-gradient(180deg, ${theme.white} 0%, #E7EEF1 100%)`,
+        borderRadius: isDesktop ? "36px 36px 0 0" : "24px 24px 0 0",
+        boxShadow: "0 -14px 36px rgba(122,157,173,0.14)",
+      }}>
+        <div style={{ maxWidth: contentMaxWidth, margin: "0 auto", padding: isDesktop ? "24px 32px 28px" : "20px 24px 24px" }}>
+          <div className="fade-up delay-1" style={{ display: "grid", gridTemplateColumns: isDesktop ? "repeat(4, 1fr)" : "1fr 1fr", gap: 10, marginBottom: 18 }}>
+            {stats.map((s) => (
+              <div key={s.label} style={{ background: theme.white, borderRadius: 18, padding: "14px 10px", textAlign: "center", boxShadow: "0 6px 20px rgba(139,107,90,0.08)" }}>
+                <div style={{ width: 34, height: 34, margin: "0 auto 8px", borderRadius: 11, background: s.chip, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16 }}>
+                  {s.icon}
+                </div>
+                <div style={{ fontSize: 19, fontWeight: 700, color: theme.text }}>{s.value}</div>
+                <div style={{ fontSize: 11, color: theme.textLight, marginTop: 2 }}>{s.label}</div>
+              </div>
+            ))}
+          </div>
+
+          <div className="fade-up delay-2" style={{ background: theme.white, borderRadius: 20, padding: "16px 20px", marginBottom: 20, boxShadow: "0 6px 20px rgba(139,107,90,0.08)" }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: theme.textLight, marginBottom: 10, textTransform: "uppercase", letterSpacing: "0.08em" }}>Session Highlights</div>
+            <div style={{ maxHeight: isDesktop ? 230 : 190, overflowY: "auto", paddingRight: 4 }}>
+              {summaryLoading && (
+                <div style={{ fontSize: 14, color: theme.textLight }}>Generating highlights...</div>
+              )}
+              {!summaryLoading && highlights.length === 0 && (
+                <div style={{ fontSize: 14, color: theme.textLight }}>No highlights available for this session.</div>
+              )}
+              {!summaryLoading && highlights.map((h, i, arr) => (
+                <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 10, marginBottom: i < arr.length - 1 ? 10 : 0, fontSize: 14, color: theme.text, lineHeight: 1.5 }}>
+                  <span style={{ color: theme.sageDark, fontWeight: 700, marginTop: 1 }}>✓</span>{h}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="fade-up delay-3">
+            <button onClick={onHome} className="btn-primary" style={{ padding: 16, fontSize: 17 }}>Finish Session</button>
+          </div>
         </div>
       </div>
     </div>

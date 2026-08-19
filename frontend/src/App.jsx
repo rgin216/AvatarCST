@@ -5,6 +5,7 @@ import LandingPage from "./pages/LandingPage";
 import SessionPage from "./pages/SessionPage";
 import EndPage from "./pages/EndPage";
 import CaregiverPage from "./pages/CaregiverPage";
+import { toTitleCase } from "./utils/formatName";
 
 const SCREENS = {
   LOGIN: "login",
@@ -57,7 +58,7 @@ export default function App() {
 
   const handleLogin = (id, name) => {
     setUserId(id);
-    setUserName(name);
+    setUserName(toTitleCase(name));
     setScreen(SCREENS.LANDING);
   };
 
