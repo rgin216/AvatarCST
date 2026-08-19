@@ -185,7 +185,7 @@ export default function App() {
           userId ? (
             <LandingPage
               onStart={handleStartSession}
-              onCaregiver={() => navigate("/caregiver")}
+              onCaregiver={() => navigate("/caregiver/summary")}
               userName={userName}
               userId={userId}
               sessionOptions={TEST_SESSIONS}
@@ -215,8 +215,9 @@ export default function App() {
         path="/end/:sessionId"
         element={userId ? <EndRoute userId={userId} userName={userName} /> : <Navigate to="/login" replace />}
       />
+      <Route path="/caregiver" element={<Navigate to="/caregiver/summary" replace />} />
       <Route
-        path="/caregiver"
+        path="/caregiver/:tab"
         element={
           userId ? (
             <CaregiverPage

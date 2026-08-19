@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 import api from "../services/api.js";
 import theme from "../utils/theme";
 import useIsDesktop from "../hooks/useIsDesktop";
@@ -17,9 +18,19 @@ const CATEGORY_COLORS = {
   caregiver_note: "#F4C8B0",
 };
 
+const CAREGIVER_TABS = [
+  { id: "summary", label: "Summary" },
+  { id: "memory", label: "Memory Bank" },
+  { id: "history", label: "History" },
+];
+const CAREGIVER_TAB_IDS = new Set(CAREGIVER_TABS.map((t) => t.id));
+
 export default function CaregiverPage({ userId, onBack, onLogout, userName }) {
   const isDesktop = useIsDesktop();
-  const [tab, setTab] = useState("summary");
+  const navigate = useNavigate();
+  const { tab: tabParam } = useParams();
+  const tab = CAREGIVER_TAB_IDS.has(tabParam) ? tabParam : "summary";
+  const setTab = (id) => navigate(`/caregiver/${id}`, { replace: true });
   const [memories, setMemories] = useState([]);
   const [sessions, setSessions] = useState([]);
   const [loadingMemory, setLoadingMemory] = useState(false);
@@ -35,11 +46,13 @@ export default function CaregiverPage({ userId, onBack, onLogout, userName }) {
   const [latestSummary, setLatestSummary] = useState(null);
   const [loadingSummary, setLoadingSummary] = useState(false);
 
-  const tabs = [
-    { id: "summary", label: "Summary" },
-    { id: "memory", label: "Memory Bank" },
-    { id: "history", label: "History" },
-  ];
+  const tabs = CAREGIVER_TABS;
+
+  useEffect(() => {
+    if (tabParam && !CAREGIVER_TAB_IDS.has(tabParam)) {
+      navigate("/caregiver/summary", { replace: true });
+    }
+  }, [tabParam, navigate]);
 
   useEffect(() => {
     if (!userId) return;
