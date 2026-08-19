@@ -36,6 +36,14 @@ function storeAuth(userId, userName) {
   }
 }
 
+function clearAuth() {
+  try {
+    localStorage.removeItem(AUTH_STORAGE_KEY);
+  } catch {
+    // Storage may be unavailable (private browsing, quota) — nothing to clean up in that case.
+  }
+}
+
 const TEST_SESSIONS = [
   {
     id: "cst_intro_reminiscence",
@@ -145,6 +153,13 @@ export default function App() {
     navigate(`/end/${sessionId}`);
   };
 
+  const handleLogout = () => {
+    clearAuth();
+    setUserId(null);
+    setUserName("");
+    navigate("/login", { replace: true });
+  };
+
   return (
     <Routes>
       <Route
@@ -204,7 +219,12 @@ export default function App() {
         path="/caregiver"
         element={
           userId ? (
-            <CaregiverPage userId={userId} onBack={() => navigate("/landing")} userName={userName} />
+            <CaregiverPage
+              userId={userId}
+              onBack={() => navigate("/landing")}
+              onLogout={handleLogout}
+              userName={userName}
+            />
           ) : (
             <Navigate to="/login" replace />
           )

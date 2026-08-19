@@ -17,7 +17,7 @@ const CATEGORY_COLORS = {
   caregiver_note: "#F4C8B0",
 };
 
-export default function CaregiverPage({ userId, onBack, userName }) {
+export default function CaregiverPage({ userId, onBack, onLogout, userName }) {
   const isDesktop = useIsDesktop();
   const [tab, setTab] = useState("summary");
   const [memories, setMemories] = useState([]);
@@ -400,10 +400,18 @@ export default function CaregiverPage({ userId, onBack, userName }) {
       <div style={{ gridColumn: isDesktop ? "1 / -1" : undefined, padding: isDesktop ? "24px 32px 0" : "24px 24px 0", background: "linear-gradient(135deg, #B8CDD866, #7A9DAD33)", borderBottom: "1px solid #B8CDD888" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: isDesktop ? 20 : 20 }}>
           <button onClick={onBack} style={{ background: "none", border: "none", fontSize: 22, cursor: "pointer" }}>←</button>
-          <div>
+          <div style={{ flex: 1 }}>
             <div style={{ fontFamily: "'Playfair Display', serif", fontSize: 22, fontWeight: 600, color: theme.text }}>Caregiver View</div>
             <div style={{ fontSize: 13, color: theme.textLight }}>{userName}'s profile</div>
           </div>
+          {onLogout && (
+            <button
+              onClick={onLogout}
+              style={{ background: "none", border: `1.5px solid ${theme.mistDark}88`, borderRadius: 12, padding: "7px 14px", fontSize: 13, color: theme.mistDark, cursor: "pointer", fontFamily: "'Nunito', sans-serif", fontWeight: 600 }}
+            >
+              Sign out
+            </button>
+          )}
         </div>
         {!isDesktop && (
           <div style={{ display: "flex" }}>
