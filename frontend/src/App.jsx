@@ -35,6 +35,16 @@ const TEST_SESSIONS = [
     title: "Getting to Know You: Childhood",
     theme: "Childhood",
   },
+  ...Array.from({ length: 13 }, (_, i) => {
+    const n = i + 3;
+    return {
+      id: `placeholder_session_${n}`,
+      label: `Session ${n}`,
+      title: "Coming soon",
+      theme: "",
+      disabled: true,
+    };
+  }),
 ];
 
 export default function App() {
@@ -52,7 +62,7 @@ export default function App() {
   };
 
   const handleStartSession = async (sessionOption = TEST_SESSIONS[0]) => {
-    if (!userId) return;
+    if (!userId || sessionOption.disabled) return;
     setSessionId(null);
     try {
       const { data } = await api.post("/sessions", {
