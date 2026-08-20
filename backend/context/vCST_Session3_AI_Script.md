@@ -128,6 +128,7 @@ Allow at least four minutes before giving an inactivity reminder. If they list o
 # Step 21 — Olympic trivia introduction
 
 Introduce the trivia as a gentle activity. Explicitly say it is fine to guess or say “I’m not sure.”
+For every trivia response, check the scripted answer before showing the answer slide. Use varied wording to acknowledge a correct response, gently say when a response is not correct, and respond without pressure when the participant is unsure. Then reveal the answer once, without repeating the acknowledgement.
 
 ---
 

@@ -560,14 +560,16 @@ body {
 }
 
 .slide-activity-card.is-revealed .slide-activity-cover {
-  inset: auto 0 0;
-  min-height: 26%;
-  padding: 6px 10px;
-  background: rgba(0, 0, 0, 0.9);
+  inset: 8px auto auto 8px;
+  min-height: 0;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.32);
 }
 
 .slide-activity-card.is-revealed .slide-activity-cover > span {
   font-size: clamp(13px, 1.55cqw, 22px);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.95);
 }
 
 .slide-activity-card:disabled {

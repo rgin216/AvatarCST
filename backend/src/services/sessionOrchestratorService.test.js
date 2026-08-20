@@ -11,6 +11,7 @@ import {
   extractPreferredNameAnswer,
   evaluateAdaptiveFollowUpAnswer,
   evaluateOrientationAnswer,
+  evaluateTriviaAnswer,
   hasSubstantialSpeechOverlap,
   inferMemorySuggestions,
   isRecordableSessionAnswer,
@@ -173,6 +174,44 @@ test('keeps Session 3 Olympic trivia answers precise and current through Paris 2
   ]) {
     assert.equal(answerStep.isAnswerReveal, true, answerStep.id);
   }
+});
+
+test('acknowledges correct and incorrect Session 3 trivia answers with varied wording', () => {
+  const cases = [
+    [21, 'Los Angeles in 2028', '2032 in Brisbane'],
+    [23, 'Black', 'Blue'],
+    [25, 'Ted Morgan', 'Peter Snell'],
+    [27, 'Peter Snell', 'John Walker'],
+    [29, 'Rowing', 'Rolling'],
+    [31, 'Three gold medals', 'Two'],
+  ];
+  const correctResponses = [];
+
+  for (const [stepIndex, correctAnswer, incorrectAnswer] of cases) {
+    const step = getScriptStep('cst_physical_games', stepIndex).step;
+    const correct = evaluateTriviaAnswer({ step, content: correctAnswer });
+    const incorrect = evaluateTriviaAnswer({ step, content: incorrectAnswer });
+
+    assert.equal(correct.answered, true, step.id);
+    assert.equal(correct.outcome, 'correct', step.id);
+    assert.equal(incorrect.answered, true, step.id);
+    assert.equal(incorrect.outcome, 'incorrect', step.id);
+    assert.notEqual(correct.response, incorrect.response, step.id);
+    correctResponses.push(correct.response);
+  }
+
+  assert.equal(new Set(correctResponses).size, cases.length);
+});
+
+test('gently handles uncertainty during Session 3 trivia', () => {
+  const step = getScriptStep('cst_physical_games', 29).step;
+  const result = evaluateTriviaAnswer({ step, content: "I don't know" });
+
+  assert.deepEqual(result, {
+    answered: true,
+    response: 'No problem. Let us reveal the answer.',
+    outcome: 'unsure',
+  });
 });
 
 test('recognises button, typed, and spoken music completion answers', () => {

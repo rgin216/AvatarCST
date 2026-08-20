@@ -418,6 +418,62 @@ export const evaluateOrientationAnswer = ({ step, content, retryCount }) => {
   };
 };
 
+const SESSION3_TRIVIA_RULES = {
+  physical_games_trivia_next_olympics: {
+    isCorrect: (answer) =>
+      /\b2028\b/.test(answer) && /\b(?:los angeles|l a)\b/.test(answer),
+    correctResponse: 'Exactly — you got both the year and host city right.',
+    incorrectResponse: 'Good try. One or both parts are not quite right.',
+  },
+  physical_games_trivia_uniform: {
+    isCorrect: (answer) => /\bblack\b/.test(answer),
+    correctResponse: 'That is right — you chose the correct colour.',
+    incorrectResponse: 'Not quite, but that was a good guess.',
+  },
+  physical_games_trivia_first_gold: {
+    isCorrect: (answer) => /\b(?:ted morgan|morgan)\b/.test(answer),
+    correctResponse: 'Spot on — you named the right Olympian.',
+    incorrectResponse: 'That is not the Olympian we are looking for, but good try.',
+  },
+  physical_games_trivia_runner: {
+    isCorrect: (answer) => /\b(?:peter snell|snell)\b/.test(answer),
+    correctResponse: 'Correct — you identified the runner.',
+    incorrectResponse: 'That is not quite right, but it was worth a try.',
+  },
+  physical_games_trivia_most_gold: {
+    isCorrect: (answer) => /\browing\b/.test(answer),
+    correctResponse: 'You have got it — that is the right sport.',
+    incorrectResponse: 'Close, but that is not the sport in the answer.',
+  },
+  physical_games_trivia_carrington: {
+    isCorrect: (answer) => /\b(?:3|three)\b/.test(answer),
+    correctResponse: 'Well done — that number is correct.',
+    incorrectResponse: 'That number is not quite right, but good guess.',
+  },
+};
+
+const isSession3TriviaQuestion = (step) => Boolean(SESSION3_TRIVIA_RULES[step?.id]);
+
+export const evaluateTriviaAnswer = ({ step, content }) => {
+  const rule = SESSION3_TRIVIA_RULES[step?.id];
+  if (!rule || !content) return null;
+
+  if (isDontKnowAnswer(content)) {
+    return {
+      answered: true,
+      response: 'No problem. Let us reveal the answer.',
+      outcome: 'unsure',
+    };
+  }
+
+  const correct = rule.isCorrect(normalizeAnswer(content));
+  return {
+    answered: true,
+    response: correct ? rule.correctResponse : rule.incorrectResponse,
+    outcome: correct ? 'correct' : 'incorrect',
+  };
+};
+
 const isMusicCompletionProtocol = (content = '') =>
   /^\[\[music-complete\]\]$/i.test(content.trim());
 
@@ -1961,6 +2017,9 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
       step,
       content: userContent,
       retryCount: currentRetryCount,
+    }) || evaluateTriviaAnswer({
+      step,
+      content: userContent,
     }) || evaluateMusicCompletionAnswer({
       step,
       content: userContent,
@@ -2232,7 +2291,7 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
   if (userContent && !hasAutoAdvanceProtocol) {
     adaptiveText = collapseRepeatedAdjacentSpeech(adaptiveText);
     if (
-      nextSlideProvidesResponse ||
+      (nextSlideProvidesResponse && !isSession3TriviaQuestion(step)) ||
       hasSubstantialSpeechOverlap(adaptiveText, scriptedNextLine)
     ) {
       adaptiveText = '';
