@@ -112,9 +112,9 @@ Ask for their favourite way to stay active.
 
 ---
 
-# Step 19 — Movement preview
+# Step 19 — 3-2-1 Action
 
-Mention the pictured movement ideas without opening a camera or asking the participant to perform them. Move on automatically.
+Invite the participant to reveal any three of the six activity cards, one at a time. For each revealed GIF, describe the scripted gentle seated upper-body imitation and wait for the participant to press the finished button. Do not open or process a camera, claim to recognise their movement, require lower-body movement, or select the same activity twice. Remind them to move only within a safe and comfortable range.
 
 ---
 

@@ -776,10 +776,58 @@ const scripts = {
       bullets: ['Swimming', 'Rugby', 'Dancing', 'Basketball', 'Yoga', 'Weight lifting'],
       visualHint: 'Source deck: NZ03. Physical Games, slide 19',
       accent: '#F4C8B0',
-      interaction: { type: 'autoAdvance' },
+      interaction: {
+        type: 'activityReveal',
+        revealCount: 3,
+        completionPrompt: 'Press “I have finished this action” when you are ready for the next card.',
+        options: [
+          {
+            id: 'swimming',
+            label: 'Swimming',
+            gifUrl: '/activities/session3/swimming.gif',
+            movementCue:
+              'Stay seated and pretend you are swimming freestyle: reach one arm forward while the other sweeps gently back, then alternate your arms. Keep every movement within a comfortable range.',
+          },
+          {
+            id: 'rugby',
+            label: 'Rugby',
+            gifUrl: '/activities/session3/rugby.gif',
+            movementCue:
+              'Stay seated and hold an imaginary rugby ball close to your chest with one arm. Gently extend your other arm forward with an open palm as though making a rugby fend, then bring it back.',
+          },
+          {
+            id: 'dancing',
+            label: 'Dancing',
+            gifUrl: '/activities/session3/dancing.gif',
+            movementCue:
+              'Stay seated and try the upper-body part of the running man: bend both elbows and gently thrust both arms forward and back in rhythm. Keep your feet still and move only as much as feels comfortable.',
+          },
+          {
+            id: 'basketball',
+            label: 'Basketball',
+            gifUrl: '/activities/session3/basketball.gif',
+            movementCue:
+              'Stay seated and imagine holding a basketball near your chest. Lift both hands upward as though dunking the ball, then lower them slowly. Do not reach higher than feels comfortable.',
+          },
+          {
+            id: 'yoga',
+            label: 'Yoga',
+            gifUrl: '/activities/session3/yoga.gif',
+            movementCue:
+              'Stay seated, bring your palms together near your chest, then slowly lift your hands upward and open your arms out wide. Stop before any stretch feels uncomfortable.',
+          },
+          {
+            id: 'weight-lifting',
+            label: 'Weight Lifting',
+            gifUrl: '/activities/session3/weight-lifting.gif',
+            movementCue:
+              'Stay seated and pretend you are holding very light dumbbells, with your hands near your shoulders. Gently press both hands upward and lower them slowly. Please do not use real weights for this activity.',
+          },
+        ],
+      },
       recordAnswer: false,
       reply: () =>
-        'Here are several ways people move, including swimming, rugby, dancing, basketball, yoga, and weight lifting. We will leave the action activity for another time and move gently to our word game.',
+        'Let us play 3-2-1 Action. Choose any three black activity cards, one at a time. When you reveal one, I will describe a gentle seated upper-body action for you to re-enact. Only move in ways that feel safe and comfortable. Select your first card when you are ready.',
     },
     {
       id: 'physical_games_scattergories',

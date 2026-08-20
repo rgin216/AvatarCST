@@ -6,6 +6,7 @@ import {
   buildThemeSongLookupFeedback,
   canRequestAdaptiveFollowUp,
   collapseRepeatedAdjacentSpeech,
+  createActivityRevealState,
   getRetryDecision,
   extractPreferredNameAnswer,
   evaluateAdaptiveFollowUpAnswer,
@@ -18,6 +19,7 @@ import {
   isThemeSongSkipAnswer,
   isVideoCompletionAnswer,
   parseAdaptiveTurn,
+  parseActivityRevealEvent,
   resolveThemeSongSelectionAnswer,
   selectRelevantMemoryEntries,
   shouldUseNextSlideResponseOnly,
@@ -54,6 +56,65 @@ test('configures Session 3 slide 20 for four minutes and an activity follow-up',
   assert.equal(scattergoriesStep.id, 'physical_games_scattergories');
   assert.equal(scattergoriesStep.inactivityTimeoutMs, 240_000);
   assert.match(scattergoriesStep.adaptiveFollowUp.guidance, /played or done/i);
+});
+
+test('configures Session 3 slide 19 as three unique GIF reveals with seated movement cues', () => {
+  const actionStep = getScriptStep('cst_physical_games', 18).step;
+  const { interaction } = actionStep;
+
+  assert.equal(actionStep.id, 'physical_games_action_preview');
+  assert.equal(interaction.type, 'activityReveal');
+  assert.equal(interaction.revealCount, 3);
+  assert.equal(interaction.options.length, 6);
+  assert.equal(new Set(interaction.options.map((option) => option.id)).size, 6);
+  for (const option of interaction.options) {
+    assert.match(option.gifUrl, /^\/activities\/session3\/.+\.gif$/);
+    assert.match(option.movementCue, /stay seated/i);
+    assert.ok(option.movementCue.length > 40, option.id);
+  }
+});
+
+test('accepts only configured activity reveal options and restores bounded progress', () => {
+  const actionStep = getScriptStep('cst_physical_games', 18).step;
+  const reveal = parseActivityRevealEvent(
+    '[[activity-reveal:{"optionId":"basketball"}]]',
+    actionStep
+  );
+  assert.equal(reveal.option.label, 'Basketball');
+  assert.match(reveal.option.movementCue, /dunking/i);
+  assert.equal(
+    parseActivityRevealEvent('[[activity-reveal:{"optionId":"camera"}]]', actionStep),
+    null
+  );
+
+  assert.deepEqual(createActivityRevealState(actionStep, {
+    status: 'performing',
+    targetCount: 99,
+    revealedOptionIds: ['basketball', 'basketball', 'not-an-option'],
+    currentOptionId: 'basketball',
+    completedCount: 8,
+  }), {
+    status: 'performing',
+    targetCount: 3,
+    revealedOptionIds: ['basketball'],
+    currentOptionId: 'basketball',
+    completedCount: 1,
+  });
+});
+
+test('does not record activity reveal controls as conversational answers', () => {
+  const actionStep = getScriptStep('cst_physical_games', 18).step;
+
+  assert.equal(isRecordableSessionAnswer({
+    step: actionStep,
+    content: '[[activity-reveal:{"optionId":"rugby"}]]',
+    wheelEvent: null,
+  }), false);
+  assert.equal(isRecordableSessionAnswer({
+    step: actionStep,
+    content: '[[activity-complete]]',
+    wheelEvent: null,
+  }), false);
 });
 
 test('ports reusable ready-state and automatic closing behavior to Session 3', () => {

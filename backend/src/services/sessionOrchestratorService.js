@@ -420,6 +420,12 @@ const isVideoCompletionProtocol = (content = '') =>
 const isAutoAdvanceProtocol = (content = '') =>
   /^\[\[auto-advance\]\]$/i.test(content.trim());
 
+const isActivityRevealProtocol = (content = '') =>
+  /^\[\[activity-reveal:/i.test(content.trim());
+
+const isActivityCompletionProtocol = (content = '') =>
+  /^\[\[activity-complete\]\]$/i.test(content.trim());
+
 const isNaturalMediaCompletionAnswer = (content = '') => {
   const normalized = normalizeAnswer(content);
   if (!normalized) return false;
@@ -671,11 +677,57 @@ const parseQuestionWheelEvent = (content = '', step = null) => {
   }
 };
 
+export const createActivityRevealState = (step, persistedState = null) => {
+  const options = step?.interaction?.type === 'activityReveal'
+    ? step.interaction.options || []
+    : [];
+  const validIds = new Set(options.map((option) => String(option.id)));
+  const requestedCount = Number(step?.interaction?.revealCount) || 3;
+  const targetCount = Math.max(1, Math.min(requestedCount, options.length || requestedCount));
+  const revealedOptionIds = Array.isArray(persistedState?.revealedOptionIds)
+    ? [...new Set(persistedState.revealedOptionIds.map(String).filter((id) => validIds.has(id)))]
+    : [];
+  const currentOptionId = validIds.has(String(persistedState?.currentOptionId || ''))
+    ? String(persistedState.currentOptionId)
+    : null;
+  const completedCount = Math.max(
+    0,
+    Math.min(Number(persistedState?.completedCount) || 0, revealedOptionIds.length, targetCount)
+  );
+
+  return {
+    status: currentOptionId && completedCount < targetCount ? 'performing' : 'choose',
+    targetCount,
+    revealedOptionIds,
+    currentOptionId: currentOptionId && completedCount < targetCount ? currentOptionId : null,
+    completedCount,
+  };
+};
+
+export const parseActivityRevealEvent = (content = '', step = null) => {
+  const match = content.trim().match(/^\[\[activity-reveal:(.+)\]\]$/s);
+  if (!match || step?.interaction?.type !== 'activityReveal') return null;
+
+  try {
+    const parsed = JSON.parse(match[1]);
+    const requestedId = String(parsed?.optionId || parsed?.id || '').trim();
+    const option = (step.interaction.options || []).find(
+      (candidate) => requestedId && String(candidate.id || '') === requestedId
+    );
+    if (!option?.id || !option?.label || !option?.movementCue) return null;
+    return { option };
+  } catch {
+    return null;
+  }
+};
+
 export const isRecordableSessionAnswer = ({ step, content, wheelEvent }) =>
   Boolean(
     content &&
     !wheelEvent &&
     !isAutoAdvanceProtocol(content) &&
+    !isActivityRevealProtocol(content) &&
+    !isActivityCompletionProtocol(content) &&
     step?.id &&
     step.recordAnswer !== false
   );
@@ -1674,9 +1726,17 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
   const hasVideoCompletionProtocol = isVideoCompletionProtocol(userContent || '');
   const hasAutoAdvanceProtocol = isAutoAdvanceProtocol(userContent || '');
   const hasWheelProtocol = isQuestionWheelProtocol(userContent || '');
+  const hasActivityRevealProtocol = isActivityRevealProtocol(userContent || '');
+  const hasActivityCompletionProtocol = isActivityCompletionProtocol(userContent || '');
   const wheelEvent = parseQuestionWheelEvent(userContent || '', step);
+  const activityRevealEvent = parseActivityRevealEvent(userContent || '', step);
   if (hasWheelProtocol && !wheelEvent) {
     const err = new Error('Invalid question wheel option');
+    err.status = 400;
+    throw err;
+  }
+  if (hasActivityRevealProtocol && !activityRevealEvent) {
+    const err = new Error('Invalid activity reveal option');
     err.status = 400;
     throw err;
   }
@@ -1691,6 +1751,17 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
   const stepTurns = step.turns || 1;
   const currentTurnIndex = session.scriptStepTurnIndex || 0;
   const effectiveTurnIndex = currentTurnIndex || (hasPriorAssistantTurn(recentMessages) ? 1 : 0);
+  const isActivityInteractionEvent = Boolean(
+    activityRevealEvent || hasActivityCompletionProtocol
+  );
+  if (
+    isActivityInteractionEvent &&
+    (step.interaction?.type !== 'activityReveal' || effectiveTurnIndex !== 1)
+  ) {
+    const err = new Error('Activity interaction is not expected at this point');
+    err.status = 409;
+    throw err;
+  }
   if (
     hasMusicCompletionProtocol &&
     (step.interaction?.type !== 'spotifySong' || effectiveTurnIndex !== 1)
@@ -1719,6 +1790,57 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
   const llmProvider = getLlmProviderForSession(session);
   const useFastScriptedTurn = isOpenAIFastScriptedPipeline(session.pipelineMode);
   const persistedWheelState = session.interactionState?.questionWheel;
+  const persistedActivityRevealState = session.interactionState?.activityReveal;
+  const currentActivityRevealState = step.interaction?.type === 'activityReveal'
+    ? createActivityRevealState(step, persistedActivityRevealState)
+    : null;
+  const currentActivityOption = step.interaction?.type === 'activityReveal'
+    ? (step.interaction.options || []).find(
+        (option) => String(option.id) === currentActivityRevealState?.currentOptionId
+      ) || null
+    : null;
+  if (
+    activityRevealEvent &&
+    (
+      currentActivityRevealState.status !== 'choose' ||
+      currentActivityRevealState.completedCount >= currentActivityRevealState.targetCount ||
+      currentActivityRevealState.revealedOptionIds.includes(String(activityRevealEvent.option.id))
+    )
+  ) {
+    const err = new Error('Choose a different unrevealed activity after finishing the current one');
+    err.status = 409;
+    throw err;
+  }
+  if (
+    hasActivityCompletionProtocol &&
+    (currentActivityRevealState?.status !== 'performing' || !currentActivityOption)
+  ) {
+    const err = new Error('Reveal an activity before marking it complete');
+    err.status = 409;
+    throw err;
+  }
+  const nextActivityRevealState = activityRevealEvent
+    ? {
+        ...currentActivityRevealState,
+        status: 'performing',
+        revealedOptionIds: [
+          ...currentActivityRevealState.revealedOptionIds,
+          String(activityRevealEvent.option.id),
+        ],
+        currentOptionId: String(activityRevealEvent.option.id),
+      }
+    : hasActivityCompletionProtocol
+    ? {
+        ...currentActivityRevealState,
+        status: 'choose',
+        currentOptionId: null,
+        completedCount: currentActivityRevealState.completedCount + 1,
+      }
+    : currentActivityRevealState;
+  const completedAllActivities = Boolean(
+    hasActivityCompletionProtocol &&
+    nextActivityRevealState.completedCount >= nextActivityRevealState.targetCount
+  );
   const persistedAdaptiveFollowUp = session.interactionState?.adaptiveFollowUp;
   const activeAdaptiveFollowUp =
     persistedAdaptiveFollowUp?.stepId === step.id ? persistedAdaptiveFollowUp : null;
@@ -1737,6 +1859,10 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
   if (userContent && !hasAutoAdvanceProtocol) {
     const messageContent = wheelEvent
       ? `Question wheel landed on ${wheelEvent.label}.`
+      : activityRevealEvent
+      ? `Revealed ${activityRevealEvent.option.label}.`
+      : hasActivityCompletionProtocol
+      ? `Finished reenacting ${currentActivityOption.label}.`
       : hasMusicCompletionProtocol
       ? 'Music playback completed.'
       : hasVideoCompletionProtocol
@@ -1823,7 +1949,7 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
   let answeredCurrentQuestion = true;
   let adaptiveText = '';
   let adaptiveFollowUpQuestion = null;
-  if (!isQuestionWheelEvent && userContent && hasDeliveredQuestion) {
+  if (!isQuestionWheelEvent && !isActivityInteractionEvent && userContent && hasDeliveredQuestion) {
     const deterministicTurn = evaluateOrientationAnswer({
       step,
       content: userContent,
@@ -1989,12 +2115,13 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
     answeredCurrentQuestion &&
     newsElaborationRequested
   );
-  const shouldAdvance =
-    canProgress &&
-    !shouldAskAdaptiveFollowUp &&
-    !shouldElaborateNews &&
-    !isFinalStep &&
-    effectiveTurnIndex >= stepTurns;
+  const shouldAdvance = isActivityInteractionEvent
+    ? completedAllActivities && !isFinalStep
+    : canProgress &&
+      !shouldAskAdaptiveFollowUp &&
+      !shouldElaborateNews &&
+      !isFinalStep &&
+      effectiveTurnIndex >= stepTurns;
   const completionReply = typeof step.completionReply === 'function'
     ? step.completionReply(scriptContext)
     : step.completionReply;
@@ -2014,7 +2141,17 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
     shouldAdvance,
     nextStep,
   });
-  const scriptedNextLine = themeSongFeedback
+  const activityInteractionReply = activityRevealEvent
+    ? `${activityRevealEvent.option.label}. ${activityRevealEvent.option.movementCue} ${step.interaction.completionPrompt}`
+    : hasActivityCompletionProtocol
+    ? completedAllActivities
+      ? joinSpeechParts(
+          'Well done. You completed all three actions.',
+          getProgressScriptLine({ step, nextStep, currentTurnIndex: effectiveTurnIndex, stepTurns, context: scriptContext })
+        )
+      : `Well done. Choose another black activity card. You have ${nextActivityRevealState.targetCount - nextActivityRevealState.completedCount} ${nextActivityRevealState.targetCount - nextActivityRevealState.completedCount === 1 ? 'action' : 'actions'} left.`
+    : '';
+  const scriptedNextLine = activityInteractionReply || (themeSongFeedback
     ? themeSongRequiresRetry
       ? themeSongFeedback
       : joinSpeechParts(
@@ -2043,7 +2180,7 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
     ? sessionCompleteAfterResponse && completionReply
       ? completionReply
       : getProgressScriptLine({ step, nextStep, currentTurnIndex: effectiveTurnIndex, stepTurns, context: scriptContext })
-    : expectedQuestion || renderScriptReply(step, scriptContext);
+    : expectedQuestion || renderScriptReply(step, scriptContext));
   const answerState = shouldRepeatQuestion
     ? 'repeat_question'
     : shouldAskAdaptiveFollowUp
@@ -2058,6 +2195,7 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
     !adaptiveText &&
     !themeSongFeedback &&
     !isQuestionWheelEvent &&
+    !isActivityInteractionEvent &&
     !hasAutoAdvanceProtocol &&
     !nextSlideProvidesResponse
   ) {
@@ -2113,6 +2251,8 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
     ? currentTurnIndex
     : shouldAdvance
     ? 1
+    : isActivityInteractionEvent
+    ? effectiveTurnIndex
     : effectiveTurnIndex + 1;
   session.scriptStepTurnIndex = nextTurnIndex;
   session.scriptStepRetryCount = !hasUserContent
@@ -2162,6 +2302,13 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
   } else {
     delete nextInteractionState.questionWheel;
   }
+  if (displaySlide.interaction?.type === 'activityReveal') {
+    nextInteractionState.activityReveal = step.interaction?.type === 'activityReveal'
+      ? createActivityRevealState(displaySlide, nextActivityRevealState)
+      : createActivityRevealState(displaySlide);
+  } else {
+    delete nextInteractionState.activityReveal;
+  }
   if (displaySlide.interaction?.type === 'positiveNews') {
     nextInteractionState.currentAffairs = currentAffairs;
     const newsUrl = currentAffairs?.status === 'available' ? currentAffairs.article?.url : null;
@@ -2209,7 +2356,7 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
       userId: session.userId,
       sessionId: session._id,
       suggestions:
-        wheelEvent || hasMusicCompletionProtocol || hasVideoCompletionProtocol || hasAutoAdvanceProtocol || !answeredCurrentQuestion
+        wheelEvent || isActivityInteractionEvent || hasMusicCompletionProtocol || hasVideoCompletionProtocol || hasAutoAdvanceProtocol || !answeredCurrentQuestion
           ? []
           : inferMemorySuggestions(userContent),
     });
@@ -2250,6 +2397,7 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
         ? session.interactionState?.musicPlayback || null
         : null,
     questionWheel: session.interactionState?.questionWheel || null,
+    activityReveal: session.interactionState?.activityReveal || null,
     assistantText,
     speechSegments,
     sessionCompleteAfterResponse,

@@ -197,6 +197,7 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
   const [musicPlayback, setMusicPlayback] = useState(null);
   const [musicPlaybackState, setMusicPlaybackState] = useState("idle");
   const [questionWheel, setQuestionWheel] = useState(null);
+  const [activityReveal, setActivityReveal] = useState(null);
   const [wheelSpinning, setWheelSpinning] = useState(false);
   const [wheelResultPending, setWheelResultPending] = useState(false);
   const [wheelRotation, setWheelRotation] = useState(0);
@@ -265,15 +266,35 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
   const musicAwaitingCompletion =
     Boolean(musicInteraction) && musicPlayback?.status !== "complete";
   const autoAdvanceInteraction = slide.interaction?.type === "autoAdvance";
+  const activityRevealInteraction =
+    slide.interaction?.type === "activityReveal" ? slide.interaction : null;
+  const activityOptions = activityRevealInteraction?.options || [];
+  const hasActivityRevealInteraction = activityOptions.length > 0;
+  const revealedActivityIds = new Set(activityReveal?.revealedOptionIds || []);
+  const currentActivity = activityOptions.find(
+    (option) => option.id === activityReveal?.currentOptionId
+  );
+  const activityTargetCount = activityReveal?.targetCount || activityRevealInteraction?.revealCount || 3;
   const inactivityTimeoutMs = Math.max(
     INACTIVITY_TIMEOUT_MS,
     Number(slide.inactivityTimeoutMs) || 0
   );
   const hasSlideInteraction =
-    hasWheelInteraction || Boolean(exerciseVideo) || hasPositiveNewsInteraction || Boolean(musicInteraction);
+    hasWheelInteraction ||
+    Boolean(exerciseVideo) ||
+    hasPositiveNewsInteraction ||
+    Boolean(musicInteraction) ||
+    hasActivityRevealInteraction;
   const landedWheelResult = questionWheel?.status === "landed" ? questionWheel : null;
   const sessionInputDisabled =
-    typing || wheelResultPending || autoAdvanceInteraction || avatarNarrationActive || pendingPlay;
+    typing ||
+    wheelResultPending ||
+    autoAdvanceInteraction ||
+    hasActivityRevealInteraction ||
+    avatarNarrationActive ||
+    pendingPlay;
+  const activityControlsDisabled =
+    typing || isRecording || avatarNarrationActive || pendingPlay;
   const wheelSliceDegrees = wheelOptions.length ? 360 / wheelOptions.length : 0;
   const wheelGradient = wheelOptions.length
     ? wheelOptions
@@ -388,6 +409,7 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
         : "idle"
     );
     setQuestionWheel(turn.questionWheel || null);
+    setActivityReveal(turn.activityReveal || null);
     spotifyAutoplayPendingRef.current = shouldAutoplayThemeSong;
     videoAutoplayPendingRef.current = shouldAutoplayExercise;
     const audioSegments = Array.isArray(turn.avatar?.audio?.segments)
@@ -1222,6 +1244,67 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
     }
   }
 
+  async function handleActivityReveal(option) {
+    if (
+      !option ||
+      activityControlsDisabled ||
+      activityReveal?.status === "performing" ||
+      revealedActivityIds.has(option.id)
+    ) return;
+
+    registerUserActivity();
+    setMessages((items) => [...items, { from: "user", text: `Reveal ${option.label}.` }]);
+    setTyping(true);
+
+    try {
+      const { data } = await api.post(`/sessions/${sessionId}/respond`, {
+        content: `[[activity-reveal:${JSON.stringify({ optionId: option.id })}]]`,
+        avatarMode: avatarModeRef.current,
+        lipSyncMode,
+      });
+      applyTurn(data);
+    } catch (err) {
+      console.error("Failed to reveal activity", err);
+      setMessages((items) => [
+        ...items,
+        { from: "avatar", text: "I could not reveal that activity just now. Please try again." },
+      ]);
+    } finally {
+      setTyping(false);
+    }
+  }
+
+  async function handleActivityDone() {
+    if (!currentActivity || activityControlsDisabled) return;
+
+    registerUserActivity();
+    setMessages((items) => [
+      ...items,
+      { from: "user", text: `I have finished ${currentActivity.label}.` },
+    ]);
+    setTyping(true);
+
+    try {
+      const { data } = await api.post(`/sessions/${sessionId}/respond`, {
+        content: "[[activity-complete]]",
+        avatarMode: avatarModeRef.current,
+        lipSyncMode,
+      });
+      applyTurn(data);
+    } catch (err) {
+      console.error("Failed to complete activity", err);
+      setMessages((items) => [
+        ...items,
+        {
+          from: "avatar",
+          text: "I could not continue just now. Please press the finished button again.",
+        },
+      ]);
+    } finally {
+      setTyping(false);
+    }
+  }
+
   async function sendQuestionWheelResult(result) {
     if (!result || typing) return;
 
@@ -1350,7 +1433,7 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
 
       <main className="session-slide-shell">
         <section
-          className={`ppt-slide${slide.imageUrl && !hasSlideInteraction ? " has-slide-image" : ""}${hasSlideInteraction ? " has-slide-interaction" : ""}${exerciseVideo ? " has-video-interaction" : ""}${hasPositiveNewsInteraction ? " has-news-interaction" : ""}${musicInteraction ? " has-music-interaction" : ""}`}
+          className={`ppt-slide${slide.imageUrl && !hasSlideInteraction ? " has-slide-image" : ""}${hasSlideInteraction ? " has-slide-interaction" : ""}${exerciseVideo ? " has-video-interaction" : ""}${hasPositiveNewsInteraction ? " has-news-interaction" : ""}${musicInteraction ? " has-music-interaction" : ""}${hasActivityRevealInteraction ? " has-activity-reveal-interaction" : ""}`}
           style={{
             "--slide-accent": slide.accent || theme.blush,
             backgroundImage: slide.imageUrl && !hasSlideInteraction ? `url(${slide.imageUrl})` : undefined,
@@ -1360,6 +1443,63 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
             Session step {slide.index + 1} / {slide.total}
             {slide.deckSlide ? ` / Deck slide ${slide.deckSlide}` : ""}
           </div>
+          {hasActivityRevealInteraction && (
+            <div className="slide-activity-overlay">
+              <header className="slide-activity-heading">
+                <div>
+                  <p>Reveal and re-enact</p>
+                  <h1>3-2-1 Action!</h1>
+                </div>
+                <strong>
+                  {Math.min(activityReveal?.completedCount || 0, activityTargetCount)} of {activityTargetCount} complete
+                </strong>
+              </header>
+              <div className="slide-activity-grid">
+                {activityOptions.map((option) => {
+                  const isRevealed = revealedActivityIds.has(option.id);
+                  const isCurrent = currentActivity?.id === option.id;
+                  return (
+                    <button
+                      type="button"
+                      key={option.id}
+                      className={`slide-activity-card${isRevealed ? " is-revealed" : ""}${isCurrent ? " is-current" : ""}`}
+                      onClick={() => handleActivityReveal(option)}
+                      disabled={
+                        activityControlsDisabled ||
+                        activityReveal?.status === "performing" ||
+                        isRevealed ||
+                        (activityReveal?.completedCount || 0) >= activityTargetCount
+                      }
+                      aria-label={isRevealed ? `${option.label} revealed` : `Reveal ${option.label}`}
+                    >
+                      <img src={option.gifUrl} alt={`${option.label} movement demonstration`} />
+                      <span className="slide-activity-cover">
+                        <span>{option.label}</span>
+                        {!isRevealed && <small>Reveal</small>}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+              <footer className="slide-activity-footer" aria-live="polite">
+                {currentActivity ? (
+                  <>
+                    <p><strong>{currentActivity.label}:</strong> {currentActivity.movementCue}</p>
+                    <button
+                      type="button"
+                      className="slide-activity-done"
+                      onClick={handleActivityDone}
+                      disabled={activityControlsDisabled}
+                    >
+                      I have finished this action
+                    </button>
+                  </>
+                ) : (
+                  <p>Choose an unrevealed black card. Move only in ways that feel safe and comfortable.</p>
+                )}
+              </footer>
+            </div>
+          )}
           {hasWheelInteraction && (
             <div className="slide-wheel-overlay">
               <div className="slide-wheel-pointer" aria-hidden="true" />
