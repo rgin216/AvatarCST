@@ -53,7 +53,7 @@ For recorded microphone input:
 2. `SessionPage.jsx` posts the audio blob to `POST /api/sessions/:id/respond-audio`.
 3. `sttService.js` sends the audio to Groq Whisper (`whisper-large-v3-turbo` by default).
 4. `sessionOrchestratorService.js` uses the transcript, session script state, recent messages, and memory entries.
-5. `llmService.js` calls Groq chat completions (`llama-3.3-70b-versatile` by default).
+5. `llmService.js` calls Groq chat completions (`openai/gpt-oss-120b` by default).
 6. `sessionController.js` chooses the voice from the selected avatar mode.
 7. Male/female avatars synthesize an audio file with `msedge-tts`, then `rhubarbService.js` generates mouth cues.
 8. The audio visualizer skips Rhubarb and uses a short-lived streaming speech token.
