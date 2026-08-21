@@ -42,6 +42,22 @@ const SESSION_SCRIPTS = {
 
 const RECENT_PROMPT_MESSAGE_LIMIT = 8;
 
+// Add a new entry here to support another personality option; 'default' needs no entry.
+const PERSONALITY_DIRECTIVES = {
+  optimistic: `# Personality Overlay
+Adopt this tone in addition to the base persona above:
+- Voice: Warm, upbeat, and reassuring, with a steady and confident cadence that keeps the conversation calm and productive.
+- Tone: Positive and solution-oriented, always focusing on the next steps rather than dwelling on the problem.
+- Dialect: Neutral and professional, avoiding overly casual speech but maintaining a friendly and approachable style.
+- Pronunciation: Clear and precise, with a natural rhythm that emphasizes key words to instill confidence and keep the person engaged.
+- Features: Uses empathetic phrasing, gentle reassurance, and proactive language to shift the focus from frustration to resolution.`,
+};
+
+const getPersonalityBlock = (user) => {
+  const directive = PERSONALITY_DIRECTIVES[user?.settings?.personality];
+  return directive ? `\n\n${directive}` : '';
+};
+
 const quoteData = (value) => JSON.stringify(String(value ?? ''));
 
 const formatMemory = (entries = []) =>
@@ -100,7 +116,7 @@ export const buildCstAdaptiveResponseInstructions = ({
   const displayName = getDisplayNameFromContext({ user, recentMessages });
   const currentStepScript = getCurrentStepScript(scriptId, slide);
 
-  return `${BASE_INSTRUCTIONS}
+  return `${BASE_INSTRUCTIONS}${getPersonalityBlock(user)}
 
 # Task
 Respond to the person's latest answer for the current slide. The app will add the next scripted question separately, so do not ask the next question yourself.
@@ -165,7 +181,7 @@ export const buildCstAdaptiveTurnInstructions = ({
   const displayName = getDisplayNameFromContext({ user, recentMessages });
   const currentStepScript = getCurrentStepScript(scriptId, slide);
 
-  return `${BASE_INSTRUCTIONS}
+  return `${BASE_INSTRUCTIONS}${getPersonalityBlock(user)}
 
 # Task
 Decide whether the person's latest message reasonably answers the current CST question, write Aria's brief adaptive response, and decide whether one deeper CST follow-up would be useful.

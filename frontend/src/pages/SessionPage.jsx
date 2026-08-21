@@ -133,10 +133,12 @@ function loadYouTubeIframeApi() {
   return youtubeIframeApiPromise;
 }
 
-function getInitialAvatarMode() {
-  if (!import.meta.env.DEV) return "male";
-  const requestedMode = new URLSearchParams(window.location.search).get("avatar");
-  return avatarModeIds.has(requestedMode) ? requestedMode : "male";
+function getInitialAvatarMode(defaultAvatarMode = "male") {
+  if (import.meta.env.DEV) {
+    const requestedMode = new URLSearchParams(window.location.search).get("avatar");
+    if (avatarModeIds.has(requestedMode)) return requestedMode;
+  }
+  return avatarModeIds.has(defaultAvatarMode) ? defaultAvatarMode : "male";
 }
 
 function formatPlaybackDuration(seconds) {
@@ -177,14 +179,14 @@ const LIP_SYNC_SETTINGS = {
   leadSeconds: 0.055,
 };
 
-export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: initialPipelineMode = "free" }) {
+export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: initialPipelineMode = "free", defaultAvatarMode = "male" }) {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [isRecording, setIsRecording] = useState(false);
   const [typing, setTyping] = useState(false);
   const [elapsed, setElapsed] = useState(0);
   const [slide, setSlide] = useState(defaultSlide);
-  const [avatarMode, setAvatarMode] = useState(getInitialAvatarMode);
+  const [avatarMode, setAvatarMode] = useState(() => getInitialAvatarMode(defaultAvatarMode));
   const [lipSyncMode, setLipSyncMode] = useState("rhubarb");
   const [pendingPlay, setPendingPlay] = useState(false);
   const [avatarNarrationActive, setAvatarNarrationActive] = useState(false);

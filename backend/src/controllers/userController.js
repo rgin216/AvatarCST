@@ -21,6 +21,26 @@ export const getUser = async (req, res, next) => {
   }
 };
 
+export const updateUserSettings = async (req, res, next) => {
+  try {
+    const { personality, language, avatarMode } = req.body;
+    const update = {};
+    if (personality !== undefined) update['settings.personality'] = personality;
+    if (language !== undefined) update['settings.language'] = language;
+    if (avatarMode !== undefined) update['settings.avatarMode'] = avatarMode;
+
+    const user = await User.findByIdAndUpdate(
+      req.params.id,
+      { $set: update },
+      { new: true, runValidators: true }
+    );
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    res.json(user);
+  } catch (err) {
+    next(err);
+  }
+};
+
 export const findOrCreateByName = async (req, res, next) => {
   try {
     const name = req.params.name.trim();
