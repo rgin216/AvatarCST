@@ -153,6 +153,7 @@ export default function App() {
     const titled = toTitleCase(name);
     setUserId(id);
     setUserName(titled);
+    setUserSettings(DEFAULT_USER_SETTINGS);
     storeAuth(id, titled);
     navigate("/landing");
   };
@@ -186,6 +187,7 @@ export default function App() {
     clearAuth();
     setUserId(null);
     setUserName("");
+    setUserSettings(DEFAULT_USER_SETTINGS);
     navigate("/login", { replace: true });
   };
 

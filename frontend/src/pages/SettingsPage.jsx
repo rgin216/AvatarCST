@@ -8,8 +8,9 @@ import { SUPPORTED_LANGUAGES } from "../language/translations.js";
 export default function SettingsPage({ userId, userName, settings, onBack, onSettingsChange }) {
   const isDesktop = useIsDesktop();
   const { t } = useLanguage();
-  const [saving, setSaving] = useState(null);
+  const [savingFields, setSavingFields] = useState(() => new Set());
   const [error, setError] = useState(null);
+  const isSaving = savingFields.size > 0;
 
   const personalityOptions = [
     { id: "default", label: t("settings.personality.default") },
@@ -23,8 +24,8 @@ export default function SettingsPage({ userId, userName, settings, onBack, onSet
   ];
 
   const applySetting = async (field, value) => {
-    if (!userId || settings[field] === value) return;
-    setSaving(field);
+    if (!userId || isSaving || settings[field] === value) return;
+    setSavingFields((prev) => new Set(prev).add(field));
     setError(null);
     const previous = settings[field];
     onSettingsChange({ [field]: value });
@@ -35,7 +36,7 @@ export default function SettingsPage({ userId, userName, settings, onBack, onSet
       onSettingsChange({ [field]: previous });
       setError(field);
     } finally {
-      setSaving(null);
+      setSavingFields((prev) => { const next = new Set(prev); next.delete(field); return next; });
     }
   };
 
@@ -51,7 +52,7 @@ export default function SettingsPage({ userId, userName, settings, onBack, onSet
             type="button"
             onClick={() => applySetting(field, option.id)}
             aria-pressed={active}
-            disabled={saving === field}
+            disabled={isSaving}
             style={{
               border: "none",
               borderRadius: 999,
@@ -59,11 +60,11 @@ export default function SettingsPage({ userId, userName, settings, onBack, onSet
               fontSize: 14,
               fontWeight: 700,
               fontFamily: "'Nunito', sans-serif",
-              cursor: saving === field ? "default" : "pointer",
+              cursor: isSaving ? "default" : "pointer",
               color: active ? theme.text : theme.textLight,
               background: active ? theme.white : "transparent",
               boxShadow: active ? "0 2px 10px rgba(139,107,90,0.15)" : "none",
-              opacity: saving === field ? 0.7 : 1,
+              opacity: isSaving ? 0.7 : 1,
               transition: "all 0.15s",
             }}
           >
@@ -80,7 +81,7 @@ export default function SettingsPage({ userId, userName, settings, onBack, onSet
         <div style={{ fontSize: 13, fontWeight: 700, color: theme.textLight, textTransform: "uppercase", letterSpacing: "0.07em" }}>
           {t(titleKey)}
         </div>
-        {saving === field && <div style={{ fontSize: 12, color: theme.textLight }}>{t("caregiver.loading")}</div>}
+        {savingFields.has(field) && <div style={{ fontSize: 12, color: theme.textLight }}>{t("caregiver.loading")}</div>}
         {error === field && <div style={{ fontSize: 12, color: "#C0504D" }}>⚠</div>}
       </div>
       {segmentedControl(field, options)}
