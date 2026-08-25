@@ -7,6 +7,7 @@ import {
   buildThemeSongLookupFeedback,
   canRequestAdaptiveFollowUp,
   collapseRepeatedAdjacentSpeech,
+  createActivityRevealState,
   getRetryDecision,
   extractPreferredNameAnswer,
   evaluateAdaptiveFollowUpAnswer,
@@ -14,6 +15,7 @@ import {
   evaluateEmotionalSupportAnswer,
   evaluateSafetySupportTurn,
   evaluateOrientationAnswer,
+  evaluateTriviaAnswer,
   hasSubstantialSpeechOverlap,
   inferMemorySuggestions,
   isRecordableSessionAnswer,
@@ -24,8 +26,10 @@ import {
   isThemeSongSkipAnswer,
   isVideoCompletionAnswer,
   parseAdaptiveTurn,
+  parseActivityRevealEvent,
   resolveThemeSongSelectionAnswer,
   selectRelevantMemoryEntries,
+  shouldUseNextSlideResponseOnly,
   toSecondPersonSummaryClause,
 } from './sessionOrchestratorService.js';
 import {
@@ -43,6 +47,180 @@ test('does not record the auto-advance protocol as a session answer', () => {
   }
 
   assert.deepEqual(sessionAnswers, [{ stepId: 'previous', answer: 'A meaningful memory' }]);
+});
+
+test('uses a scripted answer reveal without prepending a duplicate acknowledgement', () => {
+  assert.equal(shouldUseNextSlideResponseOnly({
+    shouldAdvance: true,
+    nextStep: { interaction: { type: 'autoAdvance' }, isAnswerReveal: true },
+  }), true);
+  assert.equal(shouldUseNextSlideResponseOnly({
+    shouldAdvance: true,
+    nextStep: { interaction: { type: 'autoAdvance' } },
+  }), false);
+});
+
+test('configures Session 3 slide 20 for four minutes and an activity follow-up', () => {
+  const scattergoriesStep = getScriptStep('cst_physical_games', 19).step;
+
+  assert.equal(scattergoriesStep.id, 'physical_games_scattergories');
+  assert.equal(scattergoriesStep.inactivityTimeoutMs, 240_000);
+  assert.match(scattergoriesStep.adaptiveFollowUp.guidance, /played or done/i);
+});
+
+test('configures Session 3 slide 19 as three unique GIF reveals with seated movement cues', () => {
+  const actionStep = getScriptStep('cst_physical_games', 18).step;
+  const { interaction } = actionStep;
+
+  assert.equal(actionStep.id, 'physical_games_action_preview');
+  assert.equal(interaction.type, 'activityReveal');
+  assert.equal(interaction.revealCount, 3);
+  assert.equal(interaction.options.length, 6);
+  assert.equal(new Set(interaction.options.map((option) => option.id)).size, 6);
+  for (const option of interaction.options) {
+    assert.match(option.gifUrl, /^\/activities\/session3\/.+\.gif$/);
+    assert.match(option.movementCue, /stay seated/i);
+    assert.ok(option.movementCue.length > 40, option.id);
+  }
+});
+
+test('accepts only configured activity reveal options and restores bounded progress', () => {
+  const actionStep = getScriptStep('cst_physical_games', 18).step;
+  const reveal = parseActivityRevealEvent(
+    '[[activity-reveal:{"optionId":"basketball"}]]',
+    actionStep
+  );
+  assert.equal(reveal.option.label, 'Basketball');
+  assert.match(reveal.option.movementCue, /dunking/i);
+  assert.equal(
+    parseActivityRevealEvent('[[activity-reveal:{"optionId":"camera"}]]', actionStep),
+    null
+  );
+
+  assert.deepEqual(createActivityRevealState(actionStep, {
+    status: 'performing',
+    targetCount: 99,
+    revealedOptionIds: ['basketball', 'basketball', 'not-an-option'],
+    currentOptionId: 'basketball',
+    completedCount: 8,
+  }), {
+    status: 'performing',
+    targetCount: 3,
+    revealedOptionIds: ['basketball'],
+    currentOptionId: 'basketball',
+    completedCount: 1,
+  });
+});
+
+test('does not record activity reveal controls as conversational answers', () => {
+  const actionStep = getScriptStep('cst_physical_games', 18).step;
+
+  assert.equal(isRecordableSessionAnswer({
+    step: actionStep,
+    content: '[[activity-reveal:{"optionId":"rugby"}]]',
+    wheelEvent: null,
+  }), false);
+  assert.equal(isRecordableSessionAnswer({
+    step: actionStep,
+    content: '[[activity-complete]]',
+    wheelEvent: null,
+  }), false);
+});
+
+test('ports reusable ready-state and automatic closing behavior to Session 3', () => {
+  const welcomeStep = getScriptStep('cst_physical_games', 0).step;
+  const triviaIntroStep = getScriptStep('cst_physical_games', 20).step;
+  const closingStep = getScriptStep('cst_physical_games', 35).step;
+
+  assert.equal(welcomeStep.acceptAnyAnswer, true);
+  assert.equal(triviaIntroStep.acceptAnyAnswer, true);
+  assert.equal(closingStep.autoCompleteAfterNarration, true);
+});
+
+test('keeps Session 3 Olympic trivia answers precise and current through Paris 2024', () => {
+  const nextOlympicsQuestion = getScriptStep('cst_physical_games', 21).step;
+  const nextOlympicsAnswer = getScriptStep('cst_physical_games', 22).step;
+  const uniformQuestion = getScriptStep('cst_physical_games', 23).step;
+  const uniformAnswer = getScriptStep('cst_physical_games', 24).step;
+  const firstGoldQuestion = getScriptStep('cst_physical_games', 25).step;
+  const firstGoldAnswer = getScriptStep('cst_physical_games', 26).step;
+  const runnerQuestion = getScriptStep('cst_physical_games', 27).step;
+  const runnerAnswer = getScriptStep('cst_physical_games', 28).step;
+  const rowingQuestion = getScriptStep('cst_physical_games', 29).step;
+  const rowingAnswer = getScriptStep('cst_physical_games', 30).step;
+  const carringtonQuestion = getScriptStep('cst_physical_games', 31).step;
+  const carringtonAnswer = getScriptStep('cst_physical_games', 32).step;
+
+  assert.equal(
+    renderScriptReply(nextOlympicsQuestion, {}),
+    'When is the next Summer Olympics, and who is hosting the next Summer Olympics?'
+  );
+  assert.match(renderScriptReply(nextOlympicsAnswer, {}), /Los Angeles in 2028/i);
+  assert.equal(
+    renderScriptReply(uniformQuestion, {}),
+    "What colour has traditionally formed the base of New Zealand's Olympic sporting uniform?"
+  );
+  assert.match(renderScriptReply(uniformAnswer, {}), /answer is black/i);
+  assert.equal(
+    renderScriptReply(firstGoldQuestion, {}),
+    'Who was the first New Zealander to win an individual Olympic gold medal?'
+  );
+  assert.match(renderScriptReply(firstGoldAnswer, {}), /Ted Morgan.*welterweight boxing.*1928/i);
+  assert.match(renderScriptReply(runnerQuestion, {}), /800 metres in 1960/i);
+  assert.match(renderScriptReply(runnerQuestion, {}), /both the 800 and 1500 metres in 1964/i);
+  assert.match(renderScriptReply(runnerAnswer, {}), /answer is Peter Snell/i);
+  assert.match(renderScriptReply(rowingQuestion, {}), /Paris 2024/i);
+  assert.match(renderScriptReply(rowingAnswer, {}), /answer is rowing/i);
+  assert.match(renderScriptReply(carringtonQuestion, {}), /Tokyo 2020/i);
+  assert.match(renderScriptReply(carringtonAnswer, {}), /three gold medals/i);
+  for (const answerStep of [
+    nextOlympicsAnswer,
+    uniformAnswer,
+    firstGoldAnswer,
+    runnerAnswer,
+    rowingAnswer,
+    carringtonAnswer,
+  ]) {
+    assert.equal(answerStep.isAnswerReveal, true, answerStep.id);
+  }
+});
+
+test('acknowledges correct and incorrect Session 3 trivia answers with varied wording', () => {
+  const cases = [
+    [21, 'Los Angeles in 2028', '2032 in Brisbane'],
+    [23, 'Black', 'Blue'],
+    [25, 'Ted Morgan', 'Peter Snell'],
+    [27, 'Peter Snell', 'John Walker'],
+    [29, 'Rowing', 'Rolling'],
+    [31, 'Three gold medals', 'Two'],
+  ];
+  const correctResponses = [];
+
+  for (const [stepIndex, correctAnswer, incorrectAnswer] of cases) {
+    const step = getScriptStep('cst_physical_games', stepIndex).step;
+    const correct = evaluateTriviaAnswer({ step, content: correctAnswer });
+    const incorrect = evaluateTriviaAnswer({ step, content: incorrectAnswer });
+
+    assert.equal(correct.answered, true, step.id);
+    assert.equal(correct.outcome, 'correct', step.id);
+    assert.equal(incorrect.answered, true, step.id);
+    assert.equal(incorrect.outcome, 'incorrect', step.id);
+    assert.notEqual(correct.response, incorrect.response, step.id);
+    correctResponses.push(correct.response);
+  }
+
+  assert.equal(new Set(correctResponses).size, cases.length);
+});
+
+test('gently handles uncertainty during Session 3 trivia', () => {
+  const step = getScriptStep('cst_physical_games', 29).step;
+  const result = evaluateTriviaAnswer({ step, content: "I don't know" });
+
+  assert.deepEqual(result, {
+    answered: true,
+    response: 'No problem. Let us reveal the answer.',
+    outcome: 'unsure',
+  });
 });
 
 test('recognises button, typed, and spoken music completion answers', () => {
