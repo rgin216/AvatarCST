@@ -3,10 +3,12 @@
   cst_childhood: 'session2',
 };
 
-const adaptiveReminiscence = (guidance) => ({
+const adaptiveConversation = (guidance) => ({
   enabled: true,
   guidance,
 });
+
+const adaptiveReminiscence = adaptiveConversation;
 
 const seatedExerciseInteraction = {
   type: 'youtubeShort',
@@ -34,6 +36,9 @@ const scripts = {
       bullets: ['Introduction & Welcome', 'AI-supported CST', 'University of Auckland'],
       visualHint: 'Source deck: NZ01. Welcome, slide 1',
       accent: '#00AEEF',
+      adaptiveFollowUp: adaptiveConversation(
+        'If they share a positive or neutral feeling with a little personal detail, invite one concrete detail about what shaped their day. Do not follow up if they seem tired, distressed, or ready to move on.'
+      ),
       reply: ({ name }) =>
         `Hello ${name}, and welcome. I am Aria, and I will be guiding you through this AI-supported Cognitive Stimulation Therapy session. Today is our first session, so we will take it gently and get comfortable together. How are you feeling today? Is there anything you’d like to share about your day so far?`,
     },
@@ -62,6 +67,9 @@ const scripts = {
       bullets: ['Where you live', "Who's at home with you", 'Computer or tablet comfort'],
       visualHint: 'Source deck: NZ01. Welcome, slide 3',
       accent: '#F4C8B0',
+      adaptiveFollowUp: adaptiveConversation(
+        'After the computer or tablet question, explore one concrete detail about what has felt easy, useful, or difficult today, without turning it into technical support.'
+      ),
       reply: () =>
         'Thank you. I would love to learn a little more about you. Where do you live?',
       followUps: [
@@ -77,11 +85,14 @@ const scripts = {
       title: 'What is CST?',
       subtitle: 'Cognitive Stimulation Therapy',
       prompt: 'What do you think about that?',
-      bullets: ['Evidence-based', 'Developed at University College London', 'Memory, mood, communication, and social engagement'],
+      bullets: ['Established group CST evidence', 'Developed at University College London', 'AI-supported research prototype'],
       visualHint: 'Source deck: NZ01. Welcome, slide 4',
       accent: '#A8C5A0',
+      adaptiveFollowUp: adaptiveConversation(
+        'Explore one part of their reaction to CST, such as what sounds reassuring, interesting, uncertain, or worthwhile to them.'
+      ),
       reply: () =>
-        'Cognitive Stimulation Therapy, or CST, is an evidence-based therapy for people living with cognitive changes or memory loss. It was developed at University College London, and it is designed to actively stimulate the mind in a supportive environment. What do you think about that?',
+        'Traditional group Cognitive Stimulation Therapy, or CST, has an established evidence base for people living with mild to moderate dementia. It was developed at University College London and is designed to stimulate the mind in a supportive environment. This AI-supported one-to-one format is a research prototype guided by CST principles, rather than a replacement for clinical care. What do you think about that?',
     },
     {
       id: 'cst_interests',
@@ -94,6 +105,9 @@ const scripts = {
       bullets: ['Improving memory and thinking', 'Being with others experiencing similar changes', 'Sharing thoughts and ideas', 'Having some fun'],
       visualHint: 'Source deck: NZ01. Welcome, slide 5',
       accent: '#F47C20',
+      adaptiveFollowUp: adaptiveConversation(
+        'Invite one reason why their chosen benefit or activity matters to them, without suggesting that this prototype is proven to deliver a clinical outcome.'
+      ),
       reply: () =>
         'People come to CST for different reasons. You may be interested in improving memory and thinking, being with others who understand similar changes, sharing thoughts and ideas, or simply having some fun. Which of those sounds most useful or enjoyable to you?',
     },
@@ -108,6 +122,9 @@ const scripts = {
       bullets: ['Mental stimulation', 'Opinions rather than facts', 'New ideas and associations'],
       visualHint: 'Source deck: NZ01. Welcome, slide 6',
       accent: '#F47C20',
+      adaptiveFollowUp: adaptiveConversation(
+        'Invite one brief reason or example connected to the idea they chose, keeping the focus on their opinion rather than factual knowledge.'
+      ),
       reply: () =>
         'In a nutshell, CST is about gentle mental stimulation, your opinions rather than facts, and exploring new ideas, thoughts, and associations. Which of those ideas do you like best?',
     },

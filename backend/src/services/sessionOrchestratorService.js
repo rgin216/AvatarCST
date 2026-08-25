@@ -185,6 +185,206 @@ const normalizeAnswer = (content = '') =>
     .replace(/\s+/g, ' ')
     .trim();
 
+const NEGATED_IMMEDIATE_SAFETY_CONCERN_PATTERNS = [
+  /\b(?:i am|i m|im)\s+(?:not|no longer)\s+suicidal\b/i,
+  /\b(?:i\s+)?(?:do not|don t|dont|never)\s+want\s+to\s+die\b/i,
+  /\b(?:i am|i m|im)\s+not\s+(?:going\s+to\s+)?(?:hurt|harm|kill)\s+myself\b/i,
+  /\b(?:i\s+)?(?:would|will)\s+(?:not|never)\s+(?:hurt|harm|kill)\s+myself\b/i,
+  /\bi\s+(?:will|ll)\s+(?:not|never)\s+(?:end|take)\s+my\s+life\b/i,
+  /\b(?:i am|i m|im)\s+(?:not|no longer)\s+thinking\s+about\s+(?:suicide|killing\s+myself)\b/i,
+  /\b(?:i am|i m|im)\s+not\s+(?:considering|planning)\s+suicide\b/i,
+];
+const IMMEDIATE_SAFETY_CONCERN_PATTERNS = [
+  /^(?:i am|i m|im|feeling)?\s*suicidal$/i,
+  /\b(?:i am|i m|im|i feel|i m feeling|i am feeling)\s+suicidal\b/i,
+  /\b(?:i\s+)?(?:want|plan|intend|am going|m going|might|may|will|ll)\s+to\s+(?:kill|hurt|harm)\s+myself\b/i,
+  /\bi\s+(?:will|ll|might|may)\s+(?:kill|hurt|harm)\s+myself\b/i,
+  /\b(?:i\s+)?(?:want|wish|plan|intend|might)\s+to\s+die\b/i,
+  /\b(?:i\s+)?(?:want|plan|intend|am going|m going|might|may|will|ll)\s+to\s+(?:end|take)\s+my\s+life\b/i,
+  /\bi\s+(?:will|ll|might|may)\s+(?:end|take)\s+my\s+life\b/i,
+  /\b(?:i\s+)?(?:want|plan|intend|might|may|will|am going|m going)\s+to\s+commit\s+suicide\b/i,
+  /\bi\s+(?:will|ll|might|may)\s+commit\s+suicide\b/i,
+  /\b(?:i am|i m|im)\s+(?:considering|planning)\s+suicide\b/i,
+  /\b(?:i am|i m|im|i have been|i ve been|ive been)\s+thinking\s+about\s+(?:suicide|killing\s+myself|ending\s+my\s+life)\b/i,
+  /\bi\s+(?:have|am having|m having|have been having)\s+(?:suicidal\s+thoughts|thoughts\s+of\s+(?:suicide|self\s*harm|killing\s+myself))\b/i,
+  /\b(?:i\s+)?wish\s+i\s+(?:was|were)\s+dead\b/i,
+  /\b(?:i\s+)?(?:do not|don t|dont)\s+want\s+to\s+(?:be\s+alive|live|go\s+on)\b/i,
+  /\b(?:i would|i d|id|i am|i m|im)?\s*(?:be\s+)?better\s+off\s+dead\b/i,
+  /\b(?:i have|i ve|ive|there is|there s)?\s*no\s+reason\s+(?:for\s+me\s+)?to\s+live\b/i,
+  /\bi\s+(?:self\s*harm(?:ed|ing)?|have\s+been\s+self\s*harming|ve\s+been\s+self\s*harming|am\s+self\s*harming)\b/i,
+];
+const SAFETY_SUPPORT_STATUS = {
+  AWAITING_IMMEDIATE_DANGER: 'awaiting_immediate_danger',
+  URGENT: 'urgent',
+  AWAITING_HUMAN_SUPPORT: 'awaiting_human_support',
+  SUPPORT_CONTACTED: 'support_contacted',
+};
+const SAFETY_SUPPORT_OPENING =
+  "I'm really sorry you're in this much pain, and I'm glad you told me. Let's pause the session now because your safety comes first. If you might act on these thoughts or are in immediate danger, call 111 now or go to the nearest emergency department. You can also call or text 1737 at any time to speak with a trained counsellor, and please tell someone you trust nearby. Are you in immediate danger right now?";
+const SAFETY_SUPPORT_URGENT =
+  'Please call 111 now or go to the nearest emergency department, and ask someone nearby to stay with you if possible. I will keep the CST session paused. Can you call 111 now, or ask someone nearby to call for you?';
+const SAFETY_SUPPORT_NOT_IMMEDIATE =
+  'Thank you for telling me. Even if the danger is not immediate, please call or text 1737 now or contact a trusted person or healthcare professional. I will keep the CST session paused. Can you contact someone you trust or 1737 now?';
+const SAFETY_SUPPORT_CONTACTED =
+  'Thank you for reaching out. Please stay with that person or service and follow their guidance. We will leave the CST session here for today.';
+
+export const isImmediateSafetyConcern = (content = '') => {
+  const normalized = normalizeAnswer(content);
+  if (!normalized) return false;
+
+  const withoutNegatedStatements = NEGATED_IMMEDIATE_SAFETY_CONCERN_PATTERNS.reduce(
+    (remaining, pattern) => remaining.replace(pattern, ' '),
+    normalized
+  );
+  return IMMEDIATE_SAFETY_CONCERN_PATTERNS.some((pattern) =>
+    pattern.test(withoutNegatedStatements)
+  );
+};
+
+const hasContactedSafetySupport = (content = '') => {
+  const normalized = normalizeAnswer(content);
+  return /\b(?:i\s+)?(?:called|texted|contacted|reached out to|am calling|m calling|im calling)(?:\s+(?:111|1737|someone|a friend|a family member|my\s+\w+))?\b/i.test(
+    normalized
+  ) || /\bi\s+told\s+(?:someone|my\s+\w+)\b/i.test(normalized) ||
+    /\b(?:someone is|they are|my .+ is)\s+(?:here|with me)\b/i.test(normalized) ||
+    /\b(?:i am|i m|im)\s+with\s+(?:someone|my\s+\w+)\b/i.test(normalized);
+};
+
+const hasReachedEmergencySupport = (content = '') => {
+  const normalized = normalizeAnswer(content);
+  return /\b(?:called|contacted|am calling|m calling|im calling)\s+(?:111|emergency services|the crisis team|a crisis team|an ambulance)\b/i.test(
+    normalized
+  ) || /\b(?:the ambulance is|emergency services are|the crisis team is)\s+(?:here|coming|on the way)\b/i.test(normalized) ||
+    /\b(?:i am|i m|im)\s+at\s+(?:the\s+)?(?:emergency department|hospital)\b/i.test(normalized);
+};
+
+const deniesImmediateDanger = (content = '') => {
+  const normalized = normalizeAnswer(content);
+  return /^(?:no|nope|not right now|i am safe|i m safe|im safe|i do not think so|i don t think so|dont think so|i am not suicidal|i m not suicidal|im not suicidal|i am not in danger|i m not in danger|im not in danger|not in immediate danger|i do not want to die|i don t want to die|dont want to die|i would never hurt myself|i am not going to hurt myself|i m not going to hurt myself|im not going to hurt myself)\b/i.test(
+    normalized
+  );
+};
+
+export const evaluateSafetySupportTurn = ({ content, activeSafetySupport = null } = {}) => {
+  const newSafetyConcern = isImmediateSafetyConcern(content);
+  if (!activeSafetySupport && !newSafetyConcern) return null;
+
+  if (!activeSafetySupport) {
+    return {
+      status: SAFETY_SUPPORT_STATUS.AWAITING_IMMEDIATE_DANGER,
+      response: SAFETY_SUPPORT_OPENING,
+    };
+  }
+
+  if (/^\[\[[^\]]+\]\]$/.test(String(content).trim())) {
+    return {
+      status: activeSafetySupport.status,
+      response: buildSafetyInactivityReminderText(activeSafetySupport),
+    };
+  }
+
+  if (newSafetyConcern) {
+    return {
+      status: SAFETY_SUPPORT_STATUS.URGENT,
+      response: SAFETY_SUPPORT_URGENT,
+    };
+  }
+
+  if (activeSafetySupport.status === SAFETY_SUPPORT_STATUS.AWAITING_IMMEDIATE_DANGER) {
+    if (!deniesImmediateDanger(content)) {
+      return {
+        status: SAFETY_SUPPORT_STATUS.URGENT,
+        response: SAFETY_SUPPORT_URGENT,
+      };
+    }
+    if (hasContactedSafetySupport(content)) {
+      return {
+        status: SAFETY_SUPPORT_STATUS.SUPPORT_CONTACTED,
+        response: SAFETY_SUPPORT_CONTACTED,
+      };
+    }
+    return {
+      status: SAFETY_SUPPORT_STATUS.AWAITING_HUMAN_SUPPORT,
+      response: SAFETY_SUPPORT_NOT_IMMEDIATE,
+    };
+  }
+
+  if (activeSafetySupport.status === SAFETY_SUPPORT_STATUS.AWAITING_HUMAN_SUPPORT) {
+    if (hasContactedSafetySupport(content)) {
+      return {
+        status: SAFETY_SUPPORT_STATUS.SUPPORT_CONTACTED,
+        response: SAFETY_SUPPORT_CONTACTED,
+      };
+    }
+    return {
+      status: SAFETY_SUPPORT_STATUS.AWAITING_HUMAN_SUPPORT,
+      response: SAFETY_SUPPORT_NOT_IMMEDIATE,
+    };
+  }
+
+  if (
+    activeSafetySupport.status === SAFETY_SUPPORT_STATUS.URGENT &&
+    hasReachedEmergencySupport(content)
+  ) {
+    return {
+      status: SAFETY_SUPPORT_STATUS.SUPPORT_CONTACTED,
+      response: SAFETY_SUPPORT_CONTACTED,
+    };
+  }
+
+  if (activeSafetySupport.status === SAFETY_SUPPORT_STATUS.SUPPORT_CONTACTED) {
+    return {
+      status: SAFETY_SUPPORT_STATUS.SUPPORT_CONTACTED,
+      response: SAFETY_SUPPORT_CONTACTED,
+    };
+  }
+
+  return {
+    status: SAFETY_SUPPORT_STATUS.URGENT,
+    response: SAFETY_SUPPORT_URGENT,
+  };
+};
+
+export const buildSafetyInactivityReminderText = (safetySupport = {}) =>
+  safetySupport.status === SAFETY_SUPPORT_STATUS.AWAITING_HUMAN_SUPPORT
+    ? 'Take your time. Please contact someone you trust or call or text 1737. The CST session will stay paused.'
+    : safetySupport.status === SAFETY_SUPPORT_STATUS.SUPPORT_CONTACTED
+      ? 'Please stay with the person or service supporting you. We will leave the CST session here for today.'
+      : "I'm still here. If you are in immediate danger, call 111 now or go to the nearest emergency department. You can also call or text 1737 for support.";
+const NEGATED_LOW_MOOD_PATTERN =
+  /\b(?:not|never|no longer)\s+(?:really\s+|very\s+|so\s+)?(?:depressed|sad|down|low|hopeless|lonely|miserable|overwhelmed|unhappy|upset)\b/i;
+const LOW_MOOD_PATTERNS = [
+  /\b(?:i am|i m|im|i feel|i am feeling|i m feeling|i have been|i ve been|i have been feeling|i ve been feeling|feeling|been feeling)\s+(?:(?:really|very|quite|so|pretty)\s+)*(?:depressed|sad|down|low|hopeless|lonely|miserable|overwhelmed|unhappy|upset)\b/i,
+  /\b(?:i am|i m|im|i feel|i am feeling|i m feeling)\s+(?:really\s+|very\s+|so\s+)?(?:not good|not great|not okay|not ok|awful|terrible)\b/i,
+  /\b(?:having|it has been|it s been)\s+(?:a\s+)?(?:really\s+|very\s+)?(?:hard|rough|terrible|awful)\s+(?:day|time)\b/i,
+  /^(?:(?:really|very|quite|so|pretty)\s+)?(?:depressed|sad|down|low|hopeless|lonely|miserable|overwhelmed|unhappy|upset)(?:\s+today)?$/i,
+];
+
+export const isLowMoodDisclosure = (content = '') => {
+  const normalized = normalizeAnswer(content);
+  if (
+    !normalized ||
+    isImmediateSafetyConcern(normalized) ||
+    NEGATED_LOW_MOOD_PATTERN.test(normalized)
+  ) {
+    return false;
+  }
+  return LOW_MOOD_PATTERNS.some((pattern) => pattern.test(normalized));
+};
+
+export const evaluateEmotionalSupportAnswer = ({
+  content,
+  hasActiveSupport = false,
+} = {}) => {
+  if (hasActiveSupport || !isLowMoodDisclosure(content)) return null;
+
+  return {
+    answered: true,
+    response: "I'm really sorry you're feeling this way, and I'm glad you told me.",
+    followUp: 'Would you like to tell me a little about what has been weighing on you?',
+  };
+};
+
 const NUMBER_WORD_VALUES = {
   zero: 0,
   oh: 0,
@@ -522,8 +722,8 @@ const evaluateAutoAdvance = ({ step, content, effectiveTurnIndex }) => {
   return { answered: true, response: '' };
 };
 
-const evaluateAcceptedAnswer = ({ step, content }) =>
-  step?.acceptAnyAnswer && content
+export const evaluateAcceptedAnswer = ({ step, content, allowAdaptiveFollowUp = false }) =>
+  step?.acceptAnyAnswer && content && !allowAdaptiveFollowUp
     ? { answered: true, response: '' }
     : null;
 
@@ -1602,6 +1802,7 @@ const getSessionInactivityReminderWrite = async (sessionId, expectedActivityRevi
     const persistedAdaptiveFollowUp = session.interactionState?.adaptiveFollowUp;
     const activeAdaptiveFollowUp =
       persistedAdaptiveFollowUp?.stepId === step.id ? persistedAdaptiveFollowUp : null;
+    const activeSafetySupport = session.interactionState?.safetySupport || null;
     const currentAffairs = session.interactionState?.currentAffairs || null;
     const scriptContext = {
       name: getDisplayName(user),
@@ -1622,7 +1823,9 @@ const getSessionInactivityReminderWrite = async (sessionId, expectedActivityRevi
       extractLastQuestion(expectedLine) ||
       extractLastQuestion(step.prompt) ||
       step.prompt;
-    assistantText = buildInactivityReminderText(question);
+    assistantText = activeSafetySupport
+      ? buildSafetyInactivityReminderText(activeSafetySupport)
+      : buildInactivityReminderText(question);
     assistantMessage = await Message.create({
       sessionId,
       role: 'assistant',
@@ -1661,13 +1864,18 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
   const activitySession = await registerSessionActivityWrite(sessionId);
   const context = await getSessionTurnContext(sessionId, activitySession);
   const { session, user, memoryEntries, recentMessages, step, nextStep, slide, nextSlide, boundedIndex, isFinalStep, totalSteps } = context;
+  const persistedSafetySupport = session.interactionState?.safetySupport || null;
+  const safetySupportTurn = evaluateSafetySupportTurn({
+    content: userContent || '',
+    activeSafetySupport: persistedSafetySupport,
+  });
 
   const hasMusicCompletionProtocol = isMusicCompletionProtocol(userContent || '');
   const hasVideoCompletionProtocol = isVideoCompletionProtocol(userContent || '');
   const hasAutoAdvanceProtocol = isAutoAdvanceProtocol(userContent || '');
   const hasWheelProtocol = isQuestionWheelProtocol(userContent || '');
   const wheelEvent = parseQuestionWheelEvent(userContent || '', step);
-  if (hasWheelProtocol && !wheelEvent) {
+  if (!safetySupportTurn && hasWheelProtocol && !wheelEvent) {
     const err = new Error('Invalid question wheel option');
     err.status = 400;
     throw err;
@@ -1684,6 +1892,7 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
   const currentTurnIndex = session.scriptStepTurnIndex || 0;
   const effectiveTurnIndex = currentTurnIndex || (hasPriorAssistantTurn(recentMessages) ? 1 : 0);
   if (
+    !safetySupportTurn &&
     hasMusicCompletionProtocol &&
     (step.interaction?.type !== 'spotifySong' || effectiveTurnIndex !== 1)
   ) {
@@ -1692,6 +1901,7 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
     throw err;
   }
   if (
+    !safetySupportTurn &&
     hasVideoCompletionProtocol &&
     (step.interaction?.type !== 'youtubeShort' || effectiveTurnIndex !== 1)
   ) {
@@ -1700,6 +1910,7 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
     throw err;
   }
   if (
+    !safetySupportTurn &&
     hasAutoAdvanceProtocol &&
     (step.interaction?.type !== 'autoAdvance' || effectiveTurnIndex !== 1)
   ) {
@@ -1719,7 +1930,7 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
     effectiveTurnIndex > 0 &&
     persistedWheelState?.status !== 'landed'
   );
-  if (awaitingWheelResult && userContent && !wheelEvent) {
+  if (!safetySupportTurn && awaitingWheelResult && userContent && !wheelEvent) {
     const err = new Error('Spin the question wheel before answering');
     err.status = 409;
     throw err;
@@ -1735,6 +1946,59 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
       ? 'Exercise video completed.'
       : userContent;
     userMessage = await Message.create({ sessionId, role: 'user', content: messageContent });
+  }
+
+  if (safetySupportTurn) {
+    const assistantText = safetySupportTurn.response;
+    const assistantMessage = await Message.create({
+      sessionId,
+      role: 'assistant',
+      content: assistantText,
+    });
+    const nextInteractionState = {
+      ...(session.interactionState || {}),
+      safetySupport: {
+        stepId: step.id,
+        status: safetySupportTurn.status,
+        updatedAt: new Date().toISOString(),
+      },
+    };
+    delete nextInteractionState.adaptiveFollowUp;
+    session.interactionState = nextInteractionState;
+    await session.save();
+
+    return {
+      sessionId: session._id,
+      sessionStatus: session.status,
+      scriptId: session.scriptId,
+      pipelineMode: session.pipelineMode,
+      activityRevision: session.activityRevision,
+      scriptStep: {
+        id: step.id,
+        index: boundedIndex,
+        nextIndex: boundedIndex,
+        turnIndex: session.scriptStepTurnIndex,
+        retryCount: session.scriptStepRetryCount,
+        answeredCurrentQuestion: false,
+        forcedProgress: false,
+        progressionSource: 'safety-support',
+        isFinalStep,
+        total: totalSteps,
+      },
+      slide,
+      slideTransition: null,
+      assistantText,
+      speechSegments: [{ text: assistantText, role: 'safety-support' }],
+      sessionCompleteAfterResponse: false,
+      avatar: buildAvatarResponse({ text: assistantText }),
+      messages: {
+        user: userMessage,
+        assistant: assistantMessage,
+      },
+      memoryUsed: [],
+      suggestedMemoryUpdates: [],
+      safetySupport: session.interactionState.safetySupport,
+    };
   }
 
   if (step.id === 'facilitator_role' && userContent) {
@@ -1815,8 +2079,13 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
   let answeredCurrentQuestion = true;
   let adaptiveText = '';
   let adaptiveFollowUpQuestion = null;
+  let emotionalSupportTurn = null;
   if (!isQuestionWheelEvent && userContent && hasDeliveredQuestion) {
-    const deterministicTurn = evaluateOrientationAnswer({
+    emotionalSupportTurn = evaluateEmotionalSupportAnswer({
+      content: userContent,
+      hasActiveSupport: activeAdaptiveFollowUp?.kind === 'emotional_support',
+    });
+    const deterministicTurn = emotionalSupportTurn || evaluateOrientationAnswer({
       step,
       content: userContent,
       retryCount: currentRetryCount,
@@ -1841,6 +2110,7 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
     }) || evaluateAcceptedAnswer({
       step,
       content: userContent,
+      allowAdaptiveFollowUp,
     }) || evaluateNewsElaborationRequest({
       step,
       content: userContent,
@@ -1863,6 +2133,7 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
               plannedNextLine,
               allowFollowUp: allowAdaptiveFollowUp,
               followUpGuidance: step.adaptiveFollowUp?.guidance || '',
+              acceptAnyAnswer: Boolean(step.acceptAnyAnswer),
             }),
           },
           { role: 'user', content: userContent },
@@ -1875,10 +2146,11 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
         }
       ));
     }
-    answeredCurrentQuestion = adaptiveTurn.answered;
+    answeredCurrentQuestion = step.acceptAnyAnswer ? true : adaptiveTurn.answered;
     adaptiveText = adaptiveTurn.response;
     adaptiveFollowUpQuestion =
-      answeredCurrentQuestion && allowAdaptiveFollowUp ? adaptiveTurn.followUp : null;
+      emotionalSupportTurn?.followUp ||
+      (answeredCurrentQuestion && allowAdaptiveFollowUp ? adaptiveTurn.followUp : null);
   }
 
   let themeSongFeedback = '';
@@ -1996,7 +2268,8 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
       hasUserContent &&
       hasDeliveredQuestion &&
       answeredCurrentQuestion &&
-      !shouldRepeatQuestion
+      !shouldRepeatQuestion &&
+      !shouldAskAdaptiveFollowUp
     ) || (
       shouldAdvance &&
       nextStep?.autoCompleteAfterNarration
@@ -2129,6 +2402,7 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
     nextInteractionState.adaptiveFollowUp = {
       stepId: step.id,
       question: adaptiveFollowUpQuestion,
+      ...(emotionalSupportTurn ? { kind: 'emotional_support' } : {}),
     };
   } else if (
     nextInteractionState.adaptiveFollowUp &&
@@ -2192,7 +2466,13 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
       userId: session.userId,
       sessionId: session._id,
       suggestions:
-        wheelEvent || hasMusicCompletionProtocol || hasVideoCompletionProtocol || hasAutoAdvanceProtocol || !answeredCurrentQuestion
+        wheelEvent ||
+        hasMusicCompletionProtocol ||
+        hasVideoCompletionProtocol ||
+        hasAutoAdvanceProtocol ||
+        emotionalSupportTurn ||
+        activeAdaptiveFollowUp?.kind === 'emotional_support' ||
+        !answeredCurrentQuestion
           ? []
           : inferMemorySuggestions(userContent),
     });
