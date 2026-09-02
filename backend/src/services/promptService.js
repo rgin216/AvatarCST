@@ -161,6 +161,7 @@ export const buildCstAdaptiveTurnInstructions = ({
   plannedNextLine = '',
   allowFollowUp = false,
   followUpGuidance = '',
+  acceptAnyAnswer = false,
 }) => {
   const displayName = getDisplayNameFromContext({ user, recentMessages });
   const currentStepScript = getCurrentStepScript(scriptId, slide);
@@ -204,7 +205,9 @@ ${formatRecentMessages(recentMessages)}
 </transcript_data>
 
 # Decision Rules
-Use answered=true when the message:
+${acceptAnyAnswer
+  ? `This step accepts every non-empty response. Always use answered=true, including when the response is brief, indirect, uncertain, or declines to elaborate. Use the response and followUp fields to adapt warmly without pressuring the person.`
+  : `Use answered=true when the message:
 - Directly answers the question, even briefly.
 - Gives a related memory, opinion, feeling, place, name, song, weather, or preference.
 - Says they do not know, cannot remember, or are unsure on an orientation or memory-recall question.
@@ -213,7 +216,7 @@ Use answered=true when the message:
 Use answered=false when the message:
 - Is empty, random text, unrelated, or only asks something unrelated.
 - Clearly ignores the current question.
-- Is a filler such as "ok", "yes", "no", "maybe", or "continue" when the question needs specific content.
+- Is a filler such as "ok", "yes", "no", "maybe", or "continue" when the question needs specific content.`}
 
 # Adaptive Response Rules
 - Maximum 1 sentence.

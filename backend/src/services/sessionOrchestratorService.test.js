@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   buildSessionSummary,
+  buildSafetyInactivityReminderText,
   buildNewsElaboration,
   buildThemeSongLookupFeedback,
   canRequestAdaptiveFollowUp,
@@ -10,6 +11,9 @@ import {
   getRetryDecision,
   extractPreferredNameAnswer,
   evaluateAdaptiveFollowUpAnswer,
+  evaluateAcceptedAnswer,
+  evaluateEmotionalSupportAnswer,
+  evaluateSafetySupportTurn,
   evaluateOrientationAnswer,
   evaluateTriviaAnswer,
   hasSubstantialSpeechOverlap,
@@ -17,6 +21,8 @@ import {
   isRecordableSessionAnswer,
   isMusicCompletionAnswer,
   isNewsElaborationRequest,
+  isLowMoodDisclosure,
+  isImmediateSafetyConcern,
   isThemeSongSkipAnswer,
   isVideoCompletionAnswer,
   parseAdaptiveTurn,
@@ -26,7 +32,10 @@ import {
   shouldUseNextSlideResponseOnly,
   toSecondPersonSummaryClause,
 } from './sessionOrchestratorService.js';
-import { buildCstAdaptiveTurnInstructions } from './promptService.js';
+import {
+  buildCstAdaptiveResponseInstructions,
+  buildCstAdaptiveTurnInstructions,
+} from './promptService.js';
 import { getScriptStep, renderScriptFollowUp, renderScriptReply } from './cstScriptService.js';
 
 test('does not record the auto-advance protocol as a session answer', () => {
@@ -747,6 +756,283 @@ test('does not retain a follow-up from an unanswered turn', () => {
 
   assert.equal(turn.answered, false);
   assert.equal(turn.followUp, null);
+});
+
+test('enables useful Session 1 adaptive follow-ups without deepening every slide', () => {
+  const adaptiveStepIds = [
+    'welcome_opening',
+    'introduce_yourself',
+    'what_is_cst',
+    'cst_interests',
+    'cst_nutshell',
+  ];
+  const directProgressStepIds = ['facilitator_role', 'session_themes', 'next_session'];
+
+  for (const stepId of adaptiveStepIds) {
+    const step = Array.from({ length: 8 }, (_, index) =>
+      getScriptStep('cst_intro_reminiscence', index).step
+    ).find((candidate) => candidate.id === stepId);
+    assert.equal(step?.adaptiveFollowUp?.enabled, true, stepId);
+  }
+
+  for (const stepId of directProgressStepIds) {
+    const step = Array.from({ length: 8 }, (_, index) =>
+      getScriptStep('cst_intro_reminiscence', index).step
+    ).find((candidate) => candidate.id === stepId);
+    assert.equal(step?.adaptiveFollowUp, undefined, stepId);
+  }
+});
+
+test('lets adaptive Session 1 turns reach the model while preserving accept-any progression', () => {
+  const step = getScriptStep('cst_intro_reminiscence', 0).step;
+
+  assert.deepEqual(evaluateAcceptedAnswer({ step, content: 'Fine thanks' }), {
+    answered: true,
+    response: '',
+  });
+  assert.equal(evaluateAcceptedAnswer({
+    step,
+    content: 'Fine thanks',
+    allowAdaptiveFollowUp: true,
+  }), null);
+
+  const prompt = buildCstAdaptiveTurnInstructions({
+    user: { name: 'Test User' },
+    memoryEntries: [],
+    slide: { index: 0, title: step.title, prompt: step.prompt },
+    recentMessages: [],
+    scriptId: 'cst_intro_reminiscence',
+    expectedQuestion: step.prompt,
+    allowFollowUp: true,
+    followUpGuidance: step.adaptiveFollowUp.guidance,
+    acceptAnyAnswer: true,
+  });
+  assert.match(prompt, /accepts every non-empty response/i);
+  assert.doesNotMatch(prompt, /Use answered=false/);
+});
+
+test('describes the AI-supported Session 1 format as a research prototype', () => {
+  const step = getScriptStep('cst_intro_reminiscence', 3).step;
+  const reply = renderScriptReply(step, {});
+
+  assert.match(reply, /traditional group cognitive stimulation therapy/i);
+  assert.match(reply, /research prototype/i);
+  assert.match(reply, /rather than a replacement for clinical care/i);
+});
+
+const buildSession1OpeningSmokePrompt = () => {
+  const step = getScriptStep('cst_intro_reminiscence', 0).step;
+  return {
+    step,
+    prompt: buildCstAdaptiveTurnInstructions({
+      user: { name: 'Test User' },
+      memoryEntries: [],
+      slide: { index: 0, title: step.title, prompt: step.prompt },
+      recentMessages: [],
+      scriptId: 'cst_intro_reminiscence',
+      expectedQuestion: step.prompt,
+      allowFollowUp: true,
+      followUpGuidance: step.adaptiveFollowUp.guidance,
+      acceptAnyAnswer: true,
+    }),
+  };
+};
+
+test('Session 1 smoke 1/5: a positive detail reaches bounded adaptive follow-up', () => {
+  const { step, prompt } = buildSession1OpeningSmokePrompt();
+  const input = 'I feel good because my daughter visited this morning.';
+
+  assert.equal(evaluateAcceptedAnswer({
+    step,
+    content: input,
+    allowAdaptiveFollowUp: true,
+  }), null);
+  assert.match(prompt, /single optional follow-up is allowed/i);
+  assert.match(prompt, /invite one concrete detail/i);
+});
+
+test('Session 1 smoke 2/5: a brief fine response is accepted without pressure', () => {
+  const { step, prompt } = buildSession1OpeningSmokePrompt();
+
+  assert.equal(evaluateAcceptedAnswer({
+    step,
+    content: 'Fine, thanks.',
+    allowAdaptiveFollowUp: true,
+  }), null);
+  assert.match(prompt, /accepts every non-empty response/i);
+  assert.match(prompt, /followUp=null when the answer is already detailed/i);
+});
+
+test('Session 1 smoke 3/5: a polite refusal is accepted and must not be deepened', () => {
+  const { step, prompt } = buildSession1OpeningSmokePrompt();
+
+  assert.equal(evaluateAcceptedAnswer({
+    step,
+    content: 'I would rather not talk about that today.',
+    allowAdaptiveFollowUp: true,
+  }), null);
+  assert.match(prompt, /including when the response.*declines to elaborate/i);
+  assert.match(prompt, /Return followUp=null when.*declines/i);
+});
+
+test('Session 1 smoke 4/5: depression pauses the script for empathetic support', () => {
+  const turn = evaluateEmotionalSupportAnswer({ content: "I'm depressed" });
+
+  assert.deepEqual(turn, {
+    answered: true,
+    response: "I'm really sorry you're feeling this way, and I'm glad you told me.",
+    followUp: 'Would you like to tell me a little about what has been weighing on you?',
+  });
+});
+
+test('Session 1 smoke 5/5: an adaptive follow-up answer is accepted and re-enters the script', () => {
+  const step = getScriptStep('cst_intro_reminiscence', 0).step;
+  const nextStep = getScriptStep('cst_intro_reminiscence', 1).step;
+  const scriptedNextLine = renderScriptReply(nextStep, { name: 'Test User' });
+  const input = 'She brought flowers, and we had tea together in the garden.';
+
+  assert.deepEqual(evaluateAdaptiveFollowUpAnswer({
+    activeAdaptiveFollowUp: {
+      stepId: step.id,
+      question: 'What made the visit especially enjoyable?',
+    },
+    content: input,
+  }), { answered: true, response: '' });
+
+  const prompt = buildCstAdaptiveResponseInstructions({
+    user: { name: 'Test User' },
+    memoryEntries: [],
+    slide: { index: 0, title: step.title, prompt: step.prompt },
+    recentMessages: [
+      { role: 'assistant', content: 'What made the visit especially enjoyable?' },
+    ],
+    scriptId: 'cst_intro_reminiscence',
+    scriptedNextLine,
+    answerState: 'answered',
+  });
+  assert.match(prompt, /do not ask the next question yourself/i);
+  assert.match(prompt, /briefly reflect it before the app continues/i);
+  assert.match(prompt, new RegExp(scriptedNextLine.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+});
+
+test('pauses for an empathetic follow-up when the person says they are depressed', () => {
+  assert.equal(isLowMoodDisclosure("I'm depressed"), true);
+  assert.equal(isLowMoodDisclosure("I've been depressed lately"), true);
+  assert.equal(isLowMoodDisclosure('I feel really sad today'), true);
+  assert.equal(isLowMoodDisclosure('I feel overwhelmed'), true);
+
+  assert.deepEqual(evaluateEmotionalSupportAnswer({ content: "I'm depressed" }), {
+    answered: true,
+    response: "I'm really sorry you're feeling this way, and I'm glad you told me.",
+    followUp: 'Would you like to tell me a little about what has been weighing on you?',
+  });
+});
+
+test('does not repeat or misapply the low-mood follow-up', () => {
+  assert.equal(isLowMoodDisclosure("I'm not depressed"), false);
+  assert.equal(isLowMoodDisclosure('The weather is depressing'), false);
+  assert.equal(isLowMoodDisclosure('I want to hurt myself'), false);
+  assert.equal(evaluateEmotionalSupportAnswer({
+    content: "I'm still depressed",
+    hasActiveSupport: true,
+  }), null);
+});
+
+test('recognises immediate first-person safety concerns without matching negations or discussion', () => {
+  for (const disclosure of [
+    'I want to die',
+    "I'm suicidal",
+    'I plan to hurt myself',
+    "I don't want to live",
+    "I've been thinking about suicide",
+    'I wish I were dead',
+    "I'll end my life",
+    'I am considering suicide',
+    'I want to commit suicide',
+    "I've been self harming",
+    "I'm not suicidal, but I do want to die",
+  ]) {
+    assert.equal(isImmediateSafetyConcern(disclosure), true, disclosure);
+  }
+
+  for (const nonDisclosure of [
+    "I don't want to die",
+    "I'm not suicidal",
+    'I would never hurt myself',
+    'I will not end my life',
+    'I am not considering suicide',
+    'The article discussed suicide prevention',
+    'I have a reason to live',
+  ]) {
+    assert.equal(isImmediateSafetyConcern(nonDisclosure), false, nonDisclosure);
+  }
+});
+
+test('starts a deterministic safety flow and asks directly about immediate danger', () => {
+  const turn = evaluateSafetySupportTurn({ content: 'I want to die' });
+
+  assert.equal(turn.status, 'awaiting_immediate_danger');
+  assert.match(turn.response, /glad you told me/i);
+  assert.match(turn.response, /call 111/i);
+  assert.match(turn.response, /call or text 1737/i);
+  assert.match(turn.response, /Are you in immediate danger right now\?$/i);
+  assert.doesNotMatch(turn.response, /next question|session theme|CST activity/i);
+});
+
+test('keeps the CST session paused while directing the person to human safety support', () => {
+  const awaitingDanger = { status: 'awaiting_immediate_danger' };
+  const urgent = evaluateSafetySupportTurn({
+    content: 'Maybe, I am not sure',
+    activeSafetySupport: awaitingDanger,
+  });
+  const notImmediate = evaluateSafetySupportTurn({
+    content: 'No, not right now',
+    activeSafetySupport: awaitingDanger,
+  });
+  const contacted = evaluateSafetySupportTurn({
+    content: 'I called my daughter',
+    activeSafetySupport: { status: 'awaiting_human_support' },
+  });
+  const urgentWithNearbySupport = evaluateSafetySupportTurn({
+    content: 'My daughter is with me',
+    activeSafetySupport: { status: 'urgent' },
+  });
+  const emergencySupportReached = evaluateSafetySupportTurn({
+    content: 'I called 111',
+    activeSafetySupport: { status: 'urgent' },
+  });
+  const ignoredAutoAdvance = evaluateSafetySupportTurn({
+    content: '[[auto-advance]]',
+    activeSafetySupport: { status: 'awaiting_immediate_danger' },
+  });
+
+  assert.equal(urgent.status, 'urgent');
+  assert.match(urgent.response, /call 111 now/i);
+  assert.match(urgent.response, /session paused/i);
+  assert.equal(notImmediate.status, 'awaiting_human_support');
+  assert.match(notImmediate.response, /1737/i);
+  assert.match(notImmediate.response, /session paused/i);
+  assert.equal(contacted.status, 'support_contacted');
+  assert.match(contacted.response, /stay with that person or service/i);
+  assert.match(contacted.response, /leave the CST session here for today/i);
+  assert.equal(urgentWithNearbySupport.status, 'urgent');
+  assert.match(urgentWithNearbySupport.response, /ask someone nearby to call/i);
+  assert.equal(emergencySupportReached.status, 'support_contacted');
+  assert.equal(ignoredAutoAdvance.status, 'awaiting_immediate_danger');
+  assert.match(ignoredAutoAdvance.response, /111/);
+});
+
+test('uses safety guidance instead of the scripted question in inactivity reminders', () => {
+  const urgentReminder = buildSafetyInactivityReminderText({ status: 'urgent' });
+  const supportReminder = buildSafetyInactivityReminderText({
+    status: 'awaiting_human_support',
+  });
+
+  assert.match(urgentReminder, /111/);
+  assert.match(urgentReminder, /1737/);
+  assert.match(supportReminder, /someone you trust/i);
+  assert.match(supportReminder, /session will stay paused/i);
+  assert.doesNotMatch(`${urgentReminder} ${supportReminder}`, /how are you feeling today/i);
 });
 
 test('allows at most one adaptive follow-up after scripted turns are complete', () => {
