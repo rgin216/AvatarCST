@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   buildSessionSummary,
+  buildTopicSessionSummary,
   buildSafetyInactivityReminderText,
   buildNewsElaboration,
   buildThemeSongLookupFeedback,
@@ -12,8 +13,10 @@ import {
   evaluateAdaptiveFollowUpAnswer,
   evaluateAcceptedAnswer,
   evaluateEmotionalSupportAnswer,
+  evaluateImageObservationAnswer,
   evaluateSafetySupportTurn,
   evaluateOrientationAnswer,
+  hasMeaningfulUserContent,
   hasSubstantialSpeechOverlap,
   inferMemorySuggestions,
   isRecordableSessionAnswer,
@@ -26,6 +29,7 @@ import {
   parseAdaptiveTurn,
   resolveThemeSongSelectionAnswer,
   selectRelevantMemoryEntries,
+  shouldUseNextSlideResponseOnly,
   toSecondPersonSummaryClause,
 } from './sessionOrchestratorService.js';
 import {
@@ -43,6 +47,196 @@ test('does not record the auto-advance protocol as a session answer', () => {
   }
 
   assert.deepEqual(sessionAnswers, [{ stepId: 'previous', answer: 'A meaningful memory' }]);
+});
+
+test('configures Session 6 with the supplied deck and reusable opening interactions', () => {
+  const welcome = getScriptStep('cst_current_affairs', 0).step;
+  const openingSong = getScriptStep('cst_current_affairs', 1).step;
+  const yearReveal = getScriptStep('cst_current_affairs', 6).step;
+  const season = getScriptStep('cst_current_affairs', 7).step;
+  const winterReveal = getScriptStep('cst_current_affairs', 8).step;
+  const exercise = getScriptStep('cst_current_affairs', 13).step;
+  const themeIntro = getScriptStep('cst_current_affairs', 14).step;
+
+  assert.equal(welcome.slideFolder, 'session6');
+  assert.equal(welcome.deckSlide, 1);
+  assert.equal(welcome.acceptAnyAnswer, true);
+  assert.equal(openingSong.interaction.type, 'spotifySong');
+  assert.equal(openingSong.interaction.playbackSeconds, 60);
+  assert.equal(yearReveal.deckSlide, 7);
+  assert.equal(yearReveal.isAnswerReveal, true);
+  assert.equal(yearReveal.interaction.type, 'autoAdvance');
+  assert.equal(season.seasonBranches.winter, 'current_affairs_season_winter');
+  assert.equal(winterReveal.nextStepId, 'current_affairs_weather');
+  assert.equal(exercise.interaction.type, 'youtubeShort');
+  assert.equal(themeIntro.interaction.type, 'autoAdvance');
+});
+
+test('uses the Session 6 answer-reveal narration without a duplicate acknowledgement', () => {
+  const nextStep = getScriptStep('cst_current_affairs', 6).step;
+
+  assert.equal(shouldUseNextSlideResponseOnly({ shouldAdvance: true, nextStep }), true);
+  assert.equal(shouldUseNextSlideResponseOnly({ shouldAdvance: false, nextStep }), false);
+});
+
+test('carries Session 6 orientation outcomes into supportive answer reveals', () => {
+  const yearReveal = getScriptStep('cst_current_affairs', 6).step;
+  const springReveal = getScriptStep('cst_current_affairs', 11).step;
+
+  assert.match(
+    renderScriptReply(yearReveal, { orientationOutcome: 'correct' }),
+    /yes, 2026 is right/i
+  );
+  assert.match(
+    renderScriptReply(springReveal, {
+      orientationOutcome: 'incorrect',
+      orientationAnswer: "It's winter.",
+    }),
+    /winter was an understandable answer.*it is spring now/i
+  );
+});
+
+test('follows the requested Apollo 11 observation sequence on slide 17', () => {
+  const notice = getScriptStep('cst_current_affairs', 16).step;
+  const identify = getScriptStep('cst_current_affairs', 17).step;
+  const story = getScriptStep('cst_current_affairs', 18).step;
+
+  assert.equal(notice.deckSlide, 17);
+  assert.match(renderScriptReply(notice, {}), /what do you notice/i);
+  assert.equal(identify.deckSlide, 17);
+  assert.match(renderScriptReply(identify, {}), /make out what the photograph shows/i);
+  assert.equal(story.deckSlide, 17);
+  assert.match(renderScriptReply(story, {}), /Apollo 11.*first crewed Moon landing.*July 1969/i);
+  assert.match(renderScriptReply(story, {}), /Neil Armstrong and Buzz Aldrin/i);
+  assert.match(renderScriptReply(story, {}), /Michael Collins remained in orbit/i);
+});
+
+test('compares news sources then and now without assuming one is better', () => {
+  const step = getScriptStep('cst_current_affairs', 19).step;
+
+  assert.equal(step.deckSlide, 18);
+  assert.equal(step.turns, 2);
+  assert.match(renderScriptReply(step, {}), /newspapers and radio/i);
+  assert.match(renderScriptFollowUp(step, 0, {}), /still read a newspaper/i);
+  assert.match(renderScriptFollowUp(step, 0, {}), /radio, television, or another way/i);
+});
+
+test('shows a current positive-news interlude after the news-media discussion', () => {
+  const newsThenAndNow = getScriptStep('cst_current_affairs', 19).step;
+  const positiveNews = getScriptStep('cst_current_affairs', 20).step;
+  const doctorsPhoto = getScriptStep('cst_current_affairs', 21).step;
+
+  assert.equal(newsThenAndNow.id, 'current_affairs_news_then_and_now');
+  assert.equal(positiveNews.id, 'current_affairs_positive_news');
+  assert.equal(positiveNews.interaction.type, 'positiveNews');
+  assert.equal(doctorsPhoto.id, 'current_affairs_doctors_notice');
+  assert.match(
+    renderScriptReply(positiveNews, {
+      currentAffairs: { status: 'available', article: { title: 'A community garden flourishes' } },
+    }),
+    /recent positive story.*community garden flourishes/i
+  );
+});
+
+test('acknowledges correct image details and gently clarifies mixed interpretations', () => {
+  const moon = getScriptStep('cst_current_affairs', 16).step;
+  const doctors = getScriptStep('cst_current_affairs', 21).step;
+  const airport = getScriptStep('cst_current_affairs', 23).step;
+  const ship = getScriptStep('cst_current_affairs', 25).step;
+  const bridge = getScriptStep('cst_current_affairs', 27).step;
+
+  assert.match(
+    evaluateImageObservationAnswer({ step: moon, content: 'Are those astronauts?' }).response,
+    /yes.*astronauts/i
+  );
+  assert.match(
+    evaluateImageObservationAnswer({ step: doctors, content: 'Hospital doctors protesting with signs.' }).response,
+    /yes.*hospital staff.*protest or strike/i
+  );
+  assert.match(
+    evaluateImageObservationAnswer({ step: airport, content: 'They look like flight attendants.' }).response,
+    /correctly noticed.*passenger-service staff/i
+  );
+  assert.match(
+    evaluateImageObservationAnswer({ step: ship, content: 'A crashed vehicle is in flames.' }).response,
+    /yes.*flames.*ship rather than a crashed road vehicle/i
+  );
+  assert.match(
+    evaluateImageObservationAnswer({ step: bridge, content: 'Is this in America?' }).response,
+    /understandable to wonder about the location/i
+  );
+
+  const prompt = buildCstAdaptiveResponseInstructions({
+    user: { name: 'Test User' },
+    memoryEntries: [],
+    slide: { index: 16, ...moon },
+    recentMessages: [],
+    scriptId: 'cst_current_affairs',
+  });
+  assert.match(prompt, /Image Grounding/);
+  assert.match(prompt, /affirm any detail.*confirmedDetails/i);
+  assert.match(prompt, /do not validate speculation as fact/i);
+});
+
+test('covers the Harbour Bridge history and August 2026 crossing status', () => {
+  const notice = getScriptStep('cst_current_affairs', 27).step;
+  const history = getScriptStep('cst_current_affairs', 28).step;
+  const future = getScriptStep('cst_current_affairs', 29).step;
+
+  assert.equal(notice.deckSlide, 25);
+  assert.match(renderScriptReply(history, {}), /opened on 30 May 1959/i);
+  assert.match(renderScriptReply(history, {}), /four traffic lanes/i);
+  assert.match(renderScriptReply(history, {}), /clip-on.*1966 and 1969.*eight lanes/i);
+  assert.match(renderScriptReply(future, {}), /about 170,000 vehicles each day/i);
+  assert.match(renderScriptReply(future, {}), /In August 2026/i);
+  assert.match(renderScriptReply(future, {}), /board preferred a tunnel/i);
+  assert.match(renderScriptReply(future, {}), /Cabinet had not selected a final option/i);
+  assert.match(renderScriptReply(future, {}), /detailed business case/i);
+});
+
+test('reuses the wheel, theme-song recap, and automatic Session 7 closing', () => {
+  const wheel = getScriptStep('cst_current_affairs', 30).step;
+  const recap = getScriptStep('cst_current_affairs', 31).step;
+  const closing = getScriptStep('cst_current_affairs', 32).step;
+
+  assert.equal(wheel.deckSlide, 26);
+  assert.equal(wheel.interaction.type, 'questionWheel');
+  assert.equal(wheel.interaction.options.length, 20);
+  assert.equal(recap.deckSlide, 27);
+  assert.equal(recap.turns, 2);
+  assert.equal(recap.interaction.type, 'spotifySong');
+  assert.equal(recap.interaction.summarizeOnComplete, true);
+  assert.equal(closing.deckSlide, 28);
+  assert.equal(closing.autoCompleteAfterNarration, true);
+  assert.match(renderScriptReply(closing, { name: 'Ryan' }), /Session.*Faces and Scenes|next session will explore Faces and Scenes/i);
+});
+
+test('builds a Session 6 recap from its core discussion topics', () => {
+  const summary = buildTopicSessionSummary([
+    { stepId: 'current_affairs_news_then_and_now', answer: 'I used to read the paper and now watch television.' },
+    { stepId: 'current_affairs_moon_story', answer: 'I remember watching it with my parents.' },
+    { stepId: 'current_affairs_airport_story', answer: 'Better connections can help the region.' },
+    { stepId: 'current_affairs_bridge_future', answer: 'A tunnel could provide another route.' },
+  ]);
+
+  assert.match(summary, /news was followed then and now/i);
+  assert.match(summary, /Apollo 11 Moon landing/i);
+  assert.match(summary, /New Zealand news photographs/i);
+  assert.match(summary, /Auckland Harbour Bridge and its future/i);
+});
+
+test('keeps the positive-news and personal wheel themes in a busy Session 6 fallback recap', () => {
+  const summary = buildTopicSessionSummary([
+    { stepId: 'current_affairs_news_then_and_now', answer: 'I still watch television news.' },
+    { stepId: 'current_affairs_positive_news', answer: 'It is good to hear a community success.' },
+    { stepId: 'current_affairs_moon_story', answer: 'It was an impressive achievement.' },
+    { stepId: 'current_affairs_bridge_future', answer: 'A tunnel could help.' },
+    { stepId: 'current_affairs_spin_question', answer: 'My favourite food is roast lamb.' },
+  ]);
+
+  assert.match(summary, /positive New Zealand story/i);
+  assert.match(summary, /food and cooking memories/i);
+  assert.doesNotMatch(summary, /topic from the question wheel/i);
 });
 
 test('recognises button, typed, and spoken music completion answers', () => {
@@ -198,6 +392,27 @@ test('uses distinct confirmations for the Session 2 orientation questions', () =
 
   assert.equal(new Set(responses).size, responses.length);
   assert.equal(responses.every((response) => response !== "Yes, that's right"), true);
+});
+
+test('distinguishes a tentative orientation question from a second incorrect answer', () => {
+  const step = { id: 'current_affairs_orientation_season' };
+  const tentative = evaluateOrientationAnswer({
+    step,
+    content: 'Is it still winter or has it now changed seasons?',
+    retryCount: 0,
+  });
+  const incorrect = evaluateOrientationAnswer({
+    step,
+    content: "It's winter.",
+    retryCount: 1,
+  });
+
+  assert.equal(tentative.answered, false);
+  assert.equal(tentative.outcome, 'retry');
+  assert.match(tentative.response, /understandable question.*another look/i);
+  assert.equal(incorrect.answered, true);
+  assert.equal(incorrect.outcome, 'incorrect');
+  assert.equal(incorrect.suppliedAnswer, "It's winter.");
 });
 
 test('Session 1 closing slide includes the discussion recap', () => {
@@ -601,7 +816,8 @@ test('enables useful Session 1 adaptive follow-ups without deepening every slide
     const step = Array.from({ length: 8 }, (_, index) =>
       getScriptStep('cst_intro_reminiscence', index).step
     ).find((candidate) => candidate.id === stepId);
-    assert.equal(step?.adaptiveFollowUp, undefined, stepId);
+    assert.ok(step, `${stepId} should exist`);
+    assert.equal(step.adaptiveFollowUp, undefined, stepId);
   }
 });
 
@@ -629,8 +845,29 @@ test('lets adaptive Session 1 turns reach the model while preserving accept-any 
     followUpGuidance: step.adaptiveFollowUp.guidance,
     acceptAnyAnswer: true,
   });
-  assert.match(prompt, /accepts every non-empty response/i);
+  assert.match(prompt, /accepts every meaningful response/i);
   assert.doesNotMatch(prompt, /Use answered=false/);
+});
+
+test('does not treat punctuation alone as an accept-any answer or recap detail', () => {
+  const step = getScriptStep('cst_current_affairs', 0).step;
+
+  assert.equal(hasMeaningfulUserContent('.'), false);
+  assert.equal(hasMeaningfulUserContent('...?!'), false);
+  assert.equal(hasMeaningfulUserContent("I'm ready"), true);
+  assert.deepEqual(evaluateAcceptedAnswer({ step, content: '.' }), {
+    answered: false,
+    response: 'Take your time.',
+  });
+  assert.deepEqual(evaluateAcceptedAnswer({
+    step,
+    content: '.',
+    allowAdaptiveFollowUp: true,
+  }), {
+    answered: false,
+    response: 'Take your time.',
+  });
+  assert.equal(isRecordableSessionAnswer({ step, content: '.', wheelEvent: null }), false);
 });
 
 test('describes the AI-supported Session 1 format as a research prototype', () => {
@@ -681,7 +918,7 @@ test('Session 1 smoke 2/5: a brief fine response is accepted without pressure', 
     content: 'Fine, thanks.',
     allowAdaptiveFollowUp: true,
   }), null);
-  assert.match(prompt, /accepts every non-empty response/i);
+  assert.match(prompt, /accepts every meaningful response/i);
   assert.match(prompt, /followUp=null when the answer is already detailed/i);
 });
 
