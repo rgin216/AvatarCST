@@ -597,6 +597,7 @@ export const evaluateOrientationAnswer = ({ step, content, retryCount }) => {
       response: `No problem, it is actually ${expected}.`,
       outcome: 'unsure',
       suppliedAnswer: String(content).trim(),
+      expectedAnswer: expected,
     };
   }
 
@@ -613,6 +614,7 @@ export const evaluateOrientationAnswer = ({ step, content, retryCount }) => {
       response: correctResponses[type] || `That is right, it is ${expected}.`,
       outcome: 'correct',
       suppliedAnswer: String(content).trim(),
+      expectedAnswer: expected,
     };
   }
 
@@ -625,6 +627,7 @@ export const evaluateOrientationAnswer = ({ step, content, retryCount }) => {
         : 'Good try. Let\'s take another look together.',
       outcome: 'retry',
       suppliedAnswer: String(content).trim(),
+      expectedAnswer: expected,
     };
   }
 
@@ -633,6 +636,7 @@ export const evaluateOrientationAnswer = ({ step, content, retryCount }) => {
     response: `That's okay, it is actually ${expected}.`,
     outcome: 'incorrect',
     suppliedAnswer: String(content).trim(),
+    expectedAnswer: expected,
   };
 };
 
@@ -2442,14 +2446,14 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
     }) || evaluateImageObservationAnswer({
       step,
       content: userContent,
-    }) || evaluateAcceptedAnswer({
-      step,
-      content: userContent,
-      allowAdaptiveFollowUp,
     }) || evaluateNewsElaborationRequest({
       step,
       content: userContent,
       currentAffairs,
+    }) || evaluateAcceptedAnswer({
+      step,
+      content: userContent,
+      allowAdaptiveFollowUp,
     });
     let adaptiveTurn = deterministicTurn;
     if (!adaptiveTurn) {
@@ -2490,6 +2494,7 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
     if (orientationTurn?.answered) {
       scriptContext.orientationOutcome = orientationTurn.outcome;
       scriptContext.orientationAnswer = orientationTurn.suppliedAnswer;
+      scriptContext.orientationExpectedAnswer = orientationTurn.expectedAnswer;
     }
   }
 

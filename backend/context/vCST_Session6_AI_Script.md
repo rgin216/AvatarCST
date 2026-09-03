@@ -44,12 +44,12 @@ Keep every exchange warm, adult-to-adult, and opinion-led. The photographs are p
 ## 6. Year
 **You say:** Ask what year it is.
 
-**Adapt:** Affirm gently or provide the current year without sharp correction. The next slide reveals 2026.
+**Adapt:** Affirm gently or provide the current year without sharp correction. The next slide reveals the same current year used to evaluate their answer.
 
 ---
 
 ## 7. Year reveal
-**You say:** If their answer was correct, explicitly confirm it before keeping 2026 in view. If it was incorrect or uncertain, give 2026 gently.
+**You say:** If their answer was correct, explicitly confirm it before keeping the current year in view. If it was incorrect or uncertain, give the current year gently.
 
 **Adapt:** This slide advances automatically. Do not ask a question or add another fact.
 

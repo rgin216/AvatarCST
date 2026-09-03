@@ -25,6 +25,11 @@ const spotifySongInteraction = ({ summarizeOnComplete = false } = {}) => ({
   ...(summarizeOnComplete ? { summarizeOnComplete: true } : {}),
 });
 
+const getCurrentNzYear = () => new Intl.DateTimeFormat('en-NZ', {
+  year: 'numeric',
+  timeZone: 'Pacific/Auckland',
+}).format(new Date());
+
 const orientationRevealReply = ({ answer, detail, context = {} }) => {
   const normalizedAnswer = String(answer).toLowerCase();
   const suppliedAnswer = String(context.orientationAnswer || '').toLowerCase();
@@ -654,20 +659,23 @@ const scripts = {
       id: 'current_affairs_orientation_year_reveal',
       turns: 1,
       deckSlide: 7,
-      title: '2026',
+      get title() { return getCurrentNzYear(); },
       subtitle: 'The year we are enjoying',
-      prompt: '2026',
-      bullets: ['2026'],
+      get prompt() { return getCurrentNzYear(); },
+      get bullets() { return [getCurrentNzYear()]; },
       visualHint: 'Source deck: NZ06. Current Affairs, slide 7',
       accent: '#4472C4',
       interaction: { type: 'autoAdvance' },
       isAnswerReveal: true,
       recordAnswer: false,
-      reply: (context) => orientationRevealReply({
-        answer: '2026',
-        detail: 'We can keep that date in view as we continue.',
-        context,
-      }),
+      reply: (context) => {
+        const year = context.orientationExpectedAnswer || getCurrentNzYear();
+        return orientationRevealReply({
+          answer: year,
+          detail: 'We can keep that date in view as we continue.',
+          context,
+        });
+      },
     },
     {
       id: 'current_affairs_orientation_season',

@@ -177,12 +177,20 @@ const LIP_SYNC_SETTINGS = {
   leadSeconds: 0.055,
 };
 
+const SESSION_META_LABELS = {
+  cst_intro_reminiscence: "Introduction",
+  cst_childhood: "Childhood",
+  cst_physical_games: "Physical Games",
+  cst_current_affairs: "Current Affairs",
+};
+
 export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: initialPipelineMode = "free" }) {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [isRecording, setIsRecording] = useState(false);
   const [typing, setTyping] = useState(false);
   const [elapsed, setElapsed] = useState(0);
+  const [sessionMetaLabel, setSessionMetaLabel] = useState("");
   const [slide, setSlide] = useState(defaultSlide);
   const [avatarMode, setAvatarMode] = useState(getInitialAvatarMode);
   const [lipSyncMode, setLipSyncMode] = useState("rhubarb");
@@ -416,6 +424,7 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
   }
 
   function applyTurn(turn) {
+    setSessionMetaLabel(SESSION_META_LABELS[turn.scriptId] || "");
     if (Number.isInteger(turn.activityRevision)) {
       activityRevisionRef.current = turn.activityRevision;
     }
@@ -1422,7 +1431,9 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
           <span className="pulse-dot" />
           <span>Session in progress</span>
         </div>
-        <div className="session-meta">Reminiscence / {formatElapsed(elapsed)}</div>
+        <div className="session-meta">
+          {sessionMetaLabel ? `${sessionMetaLabel} / ` : ""}{formatElapsed(elapsed)}
+        </div>
         {showDevSkip && (
           <div className="session-skip-control" aria-label="Skip to slide for testing">
             <span>Skip</span>

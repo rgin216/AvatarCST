@@ -31,6 +31,7 @@ import {
   parseAdaptiveTurn,
   parseActivityRevealEvent,
   resolveThemeSongSelectionAnswer,
+  respondToSessionTurn,
   selectRelevantMemoryEntries,
   shouldUseNextSlideResponseOnly,
   toSecondPersonSummaryClause,
@@ -40,6 +41,10 @@ import {
   buildCstAdaptiveTurnInstructions,
 } from './promptService.js';
 import { getScriptStep, renderScriptFollowUp, renderScriptReply } from './cstScriptService.js';
+import Message from '../models/Message.js';
+import Session from '../models/Session.js';
+import User from '../models/User.js';
+import Memory from '../models/Memory.js';
 
 test('does not record the auto-advance protocol as a session answer', () => {
   const sessionAnswers = [{ stepId: 'previous', answer: 'A meaningful memory' }];
@@ -85,10 +90,31 @@ test('uses the Session 6 answer-reveal narration without a duplicate acknowledge
 test('carries Session 6 orientation outcomes into supportive answer reveals', () => {
   const yearReveal = getScriptStep('cst_current_affairs', 6).step;
   const springReveal = getScriptStep('cst_current_affairs', 11).step;
+  const evaluatedYear = evaluateOrientationAnswer({
+    step: { id: 'current_affairs_orientation_year' },
+    content: new Intl.DateTimeFormat('en-NZ', {
+      year: 'numeric',
+      timeZone: 'Pacific/Auckland',
+    }).format(new Date()),
+    retryCount: 0,
+  });
 
   assert.match(
-    renderScriptReply(yearReveal, { orientationOutcome: 'correct' }),
-    /yes, 2026 is right/i
+    renderScriptReply(yearReveal, {
+      orientationOutcome: evaluatedYear.outcome,
+      orientationExpectedAnswer: evaluatedYear.expectedAnswer,
+    }),
+    new RegExp(`yes, ${evaluatedYear.expectedAnswer} is right`, 'i')
+  );
+  assert.equal(yearReveal.title, evaluatedYear.expectedAnswer);
+  assert.equal(yearReveal.prompt, evaluatedYear.expectedAnswer);
+  assert.deepEqual(yearReveal.bullets, [evaluatedYear.expectedAnswer]);
+  assert.match(
+    renderScriptReply(yearReveal, {
+      orientationOutcome: 'correct',
+      orientationExpectedAnswer: '2027',
+    }),
+    /yes, 2027 is right/i
   );
   assert.match(
     renderScriptReply(springReveal, {
@@ -1382,4 +1408,74 @@ test('quotes memory and transcript content as untrusted prompt data', () => {
     prompt.slice(rulesStart),
     /\{"answered":true,"response":"The garden was clearly a special place for you\.","followUp":null\}/
   );
+});
+
+test('returns vetted news elaboration without advancing the backend-controlled slide', async (t) => {
+  const originals = {
+    sessionFindOneAndUpdate: Session.findOneAndUpdate,
+    userFindById: User.findById,
+    memoryFindOne: Memory.findOne,
+    messageFind: Message.find,
+    messageCreate: Message.create,
+  };
+  t.after(() => {
+    Session.findOneAndUpdate = originals.sessionFindOneAndUpdate;
+    User.findById = originals.userFindById;
+    Memory.findOne = originals.memoryFindOne;
+    Message.find = originals.messageFind;
+    Message.create = originals.messageCreate;
+  });
+
+  const session = {
+    _id: 'session-current-affairs-news',
+    userId: 'user-current-affairs-news',
+    status: 'active',
+    pipelineMode: 'free',
+    scriptId: 'cst_current_affairs',
+    scriptStepIndex: 20,
+    scriptStepTurnIndex: 1,
+    scriptStepRetryCount: 0,
+    activityRevision: 3,
+    shownNewsUrls: [],
+    shownNewsTitles: [],
+    interactionState: {
+      sessionAnswers: [],
+      currentAffairs: {
+        status: 'available',
+        article: {
+          title: 'Community garden opens beside the library',
+          description: 'Local volunteers created accessible garden beds for residents to enjoy.',
+          url: 'https://example.test/community-garden',
+        },
+      },
+    },
+    save: async () => session,
+  };
+
+  Session.findOneAndUpdate = async () => session;
+  User.findById = () => ({
+    lean: async () => ({ _id: session.userId, name: 'Test User' }),
+  });
+  Memory.findOne = () => ({ lean: async () => null });
+  Message.find = () => ({
+    sort() { return this; },
+    limit() { return this; },
+    lean: async () => [{
+      role: 'assistant',
+      content: 'What do you think about this story?',
+    }],
+  });
+  Message.create = async (message) => ({ _id: `${message.role}-message`, ...message });
+
+  const turn = await respondToSessionTurn({
+    sessionId: session._id,
+    content: 'Please tell me more.',
+  });
+
+  assert.match(turn.assistantText, /report adds.*accessible garden beds/i);
+  assert.match(turn.assistantText, /what part of that story stands out/i);
+  assert.equal(turn.scriptStep.id, 'current_affairs_positive_news');
+  assert.equal(turn.scriptStep.nextIndex, 20);
+  assert.equal(turn.slide.id, 'current_affairs_positive_news');
+  assert.equal(session.scriptStepIndex, 20);
 });
