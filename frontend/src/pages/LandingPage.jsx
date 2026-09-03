@@ -31,7 +31,7 @@ export default function LandingPage({
   onPipelineModeChange = () => {},
 }) {
   const isDesktop = useIsDesktop();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const [lastSession, setLastSession] = useState(null);
   const [pageIndex, setPageIndex] = useState(0);
   const [pageDirection, setPageDirection] = useState("next");
@@ -50,10 +50,10 @@ export default function LandingPage({
     const yesterday = new Date(now);
     yesterday.setDate(yesterday.getDate() - 1);
     let dayLabel;
-    if (date.toDateString() === now.toDateString()) dayLabel = "Today";
-    else if (date.toDateString() === yesterday.toDateString()) dayLabel = "Yesterday";
-    else dayLabel = date.toLocaleDateString("en-NZ", { weekday: "short", day: "numeric", month: "short" });
-    const time = date.toLocaleTimeString("en-NZ", { hour: "numeric", minute: "2-digit" });
+    if (date.toDateString() === now.toDateString()) dayLabel = t("common.today");
+    else if (date.toDateString() === yesterday.toDateString()) dayLabel = t("common.yesterday");
+    else dayLabel = date.toLocaleDateString(language, { weekday: "short", day: "numeric", month: "short" });
+    const time = date.toLocaleTimeString(language, { hour: "numeric", minute: "2-digit" });
     const durationMins = s.startedAt && s.endedAt
       ? Math.round((new Date(s.endedAt) - new Date(s.startedAt)) / 60000)
       : null;
@@ -146,7 +146,7 @@ export default function LandingPage({
                   {lastSession ? t("landing.lastSession") : t("landing.welcome")}
                 </div>
                 <div style={{ fontSize: 17, fontWeight: 700, color: theme.text, marginTop: 2 }}>
-                  {lastSession ? (lastSession.title || "Session") : t("landing.firstSession")}
+                  {lastSession ? (lastSession.title || t("landing.sessionFallback")) : t("landing.firstSession")}
                 </div>
                 {lastSession ? (
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8 }}>

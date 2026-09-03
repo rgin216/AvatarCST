@@ -4,6 +4,7 @@ import api from "../services/api.js";
 import theme from "../utils/theme";
 import useIsDesktop from "../hooks/useIsDesktop";
 import { useLanguage } from "../language/useLanguage.js";
+import { toneLabel, levelLabel } from "../language/summaryLabels.js";
 
 const CATEGORY_LABELS = {
   personal: "Personal",
@@ -24,7 +25,7 @@ const CAREGIVER_TAB_IDS = new Set(["summary", "memory", "history"]);
 export default function CaregiverPage({ userId, onBack, onLogout, userName }) {
   const isDesktop = useIsDesktop();
   const navigate = useNavigate();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const CAREGIVER_TABS = [
     { id: "summary", label: t("caregiver.tab.summary") },
     { id: "memory", label: t("caregiver.tab.memory") },
@@ -126,9 +127,9 @@ export default function CaregiverPage({ userId, onBack, onLogout, userName }) {
     const now = new Date();
     const yesterday = new Date(now);
     yesterday.setDate(yesterday.getDate() - 1);
-    if (date.toDateString() === now.toDateString()) return "Today";
-    if (date.toDateString() === yesterday.toDateString()) return "Yesterday";
-    return date.toLocaleDateString("en-NZ", { weekday: "short", day: "numeric", month: "short" });
+    if (date.toDateString() === now.toDateString()) return t("common.today");
+    if (date.toDateString() === yesterday.toDateString()) return t("common.yesterday");
+    return date.toLocaleDateString(language, { weekday: "short", day: "numeric", month: "short" });
   };
 
   const toggleSession = async (sessionId) => {
@@ -193,13 +194,10 @@ export default function CaregiverPage({ userId, onBack, onLogout, userName }) {
             {loadingSummary && <div style={{ fontSize: 14, color: theme.textLight }}>{t("caregiver.loading")}</div>}
             {!loadingSummary && !latestSummary && <div style={{ fontSize: 14, color: theme.textLight }}>{t("caregiver.noSessionData")}</div>}
             {!loadingSummary && latestSummary && (() => {
-              const TONE = { positive: "Positive", mixed: "Mixed", neutral: "Calm", low: "Low" };
-              const LEVEL = { high: "High", medium: "Medium", low: "Low" };
-              const SCORE = { high: "High", medium: "Medium", low: "Low" };
               const stats = [
-                { label: "Mood", value: TONE[latestSummary.emotionalTone] || "—", color: "#A8C5A0" },
-                { label: "Engagement", value: LEVEL[latestSummary.engagementLevel] || "—", color: "#F4C8B0" },
-                { label: "Session Score", value: SCORE[latestSummary.sessionScore] || "—", color: "#B8CDD8" },
+                { label: t("caregiver.stat.mood"), value: toneLabel(t, latestSummary.emotionalTone), color: "#A8C5A0" },
+                { label: t("caregiver.stat.engagement"), value: levelLabel(t, latestSummary.engagementLevel), color: "#F4C8B0" },
+                { label: t("caregiver.stat.score"), value: levelLabel(t, latestSummary.sessionScore), color: "#B8CDD8" },
               ];
               return (
                 <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
@@ -417,7 +415,7 @@ export default function CaregiverPage({ userId, onBack, onLogout, userName }) {
           <button onClick={onBack} style={{ background: "none", border: "none", fontSize: 22, cursor: "pointer" }}>←</button>
           <div style={{ flex: 1 }}>
             <div style={{ fontFamily: "'Playfair Display', serif", fontSize: 22, fontWeight: 600, color: theme.text }}>{t("caregiver.title")}</div>
-            <div style={{ fontSize: 13, color: theme.textLight }}>{userName}'s profile</div>
+            <div style={{ fontSize: 13, color: theme.textLight }}>{t("caregiver.profileSubtitle", { name: userName })}</div>
           </div>
           {onLogout && (
             <button

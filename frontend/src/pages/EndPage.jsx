@@ -3,9 +3,7 @@ import api from "../services/api.js";
 import theme from "../utils/theme";
 import useIsDesktop from "../hooks/useIsDesktop";
 import { useLanguage } from "../language/useLanguage.js";
-
-const TONE_LABELS = { positive: "Happy", mixed: "Mixed", neutral: "Calm", low: "Low" };
-const LEVEL_LABELS = { high: "High", medium: "Medium", low: "Low" };
+import { toneLabel, levelLabel } from "../language/summaryLabels.js";
 
 export default function EndPage({ onHome, userName, sessionId }) {
   const isDesktop = useIsDesktop();
@@ -57,10 +55,10 @@ export default function EndPage({ onHome, userName, sessionId }) {
   const topicsCovered = sessionData?.scriptStepIndex ?? null;
 
   const stats = [
-    { label: t("end.stat.duration"), value: durationMins != null ? `${durationMins} min` : "—", icon: "⏱️", chip: `linear-gradient(135deg, ${theme.sage}, ${theme.sageDark})` },
+    { label: t("end.stat.duration"), value: durationMins != null ? t(durationMins === 1 ? "end.durationValue.one" : "end.durationValue.other", { n: durationMins }) : "—", icon: "⏱️", chip: `linear-gradient(135deg, ${theme.sage}, ${theme.sageDark})` },
     { label: t("end.stat.topics"), value: topicsCovered != null ? String(topicsCovered) : "—", icon: "💬", chip: `linear-gradient(135deg, ${theme.mist}, ${theme.mistDark})` },
-    { label: t("end.stat.engagement"), value: summary ? (LEVEL_LABELS[summary.engagementLevel] || "—") : "—", icon: "⭐", chip: `linear-gradient(135deg, ${theme.blush}, ${theme.rose})` },
-    { label: t("end.stat.mood"), value: summary ? (TONE_LABELS[summary.emotionalTone] || "—") : "—", icon: "😊", chip: `linear-gradient(135deg, ${theme.rose}, ${theme.warm})` },
+    { label: t("end.stat.engagement"), value: summary ? levelLabel(t, summary.engagementLevel) : "—", icon: "⭐", chip: `linear-gradient(135deg, ${theme.blush}, ${theme.rose})` },
+    { label: t("end.stat.mood"), value: summary ? toneLabel(t, summary.emotionalTone) : "—", icon: "😊", chip: `linear-gradient(135deg, ${theme.rose}, ${theme.warm})` },
   ];
 
   const contentMaxWidth = isDesktop ? 720 : 480;
