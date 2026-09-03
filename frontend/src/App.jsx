@@ -78,6 +78,7 @@ const TEST_SESSIONS = [
     label: "Session 6",
     title: "Current Affairs",
     theme: "Current Affairs",
+    icon: "📰",
   },
   ...Array.from({ length: 9 }, (_, i) => {
     const n = i + 7;

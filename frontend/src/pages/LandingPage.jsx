@@ -68,9 +68,10 @@ export default function LandingPage({
 
   const lastSessionMeta = getLastSessionMeta(lastSession);
   const lastSessionCardIndex = lastSession ? sessions.findIndex((s) => s.id === lastSession.scriptId) : -1;
+  const lastSessionOption = lastSessionCardIndex >= 0 ? sessions[lastSessionCardIndex] : null;
   const lastSessionPalette = lastSessionCardIndex >= 0 ? cardPalette[lastSessionCardIndex % cardPalette.length] : null;
   const defaultHeroChip = `linear-gradient(135deg, ${theme.sage}, ${theme.mist})`;
-  const heroIcon = lastSession ? (lastSessionPalette?.icon || "🕰️") : "👋";
+  const heroIcon = lastSession ? (lastSessionOption?.icon || lastSessionPalette?.icon || "🕰️") : "👋";
   const heroChip = lastSession ? (lastSessionPalette?.chip || defaultHeroChip) : defaultHeroChip;
 
   const contentMaxWidth = isDesktop ? 1180 : 480;
@@ -242,7 +243,7 @@ export default function LandingPage({
                 const globalIndex = pageStart + i;
                 const palette = session.disabled
                   ? { chip: `linear-gradient(135deg, #D9D2C8, #BFB6A8)`, icon: "🔒", accent: theme.textLight }
-                  : cardPalette[globalIndex % cardPalette.length];
+                  : { ...cardPalette[globalIndex % cardPalette.length], ...(session.icon ? { icon: session.icon } : {}) };
                 return (
                   <button
                     key={session.id}
