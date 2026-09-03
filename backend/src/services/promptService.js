@@ -31,6 +31,13 @@ const SESSION_SCRIPTS = {
     .split(/\r?\n---\r?\n/)
     .map((s) => s.trim())
     .filter(Boolean),
+  cst_physical_games: readFileSync(
+    join(CONTEXT_ROOT, 'vCST_Session3_AI_Script.md'),
+    'utf8'
+  )
+    .split(/\r?\n---\r?\n/)
+    .map((s) => s.trim())
+    .filter(Boolean),
   cst_current_affairs: readFileSync(
     join(CONTEXT_ROOT, 'vCST_Session6_AI_Script.md'),
     'utf8'

@@ -57,8 +57,14 @@ const TEST_SESSIONS = [
     title: "Getting to Know You: Childhood",
     theme: "Childhood",
   },
-  ...Array.from({ length: 3 }, (_, i) => {
-    const n = i + 3;
+  {
+    id: "cst_physical_games",
+    label: "Session 3",
+    title: "Physical Games",
+    theme: "Physical Games",
+  },
+  ...Array.from({ length: 2 }, (_, i) => {
+    const n = i + 4;
     return {
       id: `placeholder_session_${n}`,
       label: `Session ${n}`,

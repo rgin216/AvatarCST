@@ -11,7 +11,7 @@ const pipelineOptions = [
 const cardPalette = [
   { chip: `linear-gradient(135deg, ${theme.sage}, ${theme.sageDark})`, icon: "🌿", accent: theme.sageDark },
   { chip: `linear-gradient(135deg, ${theme.mist}, ${theme.mistDark})`, icon: "🧭", accent: theme.mistDark },
-  { chip: `linear-gradient(135deg, ${theme.blush}, ${theme.rose})`, icon: "🌸", accent: theme.rose },
+  { chip: `linear-gradient(135deg, ${theme.blush}, ${theme.rose})`, icon: "🏅", accent: theme.rose },
   { chip: `linear-gradient(135deg, ${theme.rose}, ${theme.warm})`, icon: "📖", accent: theme.warm },
 ];
 
