@@ -19,6 +19,12 @@ const savedThemeSongSchema = new Schema({
   savedAt: { type: Date, required: true },
 }, { _id: false });
 
+const userSettingsSchema = new Schema({
+  personality: { type: String, enum: ['default', 'optimistic'], default: 'default' },
+  language: { type: String, enum: ['en', 'zh', 'es', 'fr', 'mi'], default: 'en' },
+  avatarMode: { type: String, enum: ['male', 'female', 'visualizer'], default: 'male' },
+}, { _id: false });
+
 const userSchema = new Schema({
   name: { type: String, required: true },
   preferredName: { type: String },
@@ -28,6 +34,7 @@ const userSchema = new Schema({
   caregivers: [{ type: Schema.Types.ObjectId, ref: 'User' }],
   patients: [{ type: Schema.Types.ObjectId, ref: 'User' }],
   savedThemeSong: { type: savedThemeSongSchema },
+  settings: { type: userSettingsSchema, default: () => ({}) },
 }, { timestamps: true });
 
 export default model('User', userSchema);

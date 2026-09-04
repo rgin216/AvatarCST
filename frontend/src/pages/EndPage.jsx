@@ -2,12 +2,12 @@ import { useState, useEffect } from "react";
 import api from "../services/api.js";
 import theme from "../utils/theme";
 import useIsDesktop from "../hooks/useIsDesktop";
-
-const TONE_LABELS = { positive: "Happy", mixed: "Mixed", neutral: "Calm", low: "Low" };
-const LEVEL_LABELS = { high: "High", medium: "Medium", low: "Low" };
+import { useLanguage } from "../language/useLanguage.js";
+import { toneLabel, levelLabel } from "../language/summaryLabels.js";
 
 export default function EndPage({ onHome, userName, sessionId }) {
   const isDesktop = useIsDesktop();
+  const { t } = useLanguage();
   const [summary, setSummary] = useState(null);
   const [summaryLoading, setSummaryLoading] = useState(true);
   const [sessionData, setSessionData] = useState(null);
@@ -55,10 +55,10 @@ export default function EndPage({ onHome, userName, sessionId }) {
   const topicsCovered = sessionData?.scriptStepIndex ?? null;
 
   const stats = [
-    { label: "Duration", value: durationMins != null ? `${durationMins} min` : "—", icon: "⏱️", chip: `linear-gradient(135deg, ${theme.sage}, ${theme.sageDark})` },
-    { label: "Topics Covered", value: topicsCovered != null ? String(topicsCovered) : "—", icon: "💬", chip: `linear-gradient(135deg, ${theme.mist}, ${theme.mistDark})` },
-    { label: "Engagement", value: summary ? (LEVEL_LABELS[summary.engagementLevel] || "—") : "—", icon: "⭐", chip: `linear-gradient(135deg, ${theme.blush}, ${theme.rose})` },
-    { label: "Mood", value: summary ? (TONE_LABELS[summary.emotionalTone] || "—") : "—", icon: "😊", chip: `linear-gradient(135deg, ${theme.rose}, ${theme.warm})` },
+    { label: t("end.stat.duration"), value: durationMins != null ? t(durationMins === 1 ? "end.durationValue.one" : "end.durationValue.other", { n: durationMins }) : "—", icon: "⏱️", chip: `linear-gradient(135deg, ${theme.sage}, ${theme.sageDark})` },
+    { label: t("end.stat.topics"), value: topicsCovered != null ? String(topicsCovered) : "—", icon: "💬", chip: `linear-gradient(135deg, ${theme.mist}, ${theme.mistDark})` },
+    { label: t("end.stat.engagement"), value: summary ? levelLabel(t, summary.engagementLevel) : "—", icon: "⭐", chip: `linear-gradient(135deg, ${theme.blush}, ${theme.rose})` },
+    { label: t("end.stat.mood"), value: summary ? toneLabel(t, summary.emotionalTone) : "—", icon: "😊", chip: `linear-gradient(135deg, ${theme.rose}, ${theme.warm})` },
   ];
 
   const contentMaxWidth = isDesktop ? 720 : 480;
@@ -76,8 +76,8 @@ export default function EndPage({ onHome, userName, sessionId }) {
         <div style={{ maxWidth: contentMaxWidth, margin: "0 auto", padding: isDesktop ? "36px 32px 0" : "32px 24px 0", position: "relative" }}>
           <div className="fade-up" style={{ textAlign: "center" }}>
             <div className="avatar-float" style={{ fontSize: 52, marginBottom: 10 }}>🌟</div>
-            <div style={{ fontFamily: "'Playfair Display', serif", fontSize: isDesktop ? 36 : 30, fontWeight: 700, color: theme.text }}>Great session, {userName}!</div>
-            <div style={{ fontSize: 15, color: theme.textLight, marginTop: 6, lineHeight: 1.5 }}>You did wonderfully today. Keep up the wonderful work!</div>
+            <div style={{ fontFamily: "'Playfair Display', serif", fontSize: isDesktop ? 36 : 30, fontWeight: 700, color: theme.text }}>{t("end.greatSession")}, {userName}!</div>
+            <div style={{ fontSize: 15, color: theme.textLight, marginTop: 6, lineHeight: 1.5 }}>{t("end.wellDone")}</div>
           </div>
         </div>
       </div>
@@ -103,7 +103,7 @@ export default function EndPage({ onHome, userName, sessionId }) {
           </div>
 
           <div className="fade-up delay-2" style={{ background: theme.white, borderRadius: 20, padding: "16px 20px", marginBottom: 20, boxShadow: "0 6px 20px rgba(139,107,90,0.08)" }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: theme.textLight, marginBottom: 10, textTransform: "uppercase", letterSpacing: "0.08em" }}>Session Highlights</div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: theme.textLight, marginBottom: 10, textTransform: "uppercase", letterSpacing: "0.08em" }}>{t("end.highlights")}</div>
             <div
               className="highlights-scroll"
               tabIndex={0}
@@ -112,10 +112,10 @@ export default function EndPage({ onHome, userName, sessionId }) {
               style={{ maxHeight: isDesktop ? 230 : 190, overflowY: "auto", paddingRight: 4 }}
             >
               {summaryLoading && (
-                <div style={{ fontSize: 14, color: theme.textLight }}>Generating highlights...</div>
+                <div style={{ fontSize: 14, color: theme.textLight }}>{t("end.generatingHighlights")}</div>
               )}
               {!summaryLoading && highlights.length === 0 && (
-                <div style={{ fontSize: 14, color: theme.textLight }}>No highlights available for this session.</div>
+                <div style={{ fontSize: 14, color: theme.textLight }}>{t("end.noHighlights")}</div>
               )}
               {!summaryLoading && highlights.map((h, i, arr) => (
                 <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 10, marginBottom: i < arr.length - 1 ? 10 : 0, fontSize: 14, color: theme.text, lineHeight: 1.5 }}>
@@ -126,7 +126,7 @@ export default function EndPage({ onHome, userName, sessionId }) {
           </div>
 
           <div className="fade-up delay-3">
-            <button onClick={onHome} className="btn-primary" style={{ padding: 16, fontSize: 17 }}>Finish Session</button>
+            <button onClick={onHome} className="btn-primary" style={{ padding: 16, fontSize: 17 }}>{t("end.finishSession")}</button>
           </div>
         </div>
       </div>

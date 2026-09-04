@@ -6,7 +6,11 @@ import LandingPage from "./pages/LandingPage";
 import SessionPage from "./pages/SessionPage";
 import EndPage from "./pages/EndPage";
 import CaregiverPage from "./pages/CaregiverPage";
+import SettingsPage from "./pages/SettingsPage";
 import { toTitleCase } from "./utils/formatName";
+import { LanguageProvider } from "./language/LanguageContext.jsx";
+
+const DEFAULT_USER_SETTINGS = { personality: "default", language: "en", avatarMode: "male" };
 
 const devParams = new URLSearchParams(window.location.search);
 const devSessionEnabled = import.meta.env.DEV && devParams.get("devSession") === "1";
@@ -94,7 +98,7 @@ const TEST_SESSIONS = [
 
 // Rehydrates the pipeline mode a session actually started with, since a page
 // refresh loses the in-memory value chosen on the landing page.
-function SessionRoute({ userName, fallbackPipelineMode, onSessionEnd }) {
+function SessionRoute({ userName, fallbackPipelineMode, defaultAvatarMode, onSessionEnd }) {
   const { sessionId } = useParams();
   const [pipelineMode, setPipelineMode] = useState(fallbackPipelineMode);
   const [invalid, setInvalid] = useState(false);
@@ -119,6 +123,7 @@ function SessionRoute({ userName, fallbackPipelineMode, onSessionEnd }) {
       onEnd={() => onSessionEnd(sessionId)}
       userName={userName}
       pipelineMode={pipelineMode}
+      defaultAvatarMode={defaultAvatarMode}
     />
   );
 }
@@ -142,11 +147,30 @@ export default function App() {
   const [userId, setUserId] = useState(devSessionEnabled ? "dev-user" : storedAuth?.userId ?? null);
   const [userName, setUserName] = useState(devSessionEnabled ? "Ryan" : storedAuth?.userName ?? "");
   const [selectedPipelineMode, setSelectedPipelineMode] = useState(getInitialPipelineMode);
+  const [userSettings, setUserSettings] = useState(DEFAULT_USER_SETTINGS);
+
+  useEffect(() => {
+    if (!userId || devSessionEnabled) return;
+    let cancelled = false;
+    api.get(`/users/${userId}`)
+      .then(({ data }) => {
+        if (!cancelled && data.settings) {
+          setUserSettings({ ...DEFAULT_USER_SETTINGS, ...data.settings });
+        }
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [userId]);
+
+  const handleSettingsChange = (partial) => {
+    setUserSettings((prev) => ({ ...prev, ...partial }));
+  };
 
   const handleLogin = (id, name) => {
     const titled = toTitleCase(name);
     setUserId(id);
     setUserName(titled);
+    setUserSettings(DEFAULT_USER_SETTINGS);
     storeAuth(id, titled);
     navigate("/landing");
   };
@@ -180,81 +204,102 @@ export default function App() {
     clearAuth();
     setUserId(null);
     setUserName("");
+    setUserSettings(DEFAULT_USER_SETTINGS);
     navigate("/login", { replace: true });
   };
 
   return (
-    <Routes>
-      <Route
-        path="/"
-        element={
-          <Navigate
-            to={
-              devSessionEnabled
-                ? { pathname: "/session/dev-session", search: window.location.search }
-                : { pathname: userId ? "/landing" : "/login" }
-            }
-            replace
-          />
-        }
-      />
-      <Route
-        path="/login"
-        element={userId ? <Navigate to="/landing" replace /> : <LoginPage onLogin={handleLogin} />}
-      />
-      <Route
-        path="/landing"
-        element={
-          userId ? (
-            <LandingPage
-              onStart={handleStartSession}
-              onCaregiver={() => navigate("/caregiver/summary")}
-              userName={userName}
-              userId={userId}
-              sessionOptions={TEST_SESSIONS}
-              pipelineMode={selectedPipelineMode}
-              onPipelineModeChange={setSelectedPipelineMode}
+    <LanguageProvider language={userSettings.language}>
+      <Routes>
+        <Route
+          path="/"
+          element={
+            <Navigate
+              to={
+                devSessionEnabled
+                  ? { pathname: "/session/dev-session", search: window.location.search }
+                  : { pathname: userId ? "/landing" : "/login" }
+              }
+              replace
             />
-          ) : (
-            <Navigate to="/login" replace />
-          )
-        }
-      />
-      <Route
-        path="/session/:sessionId"
-        element={
-          userId ? (
-            <SessionRoute
-              userName={userName}
-              fallbackPipelineMode={selectedPipelineMode}
-              onSessionEnd={handleEndSession}
-            />
-          ) : (
-            <Navigate to="/login" replace />
-          )
-        }
-      />
-      <Route
-        path="/end/:sessionId"
-        element={userId ? <EndRoute userId={userId} userName={userName} /> : <Navigate to="/login" replace />}
-      />
-      <Route path="/caregiver" element={<Navigate to="/caregiver/summary" replace />} />
-      <Route
-        path="/caregiver/:tab"
-        element={
-          userId ? (
-            <CaregiverPage
-              userId={userId}
-              onBack={() => navigate("/landing")}
-              onLogout={handleLogout}
-              userName={userName}
-            />
-          ) : (
-            <Navigate to="/login" replace />
-          )
-        }
-      />
-      <Route path="*" element={<Navigate to={userId ? "/landing" : "/login"} replace />} />
-    </Routes>
+          }
+        />
+        <Route
+          path="/login"
+          element={userId ? <Navigate to="/landing" replace /> : <LoginPage onLogin={handleLogin} />}
+        />
+        <Route
+          path="/landing"
+          element={
+            userId ? (
+              <LandingPage
+                onStart={handleStartSession}
+                onCaregiver={() => navigate("/caregiver/summary")}
+                onSettings={() => navigate("/settings")}
+                userName={userName}
+                userId={userId}
+                sessionOptions={TEST_SESSIONS}
+                pipelineMode={selectedPipelineMode}
+                onPipelineModeChange={setSelectedPipelineMode}
+              />
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
+        />
+        <Route
+          path="/session/:sessionId"
+          element={
+            userId ? (
+              <SessionRoute
+                userName={userName}
+                fallbackPipelineMode={selectedPipelineMode}
+                defaultAvatarMode={userSettings.avatarMode}
+                onSessionEnd={handleEndSession}
+              />
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
+        />
+        <Route
+          path="/end/:sessionId"
+          element={userId ? <EndRoute userId={userId} userName={userName} /> : <Navigate to="/login" replace />}
+        />
+        <Route path="/caregiver" element={<Navigate to="/caregiver/summary" replace />} />
+        <Route
+          path="/caregiver/:tab"
+          element={
+            userId ? (
+              <CaregiverPage
+                userId={userId}
+                onBack={() => navigate("/landing")}
+                onLogout={handleLogout}
+                userName={userName}
+              />
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
+        />
+        <Route
+          path="/settings"
+          element={
+            userId ? (
+              <SettingsPage
+                userId={userId}
+                userName={userName}
+                settings={userSettings}
+                onBack={() => navigate("/landing")}
+                onSettingsChange={handleSettingsChange}
+              />
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
+        />
+        <Route path="*" element={<Navigate to={userId ? "/landing" : "/login"} replace />} />
+      </Routes>
+    </LanguageProvider>
   );
 }

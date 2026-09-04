@@ -133,10 +133,12 @@ function loadYouTubeIframeApi() {
   return youtubeIframeApiPromise;
 }
 
-function getInitialAvatarMode() {
-  if (!import.meta.env.DEV) return "male";
-  const requestedMode = new URLSearchParams(window.location.search).get("avatar");
-  return avatarModeIds.has(requestedMode) ? requestedMode : "male";
+function getInitialAvatarMode(defaultAvatarMode = "male") {
+  if (import.meta.env.DEV) {
+    const requestedMode = new URLSearchParams(window.location.search).get("avatar");
+    if (avatarModeIds.has(requestedMode)) return requestedMode;
+  }
+  return avatarModeIds.has(defaultAvatarMode) ? defaultAvatarMode : "male";
 }
 
 function formatPlaybackDuration(seconds) {
@@ -192,7 +194,7 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
   const [elapsed, setElapsed] = useState(0);
   const [sessionMetaLabel, setSessionMetaLabel] = useState("");
   const [slide, setSlide] = useState(defaultSlide);
-  const [avatarMode, setAvatarMode] = useState(getInitialAvatarMode);
+  const [avatarMode, setAvatarMode] = useState(() => getInitialAvatarMode(defaultAvatarMode));
   const [lipSyncMode, setLipSyncMode] = useState("rhubarb");
   const [pendingPlay, setPendingPlay] = useState(false);
   const [avatarNarrationActive, setAvatarNarrationActive] = useState(false);
