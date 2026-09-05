@@ -860,7 +860,7 @@ export const evaluateImageObservationAnswer = ({ step, content }) => {
   }
 
   if (step.id === 'current_affairs_bridge_notice') {
-    if (/\b(?:auckland|new zealand|nz|waitemata|waitemata)\b/.test(answer)) {
+    if (/\b(?:auckland|new zealand|nz|waitemata|waitemat)\b/.test(answer)) {
       return { answered: true, response: 'Yes—you have placed the bridge in New Zealand.' };
     }
     if (/\b(?:america|american|united states|usa)\b/.test(answer)) {

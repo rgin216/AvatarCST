@@ -194,6 +194,12 @@ test('acknowledges correct image details and gently clarifies mixed interpretati
     evaluateImageObservationAnswer({ step: bridge, content: 'Is this in America?' }).response,
     /understandable to wonder about the location/i
   );
+  for (const location of ['Waitemata Harbour', 'Waitematā Harbour']) {
+    assert.match(
+      evaluateImageObservationAnswer({ step: bridge, content: `That looks like ${location}.` }).response,
+      /placed the bridge in New Zealand/i
+    );
+  }
 
   const prompt = buildCstAdaptiveResponseInstructions({
     user: { name: 'Test User' },
