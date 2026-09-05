@@ -67,8 +67,25 @@ const TEST_SESSIONS = [
     title: "Physical Games",
     theme: "Physical Games",
   },
-  ...Array.from({ length: 12 }, (_, i) => {
+  ...Array.from({ length: 2 }, (_, i) => {
     const n = i + 4;
+    return {
+      id: `placeholder_session_${n}`,
+      label: `Session ${n}`,
+      title: "Coming soon",
+      theme: "",
+      disabled: true,
+    };
+  }),
+  {
+    id: "cst_current_affairs",
+    label: "Session 6",
+    title: "Current Affairs",
+    theme: "Current Affairs",
+    icon: "📰",
+  },
+  ...Array.from({ length: 9 }, (_, i) => {
+    const n = i + 7;
     return {
       id: `placeholder_session_${n}`,
       label: `Session ${n}`,
