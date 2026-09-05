@@ -186,7 +186,13 @@ const SESSION_META_LABELS = {
   cst_current_affairs: "Current Affairs",
 };
 
-export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: initialPipelineMode = "free" }) {
+export default function SessionPage({
+  sessionId,
+  onEnd,
+  userName,
+  pipelineMode: initialPipelineMode = "free",
+  defaultAvatarMode = "male",
+}) {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [isRecording, setIsRecording] = useState(false);
