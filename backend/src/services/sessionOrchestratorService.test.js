@@ -17,6 +17,7 @@ import {
   evaluateAdaptiveFollowUpAnswer,
   evaluateOrientationAnswer,
   evaluateTriviaAnswer,
+  evaluateTuneGuess,
   hasSubstantialSpeechOverlap,
   inferMemorySuggestions,
   isRecordableSessionAnswer,
@@ -343,6 +344,36 @@ test('re-prompts only for the instrument sounds still missing', () => {
   assert.match(buildNamingSlotPrompt(['second', 'third'], 'sound'), /second and third sounds/i);
   assert.match(buildNamingSlotPrompt(['third'], 'sound'), /the third sound/i);
   assert.equal(buildNamingSlotPrompt([], 'sound'), '');
+});
+
+test('gives the instrument and Name That Tune slides playable audio clips', () => {
+  const instrumentStep = getScriptStep('cst_sounds', 15).step;
+  assert.equal(instrumentStep.interaction.type, 'audioClips');
+  assert.equal(instrumentStep.interaction.clips.length, 3);
+  assert.ok(instrumentStep.interaction.clips.every((clip) => clip.id && clip.src));
+
+  for (const stepIndex of [22, 23, 24, 25, 26]) {
+    const step = getScriptStep('cst_sounds', stepIndex).step;
+    assert.equal(step.interaction.type, 'audioClips', step.id);
+    assert.equal(step.interaction.clips.length, 1, step.id);
+  }
+});
+
+test('treats a Name That Tune guess as a warm, always-answered turn that reveals the answer', () => {
+  const step = getScriptStep('cst_sounds', 22).step;
+  assert.equal(step.id, 'sounds_name_that_tune_1950s');
+
+  const guess = evaluateTuneGuess({ step, content: 'Is it Elvis?' });
+  assert.equal(guess.answered, true);
+  assert.equal(guess.outcome, 'incorrect');
+  assert.match(guess.response, /\[SONG — ARTIST\]/);
+
+  const unsure = evaluateTuneGuess({ step, content: "I don't know" });
+  assert.equal(unsure.outcome, 'unsure');
+  assert.match(unsure.response, /\[SONG — ARTIST\]/);
+
+  // Non Name That Tune steps are ignored by this evaluator.
+  assert.equal(evaluateTuneGuess({ step: { id: 'sounds_weather' }, content: 'sunny' }), null);
 });
 
 test('summarises Session 4 sound activities', () => {

@@ -1350,6 +1350,14 @@ const scripts = {
       accent: '#7A9DAD',
       // Advances only once all three sounds have an answer; re-prompts for the missing ones.
       namingSlots: { count: 3, labels: ['first', 'second', 'third'], noun: 'sound' },
+      interaction: {
+        type: 'audioClips',
+        clips: [
+          { id: 'sound-1', label: 'Sound 1', src: '/audio/session4/instrument-1.mp3' },
+          { id: 'sound-2', label: 'Sound 2', src: '/audio/session4/instrument-2.mp3' },
+          { id: 'sound-3', label: 'Sound 3', src: '/audio/session4/instrument-3.mp3' },
+        ],
+      },
       reply: () =>
         'On the slide are three short sounds. Have a listen to each one and tell me which instrument you think is making it. It is completely fine to guess.',
     },
@@ -1454,11 +1462,12 @@ const scripts = {
       bullets: ['Have a listen', 'Any guess is welcome'],
       visualHint: 'Source deck: NZ04. Sounds, slide 23',
       accent: '#A8C5A0',
-      adaptiveFollowUp: adaptiveReminiscence(
-        'If they recognise it, invite one brief memory the song brings up. Otherwise do not press.'
-      ),
+      interaction: {
+        type: 'audioClips',
+        clips: [{ id: 'tune-1950s', label: 'Play the clip', src: '/audio/session4/tune-1950s.mp3' }],
+      },
       reply: () =>
-        'Here is the first clip, from the 1950s. Can you name the song, or the artist who sang it? This one is [SONG — ARTIST].',
+        'Here is the first clip, from the 1950s. Have a listen — can you name the song, or the artist who sang it?',
     },
     {
       id: 'sounds_name_that_tune_1960s',
@@ -1471,11 +1480,12 @@ const scripts = {
       bullets: ['Have a listen', 'Any guess is welcome'],
       visualHint: 'Source deck: NZ04. Sounds, slide 24',
       accent: '#7A9DAD',
-      adaptiveFollowUp: adaptiveReminiscence(
-        'If they recognise it, invite one brief memory the song brings up. Otherwise do not press.'
-      ),
+      interaction: {
+        type: 'audioClips',
+        clips: [{ id: 'tune-1960s', label: 'Play the clip', src: '/audio/session4/tune-1960s.mp3' }],
+      },
       reply: () =>
-        'Here is a clip from the 1960s. Do you know the song or the artist? This one is [SONG — ARTIST].',
+        'Here is a clip from the 1960s. Have a listen — do you know the song or the artist?',
     },
     {
       id: 'sounds_name_that_tune_motown',
@@ -1488,11 +1498,12 @@ const scripts = {
       bullets: ['Have a listen', 'Any guess is welcome'],
       visualHint: 'Source deck: NZ04. Sounds, slide 25',
       accent: '#F47C20',
-      adaptiveFollowUp: adaptiveReminiscence(
-        'If they recognise it, invite one brief memory the song brings up. Otherwise do not press.'
-      ),
+      interaction: {
+        type: 'audioClips',
+        clips: [{ id: 'tune-motown', label: 'Play the clip', src: '/audio/session4/tune-motown.mp3' }],
+      },
       reply: () =>
-        'This clip is Motown, from the 1960s and 1970s. Can you name the song or the artist? This one is [SONG — ARTIST].',
+        'This clip is Motown, from the 1960s and 1970s. Have a listen — can you name the song or the artist?',
     },
     {
       id: 'sounds_name_that_tune_classical',
@@ -1505,11 +1516,12 @@ const scripts = {
       bullets: ['Have a listen', 'Any guess is welcome'],
       visualHint: 'Source deck: NZ04. Sounds, slide 26',
       accent: '#4472C4',
-      adaptiveFollowUp: adaptiveReminiscence(
-        'If they recognise it, invite one brief memory the piece brings up. Otherwise do not press.'
-      ),
+      interaction: {
+        type: 'audioClips',
+        clips: [{ id: 'tune-classical', label: 'Play the clip', src: '/audio/session4/tune-classical.mp3' }],
+      },
       reply: () =>
-        'Last one: a piece of classical music. Can you name the piece, or the composer who wrote it? This one is [PIECE — COMPOSER].',
+        'Last one: a piece of classical music. Have a listen — can you name the piece, or the composer who wrote it?',
     },
     {
       id: 'sounds_modern_music_opinion',
@@ -1522,11 +1534,15 @@ const scripts = {
       bullets: ['A more recent song', 'There is no right answer'],
       visualHint: 'Source deck: NZ04. Sounds, slide 27',
       accent: '#F4C8B0',
+      interaction: {
+        type: 'audioClips',
+        clips: [{ id: 'tune-modern', label: 'Play the clip', src: '/audio/session4/tune-modern.mp3' }],
+      },
       adaptiveFollowUp: adaptiveReminiscence(
         'Explore their opinion gently: what they like or dislike about it, or how it compares to music from their day.'
       ),
       reply: () =>
-        'Here is a more recent song. I am not asking you to name it, just to tell me what you think of it. What is your opinion of this artist or song?',
+        'Here is a more recent song. I am not asking you to name it, just to tell me what you think of it. Have a listen — what is your opinion of this artist or song?',
     },
     {
       id: 'sounds_onomatopoeia',

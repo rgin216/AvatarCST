@@ -198,6 +198,8 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
   const [musicPlaybackState, setMusicPlaybackState] = useState("idle");
   const [questionWheel, setQuestionWheel] = useState(null);
   const [activityReveal, setActivityReveal] = useState(null);
+  const [playingAudioClipId, setPlayingAudioClipId] = useState(null);
+  const audioClipElsRef = useRef({});
   const [wheelSpinning, setWheelSpinning] = useState(false);
   const [wheelResultPending, setWheelResultPending] = useState(false);
   const [wheelRotation, setWheelRotation] = useState(0);
@@ -275,6 +277,14 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
     (option) => option.id === activityReveal?.currentOptionId
   );
   const activityTargetCount = activityReveal?.targetCount || activityRevealInteraction?.revealCount || 3;
+  // Audio clips are a passive affordance: playing one is not a turn, so it never
+  // disables the text/mic input. A single clip (Name That Tune / modern music) is
+  // shown on a theme-song-style card; the three instrument clips stay a small
+  // patch over the slide artwork.
+  const audioClipsInteraction =
+    slide.interaction?.type === "audioClips" ? slide.interaction : null;
+  const audioClips = audioClipsInteraction?.clips || [];
+  const isSingleAudioClip = Boolean(audioClipsInteraction) && audioClips.length === 1;
   const inactivityTimeoutMs = Math.max(
     INACTIVITY_TIMEOUT_MS,
     Number(slide.inactivityTimeoutMs) || 0
@@ -284,7 +294,8 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
     Boolean(exerciseVideo) ||
     hasPositiveNewsInteraction ||
     Boolean(musicInteraction) ||
-    hasActivityRevealInteraction;
+    hasActivityRevealInteraction ||
+    isSingleAudioClip;
   const landedWheelResult = questionWheel?.status === "landed" ? questionWheel : null;
   const sessionInputDisabled =
     typing ||
@@ -376,6 +387,15 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
       setVideoPlaybackState(
         slideData.interaction?.type === "youtubeShort" ? "loading" : "idle"
       );
+      Object.values(audioClipElsRef.current).forEach((el) => {
+        try {
+          el?.pause();
+        } catch {
+          // A detached element may already be gone; nothing to stop.
+        }
+      });
+      audioClipElsRef.current = {};
+      setPlayingAudioClipId(null);
     }
     setSlide(slideData);
   }
@@ -1244,6 +1264,21 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
     }
   }
 
+  function handleAudioClipToggle(clip) {
+    const els = audioClipElsRef.current;
+    const target = els[clip.id];
+    if (!target) return;
+    Object.entries(els).forEach(([id, el]) => {
+      if (id !== clip.id && el && !el.paused) el.pause();
+    });
+    if (target.paused) {
+      target.currentTime = 0;
+      target.play().catch(() => setPlayingAudioClipId(null));
+    } else {
+      target.pause();
+    }
+  }
+
   async function handleActivityReveal(option) {
     if (
       !option ||
@@ -1433,7 +1468,7 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
 
       <main className="session-slide-shell">
         <section
-          className={`ppt-slide${slide.imageUrl && !hasSlideInteraction ? " has-slide-image" : ""}${hasSlideInteraction ? " has-slide-interaction" : ""}${exerciseVideo ? " has-video-interaction" : ""}${hasPositiveNewsInteraction ? " has-news-interaction" : ""}${musicInteraction ? " has-music-interaction" : ""}${hasActivityRevealInteraction ? " has-activity-reveal-interaction" : ""}`}
+          className={`ppt-slide${slide.imageUrl && !hasSlideInteraction ? " has-slide-image" : ""}${hasSlideInteraction ? " has-slide-interaction" : ""}${exerciseVideo ? " has-video-interaction" : ""}${hasPositiveNewsInteraction ? " has-news-interaction" : ""}${musicInteraction ? " has-music-interaction" : ""}${hasActivityRevealInteraction ? " has-activity-reveal-interaction" : ""}${isSingleAudioClip ? " has-audioclips-interaction" : ""}`}
           style={{
             "--slide-accent": slide.accent || theme.blush,
             backgroundImage: slide.imageUrl && !hasSlideInteraction ? `url(${slide.imageUrl})` : undefined,
@@ -1674,6 +1709,77 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
                     Done
                   </button>
                 </section>
+              )}
+            </div>
+          )}
+          {audioClipsInteraction && (
+            <div
+              className={`slide-audioclips-overlay${isSingleAudioClip ? " is-single" : " is-panel"}`}
+            >
+              <div className="slide-audioclips-row">
+                {audioClips.map((clip) => {
+                  const isPlaying = playingAudioClipId === clip.id;
+                  return (
+                    <div className="slide-audioclip-item" key={clip.id}>
+                      <button
+                        type="button"
+                        className={`slide-audioclip${isSingleAudioClip ? " slide-audioclip-lg" : ""}${isPlaying ? " is-playing" : ""}`}
+                        onClick={() => handleAudioClipToggle(clip)}
+                        aria-label={`${isPlaying ? "Pause" : "Play"} ${clip.label}`}
+                      >
+                        <svg
+                          className="slide-audioclip-glyph"
+                          viewBox="0 0 24 24"
+                          aria-hidden="true"
+                        >
+                          {isPlaying ? (
+                            <path d="M8 5h3.2v14H8zm4.8 0H16v14h-3.2z" />
+                          ) : (
+                            <path d="M9 5.5v13l10-6.5z" />
+                          )}
+                        </svg>
+                        <audio
+                          ref={(el) => {
+                            if (el) audioClipElsRef.current[clip.id] = el;
+                            else delete audioClipElsRef.current[clip.id];
+                          }}
+                          src={clip.src}
+                          preload="none"
+                          onPlay={() => setPlayingAudioClipId(clip.id)}
+                          onPause={() =>
+                            setPlayingAudioClipId((current) =>
+                              current === clip.id ? null : current
+                            )
+                          }
+                          onEnded={() =>
+                            setPlayingAudioClipId((current) =>
+                              current === clip.id ? null : current
+                            )
+                          }
+                        />
+                      </button>
+                      <span className="slide-audioclip-label">
+                        {isSingleAudioClip
+                          ? isPlaying
+                            ? "Playing…"
+                            : "Play clip"
+                          : clip.label}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+              {isSingleAudioClip && (
+                <div className="slide-audioclip-details">
+                  <p className="slide-music-eyebrow">{slide.subtitle || "Name That Tune"}</p>
+                  <h1>{slide.title}</h1>
+                  <p className="slide-audioclip-prompt">{slide.prompt}</p>
+                  <p className="slide-audioclip-status" aria-live="polite">
+                    {playingAudioClipId
+                      ? "Playing the clip…"
+                      : "Tap the circle to listen — play it as often as you like, then reply below."}
+                  </p>
+                </div>
               )}
             </div>
           )}

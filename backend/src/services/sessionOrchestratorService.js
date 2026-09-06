@@ -488,6 +488,38 @@ export const evaluateTriviaAnswer = ({ step, content }) => {
   };
 };
 
+// Name That Tune is a gentle guessing game, not a scored quiz: every guess is
+// welcomed, the answer is revealed in the same breath, and there is no separate
+// reveal slide. Fill `isCorrect` and the real titles once the songs are chosen.
+const SCRIPTED_TUNE_RULES = {
+  sounds_name_that_tune_1950s: { isCorrect: () => false, reveal: '[SONG — ARTIST]' },
+  sounds_name_that_tune_1960s: { isCorrect: () => false, reveal: '[SONG — ARTIST]' },
+  sounds_name_that_tune_motown: { isCorrect: () => false, reveal: '[SONG — ARTIST]' },
+  sounds_name_that_tune_classical: { isCorrect: () => false, reveal: '[PIECE — COMPOSER]' },
+};
+
+export const evaluateTuneGuess = ({ step, content }) => {
+  const rule = SCRIPTED_TUNE_RULES[step?.id];
+  if (!rule || !content) return null;
+
+  if (isDontKnowAnswer(content)) {
+    return {
+      answered: true,
+      response: `No worries at all — this one was ${rule.reveal}.`,
+      outcome: 'unsure',
+    };
+  }
+
+  const correct = rule.isCorrect(normalizeAnswer(content));
+  return {
+    answered: true,
+    response: correct
+      ? `Yes — that is ${rule.reveal}. Well remembered!`
+      : `A lovely guess. This one was ${rule.reveal}.`,
+    outcome: correct ? 'correct' : 'incorrect',
+  };
+};
+
 const isMusicCompletionProtocol = (content = '') =>
   /^\[\[music-complete\]\]$/i.test(content.trim());
 
@@ -2157,6 +2189,9 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
       content: userContent,
       retryCount: currentRetryCount,
     }) || evaluateTriviaAnswer({
+      step,
+      content: userContent,
+    }) || evaluateTuneGuess({
       step,
       content: userContent,
     }) || evaluateMusicCompletionAnswer({
