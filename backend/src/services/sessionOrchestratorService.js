@@ -75,6 +75,10 @@ const ORIENTATION_STEP_TYPES = {
   physical_games_orientation_month: 'month',
   physical_games_orientation_year: 'year',
   physical_games_orientation_season: 'season',
+  sounds_orientation_day: 'weekday',
+  sounds_orientation_month: 'month',
+  sounds_orientation_year: 'year',
+  sounds_orientation_season: 'season',
 };
 const SEASON_BY_MONTH = [
   'summer',
@@ -418,7 +422,7 @@ export const evaluateOrientationAnswer = ({ step, content, retryCount }) => {
   };
 };
 
-const SESSION3_TRIVIA_RULES = {
+const SCRIPTED_TRIVIA_RULES = {
   physical_games_trivia_next_olympics: {
     isCorrect: (answer) =>
       /\b2028\b/.test(answer) && /\b(?:los angeles|l a)\b/.test(answer),
@@ -450,12 +454,22 @@ const SESSION3_TRIVIA_RULES = {
     correctResponse: 'Well done — that number is correct.',
     incorrectResponse: 'That number is not quite right, but good guess.',
   },
+  sounds_trivia_1: {
+    isCorrect: (answer) => /vibrat/.test(answer) && /1[ ,.]?200/.test(answer),
+    correctResponse: 'That is right on both counts — vibrations, and about 1,200 kilometres per hour.',
+    incorrectResponse: 'Good try. One or both parts are not quite right.',
+  },
+  sounds_trivia_2: {
+    isCorrect: (answer) => /\becho\b/.test(answer) && /\bspace\b/.test(answer),
+    correctResponse: 'Exactly — an echo, and space is the place with no sound.',
+    incorrectResponse: 'Good try. One or both parts are not quite right.',
+  },
 };
 
-const isSession3TriviaQuestion = (step) => Boolean(SESSION3_TRIVIA_RULES[step?.id]);
+const isScriptedTriviaQuestion = (step) => Boolean(SCRIPTED_TRIVIA_RULES[step?.id]);
 
 export const evaluateTriviaAnswer = ({ step, content }) => {
-  const rule = SESSION3_TRIVIA_RULES[step?.id];
+  const rule = SCRIPTED_TRIVIA_RULES[step?.id];
   if (!rule || !content) return null;
 
   if (isDontKnowAnswer(content)) {
@@ -784,6 +798,80 @@ export const parseActivityRevealEvent = (content = '', step = null) => {
   }
 };
 
+// A "naming slots" step asks the participant to name several things on one slide
+// (e.g. three instrument sounds). It advances as soon as every slot has an answer,
+// re-prompting only for the slots still empty.
+const NAMING_SLOT_ORDINALS = [
+  { slot: 0, re: /\b(?:first|1st|number one)\b/ },
+  { slot: 1, re: /\b(?:second|2nd|number two|middle)\b/ },
+  { slot: 2, re: /\b(?:third|3rd|number three|last|final)\b/ },
+];
+
+export const createNamingSlotState = (step, persisted = null) => {
+  const count = Math.max(0, Math.trunc(Number(step?.namingSlots?.count) || 0));
+  const source = Array.isArray(persisted?.filled) ? persisted.filled : [];
+  return {
+    count,
+    filled: Array.from({ length: count }, (_, index) => Boolean(source[index])),
+  };
+};
+
+export const parseNamingSlotAnswer = (content = '', { count = 3, filled = [] } = {}) => {
+  const normalized = normalizeAnswer(content);
+  if (!normalized) return null;
+
+  const emptySlots = Array.from({ length: count }, (_, index) => index).filter(
+    (index) => !filled[index]
+  );
+  if (emptySlots.length === 0) return { slots: [] };
+
+  // Explicit "what do I do now" style messages name nothing.
+  if (/\b(?:what (?:do|should|shall) i|what now|how does this|i(?:m| am) (?:lost|confused)|not sure what to)\b/.test(normalized)) {
+    return { slots: [] };
+  }
+
+  if (/\b(?:all (?:three|3|of them|of these)|every one|they (?:re|are) all|each (?:one|of them))\b/.test(normalized)) {
+    return { slots: emptySlots };
+  }
+
+  const hits = new Set();
+  if (/\b(?:the )?(?:other|last|final) two\b/.test(normalized)) {
+    emptySlots.slice(-2).forEach((slot) => hits.add(slot));
+  }
+  if (/\b(?:the )?first two\b/.test(normalized)) {
+    [0, 1].filter((slot) => slot < count && !filled[slot]).forEach((slot) => hits.add(slot));
+  }
+  for (const { slot, re } of NAMING_SLOT_ORDINALS) {
+    if (slot < count && !filled[slot] && re.test(normalized)) hits.add(slot);
+  }
+  if (hits.size > 0) {
+    return { slots: [...hits].sort((a, b) => a - b) };
+  }
+
+  // No ordinal cue and not a genuine attempt: name nothing.
+  if (isDontKnowAnswer(content) || /\?\s*$/.test(content) || !/[a-z]{3}/.test(normalized)) {
+    return { slots: [] };
+  }
+
+  // Otherwise treat it as naming the next empty slot(s), one per listed fragment.
+  const fragments = normalized
+    .split(/\s+(?:and|then)\s+|\s*,\s*|\s*;\s*/)
+    .filter((fragment) => /[a-z]{3}/.test(fragment));
+  const fillCount = Math.min(Math.max(fragments.length, 1), emptySlots.length);
+  return { slots: emptySlots.slice(0, fillCount) };
+};
+
+export const buildNamingSlotPrompt = (missingLabels = [], noun = 'sound') => {
+  const labels = missingLabels.filter(Boolean);
+  if (labels.length === 0) return '';
+  if (labels.length === 1) return `And what does the ${labels[0]} ${noun} sound like?`;
+  const joined =
+    labels.length === 2
+      ? `${labels[0]} and ${labels[1]}`
+      : `${labels.slice(0, -1).join(', ')}, and ${labels[labels.length - 1]}`;
+  return `And what about the ${joined} ${noun}s?`;
+};
+
 export const isRecordableSessionAnswer = ({ step, content, wheelEvent }) =>
   Boolean(
     content &&
@@ -1058,6 +1146,18 @@ export const buildTopicSessionSummary = (answers = [], { themeSong = null } = {}
   }
   if (meaningful.some((item) => item.stepId === 'physical_games_spin_question')) {
     addTopic('reflecting on a physical-games question from the wheel');
+  }
+  if (meaningful.some((item) => item.stepId === 'sounds_naming_instruments')) {
+    addTopic('listening to sounds and naming instruments');
+  }
+  if (meaningful.some((item) => String(item.stepId || '').startsWith('sounds_name_that_tune'))) {
+    addTopic('playing Name That Tune with songs from different eras');
+  }
+  if (meaningful.some((item) => item.stepId === 'sounds_onomatopoeia')) {
+    addTopic('building a list of sound words together');
+  }
+  if (meaningful.some((item) => item.stepId === 'sounds_spin_question')) {
+    addTopic('reflecting on a question from the wheel');
   }
 
   const selectedTopics = topics.slice(0, 4);
@@ -1904,6 +2004,15 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
     hasActivityCompletionProtocol &&
     nextActivityRevealState.completedCount >= nextActivityRevealState.targetCount
   );
+  const namingSlotStep = step.namingSlots?.count ? step : null;
+  const currentNamingSlotState = namingSlotStep
+    ? createNamingSlotState(
+        step,
+        session.interactionState?.namingSlots?.stepId === step.id
+          ? session.interactionState.namingSlots
+          : null
+      )
+    : null;
   const persistedAdaptiveFollowUp = session.interactionState?.adaptiveFollowUp;
   const activeAdaptiveFollowUp =
     persistedAdaptiveFollowUp?.stepId === step.id ? persistedAdaptiveFollowUp : null;
@@ -2009,11 +2118,41 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
   let sessionAnswers = storedAnswers;
   scriptContext.sessionSummary = buildTopicSessionSummary(storedAnswers, { themeSong });
 
+  const namingSlotParse =
+    namingSlotStep && userContent && hasDeliveredQuestion && !hasAutoAdvanceProtocol
+      ? parseNamingSlotAnswer(userContent, {
+          count: currentNamingSlotState.count,
+          filled: currentNamingSlotState.filled,
+        })
+      : null;
+  const newlyFilledNamingSlots = namingSlotParse?.slots || [];
+  const nextNamingSlotFilled = currentNamingSlotState
+    ? currentNamingSlotState.filled.map(
+        (isFilled, index) => isFilled || newlyFilledNamingSlots.includes(index)
+      )
+    : null;
+  const namingSlotsComplete = Boolean(
+    nextNamingSlotFilled && nextNamingSlotFilled.every(Boolean)
+  );
+  const namingMissingLabels =
+    namingSlotStep && nextNamingSlotFilled
+      ? nextNamingSlotFilled
+          .map((isFilled, index) =>
+            isFilled ? null : step.namingSlots.labels?.[index] || `${index + 1}`
+          )
+          .filter(Boolean)
+      : [];
+
   let answeredCurrentQuestion = true;
   let adaptiveText = '';
   let adaptiveFollowUpQuestion = null;
   if (!isQuestionWheelEvent && !isActivityInteractionEvent && userContent && hasDeliveredQuestion) {
-    const deterministicTurn = evaluateOrientationAnswer({
+    const deterministicTurn = (namingSlotStep
+      ? {
+          answered: newlyFilledNamingSlots.length > 0 || namingSlotsComplete,
+          response: '',
+        }
+      : null) || evaluateOrientationAnswer({
       step,
       content: userContent,
       retryCount: currentRetryCount,
@@ -2183,6 +2322,11 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
   );
   const shouldAdvance = isActivityInteractionEvent
     ? completedAllActivities && !isFinalStep
+    : namingSlotStep
+    ? hasUserContent &&
+      hasDeliveredQuestion &&
+      (namingSlotsComplete || shouldForceProgress) &&
+      !isFinalStep
     : canProgress &&
       !shouldAskAdaptiveFollowUp &&
       !shouldElaborateNews &&
@@ -2217,7 +2361,15 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
         )
       : `Well done. Choose another black activity card. You have ${nextActivityRevealState.targetCount - nextActivityRevealState.completedCount} ${nextActivityRevealState.targetCount - nextActivityRevealState.completedCount === 1 ? 'action' : 'actions'} left.`
     : '';
-  const scriptedNextLine = activityInteractionReply || (themeSongFeedback
+  const namingSlotPromptLine =
+    namingSlotStep &&
+    hasUserContent &&
+    hasDeliveredQuestion &&
+    !namingSlotsComplete &&
+    !shouldForceProgress
+      ? buildNamingSlotPrompt(namingMissingLabels, step.namingSlots.noun || 'sound')
+      : '';
+  const scriptedNextLine = namingSlotPromptLine || activityInteractionReply || (themeSongFeedback
     ? themeSongRequiresRetry
       ? themeSongFeedback
       : joinSpeechParts(
@@ -2291,7 +2443,7 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
   if (userContent && !hasAutoAdvanceProtocol) {
     adaptiveText = collapseRepeatedAdjacentSpeech(adaptiveText);
     if (
-      (nextSlideProvidesResponse && !isSession3TriviaQuestion(step)) ||
+      (nextSlideProvidesResponse && !isScriptedTriviaQuestion(step)) ||
       hasSubstantialSpeechOverlap(adaptiveText, scriptedNextLine)
     ) {
       adaptiveText = '';
@@ -2374,6 +2526,11 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
       : createActivityRevealState(displaySlide);
   } else {
     delete nextInteractionState.activityReveal;
+  }
+  if (namingSlotStep && displaySlide.id === step.id) {
+    nextInteractionState.namingSlots = { stepId: step.id, filled: nextNamingSlotFilled };
+  } else if (nextInteractionState.namingSlots?.stepId !== displaySlide.id) {
+    delete nextInteractionState.namingSlots;
   }
   if (displaySlide.interaction?.type === 'positiveNews') {
     nextInteractionState.currentAffairs = currentAffairs;

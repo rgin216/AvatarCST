@@ -38,6 +38,13 @@ const SESSION_SCRIPTS = {
     .split(/\r?\n---\r?\n/)
     .map((s) => s.trim())
     .filter(Boolean),
+  cst_sounds: readFileSync(
+    join(CONTEXT_ROOT, 'vCST_Session4_AI_Script.md'),
+    'utf8'
+  )
+    .split(/\r?\n---\r?\n/)
+    .map((s) => s.trim())
+    .filter(Boolean),
 };
 
 const RECENT_PROMPT_MESSAGE_LIMIT = 8;
