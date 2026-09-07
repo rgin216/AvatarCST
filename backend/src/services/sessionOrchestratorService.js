@@ -904,6 +904,50 @@ export const buildNamingSlotPrompt = (missingLabels = [], noun = 'sound') => {
   return `And what about the ${joined} ${noun}s?`;
 };
 
+// Per-slot answers for a naming-slots step. Matching is lenient: a guess in the
+// right instrument family counts. Order matches the step's audio clips.
+const SCRIPTED_INSTRUMENT_RULES = {
+  sounds_naming_instruments: [
+    { label: 'a trumpet', match: /\b(trumpet|cornet|bugle|flugel|horn|brass|trombone|tuba)\b/ },
+    { label: 'a bass guitar', match: /\b(bass|double bass|upright bass|guitar|cello)\b/ },
+    { label: 'an organ', match: /\b(organ|harmonium|accordion|keyboard|synth|synthesiser|synthesizer|harpsichord|piano)\b/ },
+  ],
+};
+
+export const evaluateNamedInstrumentSlots = ({ step, content, slotIndices = [] }) => {
+  const rules = SCRIPTED_INSTRUMENT_RULES[step?.id];
+  if (!rules || !content || slotIndices.length === 0) return null;
+
+  const normalized = normalizeAnswer(content);
+  const unsure = isDontKnowAnswer(content);
+  const outcomes = slotIndices
+    .filter((index) => rules[index])
+    .map((index) => ({
+      label: rules[index].label,
+      outcome: unsure ? 'unsure' : rules[index].match.test(normalized) ? 'correct' : 'incorrect',
+    }));
+  if (outcomes.length === 0) return null;
+
+  const correct = outcomes.filter((o) => o.outcome === 'correct').map((o) => o.label);
+  const listCorrect =
+    correct.length <= 1
+      ? correct.join('')
+      : `${correct.slice(0, -1).join(', ')} and ${correct[correct.length - 1]}`;
+
+  let response;
+  if (outcomes.every((o) => o.outcome === 'unsure')) {
+    response = 'No trouble at all.';
+  } else if (correct.length === outcomes.length) {
+    response = `Yes, that does sound like ${listCorrect}.`;
+  } else if (correct.length > 0) {
+    response = `Good ear on ${listCorrect} — the other is not quite that, but no matter.`;
+  } else {
+    response = 'A fair guess — we will find out shortly.';
+  }
+
+  return { outcomes, response };
+};
+
 export const isRecordableSessionAnswer = ({ step, content, wheelEvent }) =>
   Boolean(
     content &&
@@ -2174,6 +2218,14 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
           )
           .filter(Boolean)
       : [];
+  const namingSlotAcknowledgement =
+    namingSlotStep && newlyFilledNamingSlots.length > 0
+      ? evaluateNamedInstrumentSlots({
+          step,
+          content: userContent,
+          slotIndices: newlyFilledNamingSlots,
+        })
+      : null;
 
   let answeredCurrentQuestion = true;
   let adaptiveText = '';
@@ -2182,7 +2234,7 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
     const deterministicTurn = (namingSlotStep
       ? {
           answered: newlyFilledNamingSlots.length > 0 || namingSlotsComplete,
-          response: '',
+          response: namingSlotAcknowledgement?.response || '',
         }
       : null) || evaluateOrientationAnswer({
       step,
@@ -2478,7 +2530,7 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
   if (userContent && !hasAutoAdvanceProtocol) {
     adaptiveText = collapseRepeatedAdjacentSpeech(adaptiveText);
     if (
-      (nextSlideProvidesResponse && !isScriptedTriviaQuestion(step)) ||
+      (nextSlideProvidesResponse && !isScriptedTriviaQuestion(step) && !namingSlotStep) ||
       hasSubstantialSpeechOverlap(adaptiveText, scriptedNextLine)
     ) {
       adaptiveText = '';

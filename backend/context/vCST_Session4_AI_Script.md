@@ -94,15 +94,15 @@ Announce Sounds as today’s theme. Do not ask a question; the slide advances au
 
 ---
 
-# Step 16 — Naming instrument sounds
+# Step 16 — Naming the sounds
 
-Three short audio clips are on the slide. Ask the participant to listen and say what instrument makes each sound. Check each answer against the scripted instrument: acknowledge a correct guess warmly, gently say when a guess is not right, and reassure without pressure when they are unsure. If they answer for only some of the clips, prompt them again for the clips they have not named yet. Once all three clips have an answer, move on to the next slide.
+Three short audio clips are on the slide. Ask the participant to listen and say what they think is making each sound. Do not tell them the sounds are instruments — that is revealed on the next slide. Check each answer against the scripted source: acknowledge a good guess warmly, gently say when a guess is not right, and reassure without pressure when they are unsure. If they answer for only some of the clips, prompt them again for the clips they have not named yet. Once all three clips have an answer, move on to the next slide.
 
 ---
 
 # Step 17 — Instrument sounds answer
 
-State that the three sounds were [ANSWER 1], [ANSWER 2], and [ANSWER 3]. Do not ask a question; the slide advances automatically.
+State that the three sounds were a trumpet, a bass guitar, and an organ, and that they are all musical instruments. Do not ask a question; the slide advances automatically.
 
 ---
 

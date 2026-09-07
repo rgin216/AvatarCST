@@ -1343,9 +1343,9 @@ const scripts = {
       turns: 1,
       deckSlide: 16,
       title: 'What Makes These Sounds?',
-      subtitle: 'Listen and name the instrument',
-      prompt: 'What instrument makes each sound?',
-      bullets: ['Three short clips', 'Name the instrument', 'It is fine to guess'],
+      subtitle: 'Listen and have a guess',
+      prompt: 'What do you think makes each sound?',
+      bullets: ['Three short clips', 'What could each one be?', 'It is fine to guess'],
       visualHint: 'Source deck: NZ04. Sounds, slide 16',
       accent: '#7A9DAD',
       // Advances only once all three sounds have an answer; re-prompts for the missing ones.
@@ -1359,7 +1359,7 @@ const scripts = {
         ],
       },
       reply: () =>
-        'On the slide are three short sounds. Have a listen to each one and tell me which instrument you think is making it. It is completely fine to guess.',
+        'On the slide are three short sounds. Have a listen to each one and tell me what you think is making it. It is completely fine to guess.',
     },
     {
       id: 'sounds_naming_instruments_answer',
@@ -1368,14 +1368,14 @@ const scripts = {
       title: 'The Sounds Were...',
       subtitle: 'What the clips had in common',
       prompt: 'They are all musical instruments',
-      bullets: ['[ANSWER 1]', '[ANSWER 2]', '[ANSWER 3]'],
+      bullets: ['A trumpet', 'A bass guitar', 'An organ'],
       visualHint: 'Source deck: NZ04. Sounds, slide 17',
       accent: '#A8C5A0',
       interaction: { type: 'autoAdvance' },
       isAnswerReveal: true,
       recordAnswer: false,
       reply: () =>
-        'Those three sounds were [ANSWER 1], [ANSWER 2], and [ANSWER 3]. What they have in common is that each one is a musical instrument.',
+        'Those three sounds were a trumpet, a bass guitar, and an organ. What they have in common is that each one is a musical instrument.',
     },
     {
       id: 'sounds_trivia_1',

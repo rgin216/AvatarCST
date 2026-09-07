@@ -15,6 +15,7 @@ import {
   getRetryDecision,
   extractPreferredNameAnswer,
   evaluateAdaptiveFollowUpAnswer,
+  evaluateNamedInstrumentSlots,
   evaluateOrientationAnswer,
   evaluateTriviaAnswer,
   evaluateTuneGuess,
@@ -357,6 +358,47 @@ test('gives the instrument and Name That Tune slides playable audio clips', () =
     assert.equal(step.interaction.type, 'audioClips', step.id);
     assert.equal(step.interaction.clips.length, 1, step.id);
   }
+});
+
+test('acknowledges instrument-sound guesses leniently, by family', () => {
+  const step = getScriptStep('cst_sounds', 15).step;
+  assert.equal(step.id, 'sounds_naming_instruments');
+
+  // Right family counts, even loosely.
+  assert.equal(
+    evaluateNamedInstrumentSlots({ step, content: 'the first one is a trumpet', slotIndices: [0] }).outcomes[0].outcome,
+    'correct'
+  );
+  assert.equal(
+    evaluateNamedInstrumentSlots({ step, content: 'sounds like a plucked bass', slotIndices: [1] }).outcomes[0].outcome,
+    'correct'
+  );
+  assert.equal(
+    evaluateNamedInstrumentSlots({ step, content: 'a church organ maybe', slotIndices: [2] }).outcomes[0].outcome,
+    'correct'
+  );
+
+  // Wrong family is gently flagged, unsure is neither.
+  const wrong = evaluateNamedInstrumentSlots({ step, content: 'a flute', slotIndices: [0] });
+  assert.equal(wrong.outcomes[0].outcome, 'incorrect');
+  assert.match(wrong.response, /fair guess/i);
+
+  const unsure = evaluateNamedInstrumentSlots({ step, content: "I'm not sure", slotIndices: [1] });
+  assert.equal(unsure.outcomes[0].outcome, 'unsure');
+
+  // A single message naming several slots is scored per slot.
+  const many = evaluateNamedInstrumentSlots({
+    step,
+    content: 'second is a bass, third is an organ',
+    slotIndices: [1, 2],
+  });
+  assert.deepEqual(many.outcomes.map((o) => o.outcome), ['correct', 'correct']);
+
+  // Non naming steps are ignored.
+  assert.equal(
+    evaluateNamedInstrumentSlots({ step: { id: 'sounds_weather' }, content: 'trumpet', slotIndices: [0] }),
+    null
+  );
 });
 
 test('treats a Name That Tune guess as a warm, always-answered turn that reveals the answer', () => {
