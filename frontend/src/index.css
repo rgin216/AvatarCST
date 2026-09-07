@@ -1599,6 +1599,21 @@ body {
     min-height: 620px;
   }
 
+  .ppt-slide.has-audioclips-interaction {
+    min-height: 520px;
+  }
+
+  .slide-audioclips-overlay.is-single {
+    grid-template-columns: 1fr;
+    justify-items: center;
+    gap: 18px;
+    overflow: auto;
+  }
+
+  .slide-audioclips-overlay.is-single .slide-audioclips-row {
+    justify-self: center;
+  }
+
   .slide-activity-overlay {
     inset: 42px 16px 16px;
   }

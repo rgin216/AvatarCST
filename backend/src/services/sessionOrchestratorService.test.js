@@ -401,6 +401,21 @@ test('acknowledges instrument-sound guesses leniently, by family', () => {
   );
 });
 
+test('judges each listed slot against its own fragment, not the whole message', () => {
+  const step = getScriptStep('cst_sounds', 15).step;
+  assert.equal(step.id, 'sounds_naming_instruments');
+
+  // One reply naming two slots: slot 0 is a wrong "drum" guess, slot 1 is a
+  // right "bass" guess. The word "horn" sits in slot 1's fragment and must not
+  // leak across to mark slot 0 (the trumpet family) correct.
+  const mixed = evaluateNamedInstrumentSlots({
+    step,
+    content: 'the first is a drum and the second is a bass, lower than a horn',
+    slotIndices: [0, 1],
+  });
+  assert.deepEqual(mixed.outcomes.map((o) => o.outcome), ['incorrect', 'correct']);
+});
+
 test('carries the Name That Tune answer on the step and in its markdown guidance', () => {
   const md = readFileSync(
     new URL('../../context/vCST_Session4_AI_Script.md', import.meta.url),

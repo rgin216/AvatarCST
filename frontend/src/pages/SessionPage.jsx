@@ -367,6 +367,18 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
     if (sessionEndTimeoutRef.current) window.clearTimeout(sessionEndTimeoutRef.current);
   }, []);
 
+  function stopAudioClipPlayback() {
+    Object.values(audioClipElsRef.current).forEach((el) => {
+      try {
+        el?.pause();
+        if (el) el.currentTime = 0;
+      } catch {
+        // A detached element may already be gone; nothing to stop.
+      }
+    });
+    setPlayingAudioClipId(null);
+  }
+
   function commitSlide(slideData) {
     if (!slideData) return;
     if (slideData.id !== slideIdRef.current) {
@@ -387,15 +399,8 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
       setVideoPlaybackState(
         slideData.interaction?.type === "youtubeShort" ? "loading" : "idle"
       );
-      Object.values(audioClipElsRef.current).forEach((el) => {
-        try {
-          el?.pause();
-        } catch {
-          // A detached element may already be gone; nothing to stop.
-        }
-      });
+      stopAudioClipPlayback();
       audioClipElsRef.current = {};
-      setPlayingAudioClipId(null);
     }
     setSlide(slideData);
   }
@@ -447,6 +452,10 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
     endAfterNarrationRef.current = Boolean(turn.sessionCompleteAfterResponse);
     avatarNarrationActiveRef.current = hasAvatarNarration;
     setAvatarNarrationActive(hasAvatarNarration);
+
+    // Aria's voice takes over on any narration turn, including one that stays on
+    // the same slide, so silence a clip the person left playing.
+    if (hasAvatarNarration) stopAudioClipPlayback();
 
     if (turn.assistantText) {
       const debugSuffix = import.meta.env.DEV
@@ -716,6 +725,7 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
       !exerciseAwaitingCompletion &&
       !musicAwaitingCompletion &&
       !autoAdvanceInteraction &&
+      !playingAudioClipId &&
       !inactivityRemindedRef.current;
     const expectedActivityRevision = activityRevisionRef.current;
     if (!sessionId || !inputExpected || !Number.isInteger(expectedActivityRevision)) {
@@ -809,6 +819,7 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
     exerciseAwaitingCompletion,
     musicAwaitingCompletion,
     autoAdvanceInteraction,
+    playingAudioClipId,
     inactivityTimeoutMs,
     inactivityResetToken,
     lipSyncMode,
@@ -1265,6 +1276,7 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
   }
 
   function handleAudioClipToggle(clip) {
+    if (avatarNarrationActive || pendingPlay) return;
     const els = audioClipElsRef.current;
     const target = els[clip.id];
     if (!target) return;
@@ -1272,6 +1284,8 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
       if (id !== clip.id && el && !el.paused) el.pause();
     });
     if (target.paused) {
+      // Listening to a clip is engagement; keep the inactivity reminder quiet.
+      registerUserActivity();
       target.currentTime = 0;
       target.play().catch(() => setPlayingAudioClipId(null));
     } else {
@@ -1725,6 +1739,7 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
                         type="button"
                         className={`slide-audioclip${isSingleAudioClip ? " slide-audioclip-lg" : ""}${isPlaying ? " is-playing" : ""}`}
                         onClick={() => handleAudioClipToggle(clip)}
+                        disabled={avatarNarrationActive || pendingPlay}
                         aria-label={`${isPlaying ? "Pause" : "Play"} ${clip.label}`}
                       >
                         <svg

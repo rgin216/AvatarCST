@@ -814,6 +814,13 @@ const NAMING_SLOT_ORDINALS = [
   { slot: 2, re: /\b(?:third|3rd|number three|last|final)\b/ },
 ];
 
+// Split a normalized answer into the separate things the person listed, so a
+// multi-slot reply ("first a trumpet, second a drum") can be judged per slot.
+const splitNamingFragments = (normalized = '') =>
+  normalized
+    .split(/\s+(?:and|then)\s+|\s*,\s*|\s*;\s*/)
+    .filter((fragment) => /[a-z]{3}/.test(fragment));
+
 export const createNamingSlotState = (step, persisted = null) => {
   const count = Math.max(0, Math.trunc(Number(step?.namingSlots?.count) || 0));
   const source = Array.isArray(persisted?.filled) ? persisted.filled : [];
@@ -861,9 +868,7 @@ export const parseNamingSlotAnswer = (content = '', { count = 3, filled = [] } =
   }
 
   // Otherwise treat it as naming the next empty slot(s), one per listed fragment.
-  const fragments = normalized
-    .split(/\s+(?:and|then)\s+|\s*,\s*|\s*;\s*/)
-    .filter((fragment) => /[a-z]{3}/.test(fragment));
+  const fragments = splitNamingFragments(normalized);
   const fillCount = Math.min(Math.max(fragments.length, 1), emptySlots.length);
   return { slots: emptySlots.slice(0, fillCount) };
 };
@@ -895,12 +900,25 @@ export const evaluateNamedInstrumentSlots = ({ step, content, slotIndices = [] }
 
   const normalized = normalizeAnswer(content);
   const unsure = isDontKnowAnswer(content);
-  const outcomes = slotIndices
-    .filter((index) => rules[index])
-    .map((index) => ({
-      label: rules[index].label,
-      outcome: unsure ? 'unsure' : rules[index].match.test(normalized) ? 'correct' : 'incorrect',
-    }));
+  const consideredSlots = slotIndices.filter((index) => rules[index]);
+  if (consideredSlots.length === 0) return null;
+
+  // When the person listed one fragment per slot, judge each slot against its
+  // own fragment so a keyword elsewhere in the message cannot mark it correct.
+  const fragments = splitNamingFragments(normalized);
+  const perSlotText =
+    fragments.length === consideredSlots.length
+      ? (position) => fragments[position]
+      : () => normalized;
+
+  const outcomes = consideredSlots.map((index, position) => ({
+    label: rules[index].label,
+    outcome: unsure
+      ? 'unsure'
+      : rules[index].match.test(perSlotText(position))
+      ? 'correct'
+      : 'incorrect',
+  }));
   if (outcomes.length === 0) return null;
 
   const correct = outcomes.filter((o) => o.outcome === 'correct').map((o) => o.label);
