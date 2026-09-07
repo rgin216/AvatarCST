@@ -18,12 +18,15 @@ The project has moved beyond the old "basic backend foundation" phase. The main 
 
 - React/Vite frontend and Express/Mongo backend.
 - Login flow that creates or loads a patient user by name.
-- Landing flow with two test sessions:
+- Landing flow with four test sessions:
   - `cst_intro_reminiscence` - Session 1: Introduction and Welcome.
   - `cst_childhood` - Session 2: Getting to Know You: Childhood.
+  - `cst_physical_games` - Session 3: Physical Games.
+  - `cst_sounds` - Session 4: Sounds.
 - Scripted session orchestration through `POST /api/sessions/:id/respond`.
 - Microphone input path through `POST /api/sessions/:id/respond-audio`.
-- Slide-backed session UI using exported slide images under `frontend/public/slides/session1/` and `frontend/public/slides/session2/`.
+- Slide-backed session UI using exported slide images under `frontend/public/slides/session1/` through `session4/`.
+- Session 4 adds an `audioClips` slide interaction: local `.mp3` clips in `frontend/public/audio/session4/` for the instrument-sounds slide and the Name That Tune slides, with a per-slot naming tracker and lenient right/wrong acknowledgement.
 - Local avatar rendering with:
   - male avatar path based on `frontend/public/models/harry.glb`,
   - experimental female/avatar mode path,
@@ -121,13 +124,12 @@ The session state fields that matter most are:
 Script data is currently split across two layers:
 
 - `backend/src/services/cstScriptService.js` contains executable session steps used by the app.
-- `backend/context/vCST_Session1_AI_Script.md` and `backend/context/vCST_Session2_AI_Script.md` hold fuller source script text and adaptation guidance.
+- `backend/context/vCST_Session1_AI_Script.md` through `vCST_Session4_AI_Script.md` hold fuller source script text and adaptation guidance. Each markdown file has one `---`-separated section per executable step, in order, after a preamble section.
 - `backend/context/vCST_Initial_Prompt.md` defines Aria's tone and CST facilitation principles.
 
 Slide images live in:
 
-- `frontend/public/slides/session1/`
-- `frontend/public/slides/session2/`
+- `frontend/public/slides/session1/` through `frontend/public/slides/session4/`
 
 When adding a session:
 
