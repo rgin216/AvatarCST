@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import api from "../services/api.js";
 import theme from "../utils/theme";
 import useIsDesktop from "../hooks/useIsDesktop";
+import { useLanguage } from "../language/useLanguage.js";
 
 const pipelineOptions = [
   { id: "free", label: "Free", detail: "Groq + streamed Edge TTS" },
@@ -22,6 +23,7 @@ const fallbackSessions = [
 export default function LandingPage({
   onStart,
   onCaregiver,
+  onSettings,
   userName,
   userId,
   sessionOptions = [],
@@ -29,6 +31,7 @@ export default function LandingPage({
   onPipelineModeChange = () => {},
 }) {
   const isDesktop = useIsDesktop();
+  const { t, language } = useLanguage();
   const [lastSession, setLastSession] = useState(null);
   const [pageIndex, setPageIndex] = useState(0);
   const [pageDirection, setPageDirection] = useState("next");
@@ -47,10 +50,10 @@ export default function LandingPage({
     const yesterday = new Date(now);
     yesterday.setDate(yesterday.getDate() - 1);
     let dayLabel;
-    if (date.toDateString() === now.toDateString()) dayLabel = "Today";
-    else if (date.toDateString() === yesterday.toDateString()) dayLabel = "Yesterday";
-    else dayLabel = date.toLocaleDateString("en-NZ", { weekday: "short", day: "numeric", month: "short" });
-    const time = date.toLocaleTimeString("en-NZ", { hour: "numeric", minute: "2-digit" });
+    if (date.toDateString() === now.toDateString()) dayLabel = t("common.today");
+    else if (date.toDateString() === yesterday.toDateString()) dayLabel = t("common.yesterday");
+    else dayLabel = date.toLocaleDateString(language, { weekday: "short", day: "numeric", month: "short" });
+    const time = date.toLocaleTimeString(language, { hour: "numeric", minute: "2-digit" });
     const durationMins = s.startedAt && s.endedAt
       ? Math.round((new Date(s.endedAt) - new Date(s.startedAt)) / 60000)
       : null;
@@ -59,18 +62,19 @@ export default function LandingPage({
 
   const timeOfDay = () => {
     const h = new Date().getHours();
-    if (h < 12) return "Good morning";
-    if (h < 17) return "Good afternoon";
-    return "Good evening";
+    if (h < 12) return t("landing.greeting.morning");
+    if (h < 17) return t("landing.greeting.afternoon");
+    return t("landing.greeting.evening");
   };
 
   const sessions = sessionOptions.length ? sessionOptions : fallbackSessions;
 
   const lastSessionMeta = getLastSessionMeta(lastSession);
   const lastSessionCardIndex = lastSession ? sessions.findIndex((s) => s.id === lastSession.scriptId) : -1;
+  const lastSessionOption = lastSessionCardIndex >= 0 ? sessions[lastSessionCardIndex] : null;
   const lastSessionPalette = lastSessionCardIndex >= 0 ? cardPalette[lastSessionCardIndex % cardPalette.length] : null;
   const defaultHeroChip = `linear-gradient(135deg, ${theme.sage}, ${theme.mist})`;
-  const heroIcon = lastSession ? (lastSessionPalette?.icon || "🕰️") : "👋";
+  const heroIcon = lastSession ? (lastSessionOption?.icon || lastSessionPalette?.icon || "🕰️") : "👋";
   const heroChip = lastSession ? (lastSessionPalette?.chip || defaultHeroChip) : defaultHeroChip;
 
   const contentMaxWidth = isDesktop ? 1180 : 480;
@@ -112,7 +116,10 @@ export default function LandingPage({
               <div style={{ fontFamily: "'Playfair Display', serif", fontSize: isDesktop ? 38 : 30, fontWeight: 700, color: theme.text }}>AvatarCST</div>
               <div style={{ fontSize: 13, color: theme.textLight, marginTop: 2 }}>Your therapy companion</div>
             </div>
-            <button onClick={onCaregiver} className="btn-outline">👨‍👩‍👧 Caregiver</button>
+            <div style={{ display: "flex", gap: 10 }}>
+              <button onClick={onSettings} className="btn-outline">⚙️ {t("landing.settings")}</button>
+              <button onClick={onCaregiver} className="btn-outline">👨‍👩‍👧 {t("landing.caregiver")}</button>
+            </div>
           </div>
 
           <div style={{
@@ -123,7 +130,7 @@ export default function LandingPage({
             <div className="fade-up delay-1" style={{ display: "flex", flexDirection: "column", justifyContent: "center" }}>
               <div style={{ fontSize: 15, color: theme.textLight, fontWeight: 500, marginBottom: 4 }}>{timeOfDay()},</div>
               <div style={{ fontFamily: "'Playfair Display', serif", fontSize: isDesktop ? 40 : 34, fontWeight: 600, color: theme.text, lineHeight: 1.15 }}>{userName} 🌸</div>
-              <div style={{ marginTop: 12, fontSize: 17, color: theme.textLight, lineHeight: 1.6 }}>Ready for today's session?<br />It's a great day to exercise your mind.</div>
+              <div style={{ marginTop: 12, fontSize: 17, color: theme.textLight, lineHeight: 1.6 }}>{t("landing.readyForSession")}<br />{t("landing.exerciseMind")}</div>
             </div>
 
             <div className="fade-up delay-2" style={{
@@ -137,10 +144,10 @@ export default function LandingPage({
               </div>
               <div>
                 <div style={{ fontSize: 12, fontWeight: 700, color: theme.textLight, textTransform: "uppercase", letterSpacing: "0.08em" }}>
-                  {lastSession ? "Last session" : "Welcome"}
+                  {lastSession ? t("landing.lastSession") : t("landing.welcome")}
                 </div>
                 <div style={{ fontSize: 17, fontWeight: 700, color: theme.text, marginTop: 2 }}>
-                  {lastSession ? (lastSession.title || "Session") : "This is your first session"}
+                  {lastSession ? (lastSession.title || t("landing.sessionFallback")) : t("landing.firstSession")}
                 </div>
                 {lastSession ? (
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
@@ -155,7 +162,7 @@ export default function LandingPage({
                   </div>
                 ) : (
                   <div style={{ fontSize: 14, color: theme.textLight, marginTop: 4, lineHeight: 1.4 }}>
-                    Aria will guide you gently through today's session, at your own pace.
+                    {t("landing.firstSessionHint")}
                   </div>
                 )}
               </div>
@@ -182,7 +189,7 @@ export default function LandingPage({
             flexWrap: "wrap", gap: 12, marginBottom: 16,
           }}>
             <div style={{ fontSize: 14, fontWeight: 600, color: theme.textLight, textTransform: "uppercase", letterSpacing: "0.08em" }}>
-              Your sessions
+              {t("landing.yourSessions")}
             </div>
             <div style={{ display: "inline-flex", gap: 4, background: theme.sand, borderRadius: 999, padding: 4 }}>
               {pipelineOptions.map((option) => {
@@ -242,7 +249,7 @@ export default function LandingPage({
                 const globalIndex = pageStart + i;
                 const palette = session.disabled
                   ? { chip: `linear-gradient(135deg, #D9D2C8, #BFB6A8)`, icon: "🔒", accent: theme.textLight }
-                  : cardPalette[globalIndex % cardPalette.length];
+                  : { ...cardPalette[globalIndex % cardPalette.length], ...(session.icon ? { icon: session.icon } : {}) };
                 return (
                   <button
                     key={session.id}
@@ -277,7 +284,7 @@ export default function LandingPage({
                       )}
                     </div>
                     <div style={{ marginTop: 18, display: "flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 700, color: palette.accent }}>
-                      {session.disabled ? "Coming soon" : <>Start session <span aria-hidden="true">→</span></>}
+                      {session.disabled ? t("landing.comingSoon") : <>{t("landing.startSession")} <span aria-hidden="true">→</span></>}
                     </div>
                   </button>
                 );

@@ -45,9 +45,32 @@ const SESSION_SCRIPTS = {
     .split(/\r?\n---\r?\n/)
     .map((s) => s.trim())
     .filter(Boolean),
+  cst_current_affairs: readFileSync(
+    join(CONTEXT_ROOT, 'vCST_Session6_AI_Script.md'),
+    'utf8'
+  )
+    .split(/\r?\n---\r?\n/)
+    .map((s) => s.trim())
+    .filter(Boolean),
 };
 
 const RECENT_PROMPT_MESSAGE_LIMIT = 8;
+
+// Add a new entry here to support another personality option; 'default' needs no entry.
+const PERSONALITY_DIRECTIVES = {
+  optimistic: `# Personality Overlay
+Adopt this tone in addition to the base persona above:
+- Voice: Warm, upbeat, and reassuring, with a steady and confident cadence that keeps the conversation calm and productive.
+- Tone: Positive and solution-oriented, always focusing on the next steps rather than dwelling on the problem.
+- Dialect: Neutral and professional, avoiding overly casual speech but maintaining a friendly and approachable style.
+- Pronunciation: Clear and precise, with a natural rhythm that emphasizes key words to instill confidence and keep the person engaged.
+- Features: Uses empathetic phrasing, gentle reassurance, and proactive language to shift the focus from frustration to resolution.`,
+};
+
+const getPersonalityBlock = (user) => {
+  const directive = PERSONALITY_DIRECTIVES[user?.settings?.personality];
+  return directive ? `\n\n${directive}` : '';
+};
 
 const quoteData = (value) => JSON.stringify(String(value ?? ''));
 
@@ -69,6 +92,31 @@ const formatRecentMessages = (messages = []) =>
         .slice(-RECENT_PROMPT_MESSAGE_LIMIT)
         .map((message) => `{"role":${quoteData(message.role)},"content":${quoteData(message.content)}}`)
         .join('\n');
+
+const formatAcknowledgementVarietyGuidance = (messages = []) => {
+  const recentOpeners = messages
+    .filter((message) => message.role === 'assistant')
+    .slice(-4)
+    .map((message) => (String(message.content).match(/[\p{L}\p{N}'’-]+/gu) || []).slice(0, 4).join(' '))
+    .filter(Boolean);
+
+  return `- Vary sentence openings and grammatical structure across the conversation.
+- Do not use stock openings such as "I hear you", "It sounds like", or "That sounds like" merely to signal listening.
+- Prefer leading naturally with a concrete detail from the answer, a concise direct reaction, or a specific affirmation. Do not force every acknowledgement into a reflective paraphrase.
+${recentOpeners.length > 0
+  ? `- Recent assistant opening phrases were ${JSON.stringify(recentOpeners)}. Do not reuse those openings in this response.`
+  : '- There are no recent assistant openings to avoid yet.'}`;
+};
+
+const formatImageGuidance = (slide = {}) =>
+  slide.imageGuidance
+    ? `# Image Grounding
+The following is trusted, step-specific grounding for the displayed photograph:
+${JSON.stringify(slide.imageGuidance)}
+- Explicitly affirm any detail the person identified that matches confirmedDetails.
+- If an answer mixes a correct observation with a mistaken interpretation, affirm the correct part first and clarify the mismatch gently.
+- Do not validate speculation as fact, invent what the person pictured, or reveal an identity earlier than the clarification permits.`
+    : '';
 
 const getCurrentStepScript = (scriptId, slide) => {
   const scriptSections = SESSION_SCRIPTS[scriptId] || SESSION_SCRIPTS.cst_intro_reminiscence;
@@ -107,7 +155,7 @@ export const buildCstAdaptiveResponseInstructions = ({
   const displayName = getDisplayNameFromContext({ user, recentMessages });
   const currentStepScript = getCurrentStepScript(scriptId, slide);
 
-  return `${BASE_INSTRUCTIONS}
+  return `${BASE_INSTRUCTIONS}${getPersonalityBlock(user)}
 
 # Task
 Respond to the person's latest answer for the current slide. The app will add the next scripted question separately, so do not ask the next question yourself.
@@ -120,6 +168,8 @@ ${currentStepScript}
 # Current PPT Slide
 Title: ${slide.title}
 Prompt: ${slide.prompt}
+
+${formatImageGuidance(slide)}
 
 # User
 The person's display name is ${quoteData(displayName)}.
@@ -151,6 +201,7 @@ ${answerState === 'repeat_question'
 Return ONLY Aria's adaptive response to the latest user message.
 - Maximum 1 sentence.
 - Always acknowledge the latest answer; when possible, mention one concrete detail from it.
+${formatAcknowledgementVarietyGuidance(recentMessages)}
 - Do not address the person by name in this response. Scripted greetings handle their name separately.
 - Do not ask a question.
 - Do not introduce a new slide or future step.
@@ -199,11 +250,12 @@ export const buildCstAdaptiveTurnInstructions = ({
   plannedNextLine = '',
   allowFollowUp = false,
   followUpGuidance = '',
+  acceptAnyAnswer = false,
 }) => {
   const displayName = getDisplayNameFromContext({ user, recentMessages });
   const currentStepScript = getCurrentStepScript(scriptId, slide);
 
-  return `${BASE_INSTRUCTIONS}
+  return `${BASE_INSTRUCTIONS}${getPersonalityBlock(user)}
 
 # Task
 Decide whether the person's latest message reasonably answers the current CST question, write Aria's brief adaptive response, and decide whether one deeper CST follow-up would be useful.
@@ -216,6 +268,8 @@ ${currentStepScript}
 # Current PPT Slide
 Title: ${slide.title}
 Prompt: ${slide.prompt}
+
+${formatImageGuidance(slide)}
 
 # Question They Were Asked
 ${quoteData(expectedQuestion || slide.prompt)}
@@ -242,7 +296,9 @@ ${formatRecentMessages(recentMessages)}
 </transcript_data>
 
 # Decision Rules
-Use answered=true when the message:
+${acceptAnyAnswer
+  ? `This step accepts every meaningful response containing a letter or number. Use answered=true when it is brief, indirect, or uncertain, including when the response politely declines to elaborate. Punctuation alone is not an answer. Use the response and followUp fields to adapt warmly without pressuring the person.`
+  : `Use answered=true when the message:
 - Directly answers the question, even briefly.
 - Gives a related memory, opinion, feeling, place, name, song, weather, or preference.
 - Says they do not know, cannot remember, or are unsure on an orientation or memory-recall question.
@@ -251,11 +307,12 @@ Use answered=true when the message:
 Use answered=false when the message:
 - Is empty, random text, unrelated, or only asks something unrelated.
 - Clearly ignores the current question.
-- Is a filler such as "ok", "yes", "no", "maybe", or "continue" when the question needs specific content.
+- Is a filler such as "ok", "yes", "no", "maybe", or "continue" when the question needs specific content.`}
 
 # Adaptive Response Rules
 - Maximum 1 sentence.
 - Always acknowledge the latest answer; when possible, mention one concrete detail from it.
+${formatAcknowledgementVarietyGuidance(recentMessages)}
 - Do not address the person by name. Scripted greetings handle their name separately.
 - The response field must not ask a question.
 - Do not introduce a new slide or future step.
@@ -281,8 +338,8 @@ ${followUpGuidance ? `- Step-specific focus: ${followUpGuidance}` : ''}`
 # Output
 Return only compact JSON:
 ${allowFollowUp
-  ? '{"answered":true,"response":"That sounds lovely.","followUp":"What made that especially memorable for you?"}'
-  : '{"answered":true,"response":"That sounds lovely.","followUp":null}'}
+  ? '{"answered":true,"response":"The garden was clearly a special place for you.","followUp":"What made that especially memorable for you?"}'
+  : '{"answered":true,"response":"The garden was clearly a special place for you.","followUp":null}'}
 
 The followUp value must be either one question string or null. If answered=false, followUp must be null.`;
 };

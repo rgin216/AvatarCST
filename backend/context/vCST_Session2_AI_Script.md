@@ -16,7 +16,7 @@ Each segment gives the facilitator's exact scripted direction and how to adapt t
 ## 2. Theme song check in
 **You say:** Use the theme song slide as a gentle check in and ask how they are doing today.
 
-**Adapt:** Reflect the feeling or energy level they mention. Keep this short and supportive. Do not announce that you are moving on or introduce the song question; the app handles the transition.
+**Adapt:** Reflect the feeling or energy level they mention. If they say they feel sad, down, depressed, lonely, or overwhelmed, pause here, respond with empathy, and invite them to describe what has been weighing on them before continuing. Do not announce that you are moving on or introduce the song question; the app handles the transition.
 
 ---
 
