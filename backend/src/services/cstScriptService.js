@@ -1462,6 +1462,8 @@ const scripts = {
       bullets: ['Have a listen', 'Any guess is welcome'],
       visualHint: 'Source deck: NZ04. Sounds, slide 23',
       accent: '#A8C5A0',
+      // Canonical answer, revealed by the app after the participant's guess.
+      tuneAnswer: 'Jailhouse Rock, by Elvis Presley',
       interaction: {
         type: 'audioClips',
         clips: [{ id: 'tune-1950s', label: 'Play the clip', src: '/audio/session4/tune-1950s.mp3' }],
@@ -1480,12 +1482,13 @@ const scripts = {
       bullets: ['Have a listen', 'Any guess is welcome'],
       visualHint: 'Source deck: NZ04. Sounds, slide 24',
       accent: '#7A9DAD',
+      tuneAnswer: 'Sympathy for the Devil, by The Rolling Stones',
       interaction: {
         type: 'audioClips',
         clips: [{ id: 'tune-1960s', label: 'Play the clip', src: '/audio/session4/tune-1960s.mp3' }],
       },
       reply: () =>
-        'Here is a clip from the 1960s. Have a listen — do you know the song or the artist?',
+        'Now a clip from the 1960s. Have a listen — do you know the song or the artist?',
     },
     {
       id: 'sounds_name_that_tune_motown',
@@ -1498,12 +1501,13 @@ const scripts = {
       bullets: ['Have a listen', 'Any guess is welcome'],
       visualHint: 'Source deck: NZ04. Sounds, slide 25',
       accent: '#F47C20',
+      tuneAnswer: 'Superstition, by Stevie Wonder',
       interaction: {
         type: 'audioClips',
         clips: [{ id: 'tune-motown', label: 'Play the clip', src: '/audio/session4/tune-motown.mp3' }],
       },
       reply: () =>
-        'This clip is Motown, from the 1960s and 1970s. Have a listen — can you name the song or the artist?',
+        'Next up, a clip from Motown — the sound of the 1960s and 1970s. Have a listen — can you name the song or the artist?',
     },
     {
       id: 'sounds_name_that_tune_classical',
@@ -1516,12 +1520,13 @@ const scripts = {
       bullets: ['Have a listen', 'Any guess is welcome'],
       visualHint: 'Source deck: NZ04. Sounds, slide 26',
       accent: '#4472C4',
+      tuneAnswer: 'Für Elise, by Beethoven',
       interaction: {
         type: 'audioClips',
         clips: [{ id: 'tune-classical', label: 'Play the clip', src: '/audio/session4/tune-classical.mp3' }],
       },
       reply: () =>
-        'Last one: a piece of classical music. Have a listen — can you name the piece, or the composer who wrote it?',
+        'Last of all, a piece of classical music. Have a listen — can you name the piece, or the composer?',
     },
     {
       id: 'sounds_modern_music_opinion',

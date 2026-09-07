@@ -18,7 +18,7 @@ import {
   evaluateNamedInstrumentSlots,
   evaluateOrientationAnswer,
   evaluateTriviaAnswer,
-  evaluateTuneGuess,
+  isNameThatTuneStep,
   hasSubstantialSpeechOverlap,
   inferMemorySuggestions,
   isRecordableSessionAnswer,
@@ -401,21 +401,32 @@ test('acknowledges instrument-sound guesses leniently, by family', () => {
   );
 });
 
-test('treats a Name That Tune guess as a warm, always-answered turn that reveals the answer', () => {
-  const step = getScriptStep('cst_sounds', 22).step;
-  assert.equal(step.id, 'sounds_name_that_tune_1950s');
+test('carries the Name That Tune answer on the step and in its markdown guidance', () => {
+  const md = readFileSync(
+    new URL('../../context/vCST_Session4_AI_Script.md', import.meta.url),
+    'utf8'
+  );
+  const expected = [
+    [22, 'sounds_name_that_tune_1950s', 'Jailhouse Rock', 'Elvis Presley'],
+    [23, 'sounds_name_that_tune_1960s', 'Sympathy for the Devil', 'The Rolling Stones'],
+    [24, 'sounds_name_that_tune_motown', 'Superstition', 'Stevie Wonder'],
+    [25, 'sounds_name_that_tune_classical', 'Für Elise', 'Beethoven'],
+  ];
 
-  const guess = evaluateTuneGuess({ step, content: 'Is it Elvis?' });
-  assert.equal(guess.answered, true);
-  assert.equal(guess.outcome, 'incorrect');
-  assert.match(guess.response, /\[SONG — ARTIST\]/);
+  for (const [index, id, title, artist] of expected) {
+    const step = getScriptStep('cst_sounds', index).step;
+    assert.equal(step.id, id);
+    assert.equal(isNameThatTuneStep(step), true, id);
+    assert.equal(step.tuneAnswer, `${title}, by ${artist}`);
+    // The step reply asks for a guess without giving the answer away.
+    assert.doesNotMatch(renderScriptReply(step, {}), new RegExp(title, 'i'));
+    // The markdown guidance names the answer for the acknowledgement prompt.
+    assert.ok(md.includes(title) && md.includes(artist), id);
+  }
+  // Guidance is about judging garbled speech-to-text guesses by sound.
+  assert.match(md, /Judge (?:their|the) guess by (?:how it sounds|sound)/i);
 
-  const unsure = evaluateTuneGuess({ step, content: "I don't know" });
-  assert.equal(unsure.outcome, 'unsure');
-  assert.match(unsure.response, /\[SONG — ARTIST\]/);
-
-  // Non Name That Tune steps are ignored by this evaluator.
-  assert.equal(evaluateTuneGuess({ step: { id: 'sounds_weather' }, content: 'sunny' }), null);
+  assert.equal(isNameThatTuneStep(getScriptStep('cst_sounds', 26).step), false);
 });
 
 test('summarises Session 4 sound activities', () => {

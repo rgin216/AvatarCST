@@ -139,25 +139,25 @@ Introduce the next section of the trivia, “Name that Tune”, where we try to 
 
 # Step 23 — Name that tune 1950s
 
-Play the 1950s audio clip. Ask if the participant can name the song or artist. Check their guess against the scripted song: warmly confirm a correct guess, gently note when it is not right, and reassure without pressure when they are unsure. This is not a scored quiz, so accept any genuine attempt. If they recall it, invite one brief follow-up, such as a memory it brings up. State the song once after their attempt: [SONG — ARTIST]. Do not repeat the acknowledgement.
+The clip is "Jailhouse Rock" by Elvis Presley. Ask if the participant can name the song or the artist. Judge their guess by how it sounds said aloud, not how it is spelled: misspellings, mishearings, phonetic attempts, part of the title or artist, or a well-known lyric all count as recognising it, because this is usually speech-to-text input. If they got it, affirm it plainly and react to what they said; if not, stay warm and encouraging without correcting or quizzing them; if they are unsure, reassure them. Then state the answer once. The app moves to the next clip after.
 
 ---
 
 # Step 24 — Name that tune 1960s
 
-Play the 1960s audio clip. Ask if the participant can name the song or artist. Check their guess against the scripted song, warmly for a correct guess and gently otherwise, without pressure when they are unsure. State the song once: [SONG — ARTIST].
+The clip is "Sympathy for the Devil" by The Rolling Stones (the line "pleased to meet you" is from this song). Judge the guess by sound, as in the previous step, allowing mishearings and lyric fragments. Affirm a good guess plainly, stay encouraging otherwise, reassure if unsure, then state the answer once. The app moves to the next clip after.
 
 ---
 
 # Step 25 — Name that tune Motown 1960s and 70s
 
-Play the Motown audio clip. Ask if the participant can name the song or artist. Check their guess against the scripted song, warmly for a correct guess and gently otherwise, without pressure when they are unsure. State the song once: [SONG — ARTIST].
+The clip is "Superstition" by Stevie Wonder (a mishearing like "super sticious" still counts). Judge the guess by sound, allowing misspellings and mishearings. Affirm a good guess plainly, stay encouraging otherwise, reassure if unsure, then state the answer once. The app moves to the next clip after.
 
 ---
 
 # Step 26 — Name that tune classical music
 
-Play the classical audio clip. Ask if the participant can name the piece or composer. Check their guess against the scripted piece, warmly for a correct guess and gently otherwise, without pressure when they are unsure. State the piece once: [PIECE — COMPOSER].
+The clip is "Für Elise" by Beethoven (rough spellings like "bake hoven" or "for elise" still count). Judge the guess by sound. Affirm a good guess plainly, stay encouraging otherwise, reassure if unsure, then state the answer once. The app moves to the modern-music discussion after.
 
 ---
 

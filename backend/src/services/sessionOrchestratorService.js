@@ -12,6 +12,7 @@ import {
 import {
   buildCstAdaptiveResponseInstructions,
   buildCstAdaptiveTurnInstructions,
+  buildCstNameThatTuneInstructions,
 } from './promptService.js';
 import { generateResponse } from './llmService.js';
 import { getPositiveNzNews } from './newsService.js';
@@ -488,37 +489,11 @@ export const evaluateTriviaAnswer = ({ step, content }) => {
   };
 };
 
-// Name That Tune is a gentle guessing game, not a scored quiz: every guess is
-// welcomed, the answer is revealed in the same breath, and there is no separate
-// reveal slide. Fill `isCorrect` and the real titles once the songs are chosen.
-const SCRIPTED_TUNE_RULES = {
-  sounds_name_that_tune_1950s: { isCorrect: () => false, reveal: '[SONG — ARTIST]' },
-  sounds_name_that_tune_1960s: { isCorrect: () => false, reveal: '[SONG — ARTIST]' },
-  sounds_name_that_tune_motown: { isCorrect: () => false, reveal: '[SONG — ARTIST]' },
-  sounds_name_that_tune_classical: { isCorrect: () => false, reveal: '[PIECE — COMPOSER]' },
-};
-
-export const evaluateTuneGuess = ({ step, content }) => {
-  const rule = SCRIPTED_TUNE_RULES[step?.id];
-  if (!rule || !content) return null;
-
-  if (isDontKnowAnswer(content)) {
-    return {
-      answered: true,
-      response: `No worries at all — this one was ${rule.reveal}.`,
-      outcome: 'unsure',
-    };
-  }
-
-  const correct = rule.isCorrect(normalizeAnswer(content));
-  return {
-    answered: true,
-    response: correct
-      ? `Yes — that is ${rule.reveal}. Well remembered!`
-      : `A lovely guess. This one was ${rule.reveal}.`,
-    outcome: correct ? 'correct' : 'incorrect',
-  };
-};
+// Name That Tune is a gentle guessing game, not a scored quiz. The guess turn is
+// handled by the normal adaptive path (which reads the answer and lenient-judging
+// rules from the step's markdown), and the app reveals the answer in the line
+// that follows, worded as a transition into the next clip.
+export const isNameThatTuneStep = (step) => Boolean(step?.tuneAnswer);
 
 const isMusicCompletionProtocol = (content = '') =>
   /^\[\[music-complete\]\]$/i.test(content.trim());
@@ -2243,9 +2218,6 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
     }) || evaluateTriviaAnswer({
       step,
       content: userContent,
-    }) || evaluateTuneGuess({
-      step,
-      content: userContent,
     }) || evaluateMusicCompletionAnswer({
       step,
       content: userContent,
@@ -2305,6 +2277,33 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
     adaptiveText = adaptiveTurn.response;
     adaptiveFollowUpQuestion =
       answeredCurrentQuestion && allowAdaptiveFollowUp ? adaptiveTurn.followUp : null;
+  }
+
+  // Name That Tune acknowledges the guess and reveals the answer in one adaptive
+  // line; the scripted line that follows is only the transition to the next clip.
+  if (isNameThatTuneStep(step) && userContent && hasDeliveredQuestion && answeredCurrentQuestion) {
+    adaptiveText = await generateResponse(
+      [
+        {
+          role: 'system',
+          content: buildCstNameThatTuneInstructions({
+            user,
+            recentMessages,
+            tuneAnswer: step.tuneAnswer,
+          }),
+        },
+        { role: 'user', content: userContent },
+      ],
+      {
+        provider: llmProvider,
+        temperature: 0.4,
+        maxTokens: 90,
+        model: useFastScriptedTurn ? process.env.OPENAI_FAST_TEXT_MODEL : undefined,
+      }
+    );
+    if (!collapseRepeatedAdjacentSpeech(adaptiveText || '').trim()) {
+      adaptiveText = `That was ${step.tuneAnswer}.`;
+    }
   }
 
   let themeSongFeedback = '';
@@ -2666,7 +2665,7 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
       userId: session.userId,
       sessionId: session._id,
       suggestions:
-        wheelEvent || isActivityInteractionEvent || hasMusicCompletionProtocol || hasVideoCompletionProtocol || hasAutoAdvanceProtocol || !answeredCurrentQuestion
+        wheelEvent || isActivityInteractionEvent || isNameThatTuneStep(step) || hasMusicCompletionProtocol || hasVideoCompletionProtocol || hasAutoAdvanceProtocol || !answeredCurrentQuestion
           ? []
           : inferMemorySuggestions(userContent),
     });
