@@ -179,12 +179,26 @@ const LIP_SYNC_SETTINGS = {
   leadSeconds: 0.055,
 };
 
-export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: initialPipelineMode = "free", defaultAvatarMode = "male" }) {
+const SESSION_META_LABELS = {
+  cst_intro_reminiscence: "Introduction",
+  cst_childhood: "Childhood",
+  cst_physical_games: "Physical Games",
+  cst_current_affairs: "Current Affairs",
+};
+
+export default function SessionPage({
+  sessionId,
+  onEnd,
+  userName,
+  pipelineMode: initialPipelineMode = "free",
+  defaultAvatarMode = "male",
+}) {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [isRecording, setIsRecording] = useState(false);
   const [typing, setTyping] = useState(false);
   const [elapsed, setElapsed] = useState(0);
+  const [sessionMetaLabel, setSessionMetaLabel] = useState("");
   const [slide, setSlide] = useState(defaultSlide);
   const [avatarMode, setAvatarMode] = useState(() => getInitialAvatarMode(defaultAvatarMode));
   const [lipSyncMode, setLipSyncMode] = useState("rhubarb");
@@ -382,11 +396,7 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
     setSlide(slideData);
   }
 
-  function applyTurn(turn) {
-    if (Number.isInteger(turn.activityRevision)) {
-      activityRevisionRef.current = turn.activityRevision;
-    }
-    const slideData = turn.slide || defaultSlide;
+  function applyInteractionState(turn, slideData) {
     const shouldAutoplayThemeSong =
       slideData.interaction?.type === "spotifySong" &&
       turn.themeSong?.status === "available" &&
@@ -394,11 +404,7 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
     const shouldAutoplayExercise =
       slideData.interaction?.type === "youtubeShort" &&
       turn.exercisePlayback?.status !== "complete";
-    const deferredTransition = turn.slideTransition?.deferUntilAcknowledgementEnds
-      ? turn.slideTransition
-      : null;
-    pendingSlideTransitionRef.current = deferredTransition;
-    commitSlide(deferredTransition?.from || slideData);
+
     setCurrentAffairs(turn.currentAffairs || null);
     setExercisePlayback(turn.exercisePlayback || null);
     setThemeSong(turn.themeSong || null);
@@ -414,6 +420,31 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
     setActivityReveal(turn.activityReveal || null);
     spotifyAutoplayPendingRef.current = shouldAutoplayThemeSong;
     videoAutoplayPendingRef.current = shouldAutoplayExercise;
+  }
+
+  function commitPendingSlideTransition() {
+    const pendingTransition = pendingSlideTransitionRef.current;
+    if (!pendingTransition?.to) return;
+
+    commitSlide(pendingTransition.to);
+    applyInteractionState(pendingTransition.turn, pendingTransition.to);
+    pendingSlideTransitionRef.current = null;
+  }
+
+  function applyTurn(turn) {
+    setSessionMetaLabel(SESSION_META_LABELS[turn.scriptId] || "");
+    if (Number.isInteger(turn.activityRevision)) {
+      activityRevisionRef.current = turn.activityRevision;
+    }
+    const slideData = turn.slide || defaultSlide;
+    const deferredTransition = turn.slideTransition?.deferUntilAcknowledgementEnds
+      ? turn.slideTransition
+      : null;
+    pendingSlideTransitionRef.current = deferredTransition
+      ? { ...deferredTransition, turn }
+      : null;
+    commitSlide(deferredTransition?.from || slideData);
+    if (!deferredTransition) applyInteractionState(turn, slideData);
     const audioSegments = Array.isArray(turn.avatar?.audio?.segments)
       ? turn.avatar.audio.segments.filter((segment) => segment?.url)
       : turn.avatar?.audio?.url
@@ -458,8 +489,7 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
         rhubarbJson: audioSegments[0].rhubarbJson,
       });
     } else {
-      if (deferredTransition?.to) commitSlide(deferredTransition.to);
-      pendingSlideTransitionRef.current = null;
+      commitPendingSlideTransition();
       finishNarrationSequence();
     }
   }
@@ -561,8 +591,7 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
   function continueNarrationSequence() {
     const completedSegment = activeNarrationSegmentRef.current;
     if (completedSegment?.advanceSlideAfter && pendingSlideTransitionRef.current?.to) {
-      commitSlide(pendingSlideTransitionRef.current.to);
-      pendingSlideTransitionRef.current = null;
+      commitPendingSlideTransition();
     }
 
     const nextSegment = narrationQueueRef.current.shift();
@@ -577,8 +606,7 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
     }
 
     if (pendingSlideTransitionRef.current?.to) {
-      commitSlide(pendingSlideTransitionRef.current.to);
-      pendingSlideTransitionRef.current = null;
+      commitPendingSlideTransition();
     }
     finishNarrationSequence();
   }
@@ -1411,7 +1439,9 @@ export default function SessionPage({ sessionId, onEnd, userName, pipelineMode: 
           <span className="pulse-dot" />
           <span>Session in progress</span>
         </div>
-        <div className="session-meta">Reminiscence / {formatElapsed(elapsed)}</div>
+        <div className="session-meta">
+          {sessionMetaLabel ? `${sessionMetaLabel} / ` : ""}{formatElapsed(elapsed)}
+        </div>
         {showDevSkip && (
           <div className="session-skip-control" aria-label="Skip to slide for testing">
             <span>Skip</span>

@@ -71,6 +71,10 @@ const ORIENTATION_STEP_TYPES = {
   childhood_orientation_month: 'month',
   childhood_orientation_year: 'year',
   childhood_orientation_season: 'season',
+  current_affairs_orientation_day: 'weekday',
+  current_affairs_orientation_month: 'month',
+  current_affairs_orientation_year: 'year',
+  current_affairs_orientation_season: 'season',
   physical_games_orientation_day: 'weekday',
   physical_games_orientation_month: 'month',
   physical_games_orientation_year: 'year',
@@ -183,11 +187,14 @@ const getNzDateParts = () => {
 };
 
 const normalizeAnswer = (content = '') =>
-  content
+  String(content)
     .toLowerCase()
     .replace(/[^a-z0-9 ]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
+
+export const hasMeaningfulUserContent = (content = '') =>
+  /[\p{L}\p{N}]/u.test(String(content));
 
 const NEGATED_IMMEDIATE_SAFETY_CONCERN_PATTERNS = [
   /\b(?:i am|i m|im)\s+(?:not|no longer)\s+suicidal\b/i,
@@ -588,6 +595,9 @@ export const evaluateOrientationAnswer = ({ step, content, retryCount }) => {
     return {
       answered: true,
       response: `No problem, it is actually ${expected}.`,
+      outcome: 'unsure',
+      suppliedAnswer: String(content).trim(),
+      expectedAnswer: expected,
     };
   }
 
@@ -602,19 +612,31 @@ export const evaluateOrientationAnswer = ({ step, content, retryCount }) => {
     return {
       answered: true,
       response: correctResponses[type] || `That is right, it is ${expected}.`,
+      outcome: 'correct',
+      suppliedAnswer: String(content).trim(),
+      expectedAnswer: expected,
     };
   }
 
   if (retryCount === 0) {
+    const soundsTentative = /\?|\b(?:maybe|could it be|is it|or has|or is)\b/i.test(content);
     return {
       answered: false,
-      response: 'Good try. Let\'s try that once more.',
+      response: soundsTentative
+        ? 'That is an understandable question. Let\'s take another look together.'
+        : 'Good try. Let\'s take another look together.',
+      outcome: 'retry',
+      suppliedAnswer: String(content).trim(),
+      expectedAnswer: expected,
     };
   }
 
   return {
     answered: true,
     response: `That's okay, it is actually ${expected}.`,
+    outcome: 'incorrect',
+    suppliedAnswer: String(content).trim(),
+    expectedAnswer: expected,
   };
 };
 
@@ -788,13 +810,72 @@ const evaluateAutoAdvance = ({ step, content, effectiveTurnIndex }) => {
   return { answered: true, response: '' };
 };
 
-export const evaluateAcceptedAnswer = ({ step, content, allowAdaptiveFollowUp = false }) =>
-  step?.acceptAnyAnswer && content && !allowAdaptiveFollowUp
-    ? { answered: true, response: '' }
-    : null;
+export const evaluateAcceptedAnswer = ({ step, content, allowAdaptiveFollowUp = false }) => {
+  if (!step?.acceptAnyAnswer || !content) return null;
+  if (!hasMeaningfulUserContent(content)) {
+    return { answered: false, response: 'Take your time.' };
+  }
+  return allowAdaptiveFollowUp ? null : { answered: true, response: '' };
+};
+
+export const evaluateImageObservationAnswer = ({ step, content }) => {
+  const answer = normalizeAnswer(content);
+  if (!step?.imageGuidance || !answer) return null;
+
+  if (
+    ['current_affairs_moon_notice', 'current_affairs_moon_identify'].includes(step.id) &&
+    /\b(?:astronauts?|space ?suits?)\b/.test(answer)
+  ) {
+    return { answered: true, response: 'Yes—you spotted the astronauts in the photograph.' };
+  }
+
+  if (
+    step.id === 'current_affairs_doctors_notice' &&
+    /\b(?:doctors?|hospital|medical|staff)\b/.test(answer) &&
+    /\b(?:protest|strike|signs?|demonstration|gathering)\b/.test(answer)
+  ) {
+    return {
+      answered: true,
+      response: 'Yes—you noticed both the hospital staff and signs of a protest or strike.',
+    };
+  }
+
+  if (
+    step.id === 'current_affairs_airport_notice' &&
+    /\b(?:flight attendants?|air ?hostesses?|cabin crew)\b/.test(answer)
+  ) {
+    return {
+      answered: true,
+      response: 'You correctly noticed the uniforms and the connection with air travel; the caption identifies them as passenger-service staff.',
+    };
+  }
+
+  if (step.id === 'current_affairs_ship_fire_notice' && /\b(?:fire|flames?|burning|blaze)\b/.test(answer)) {
+    return /\b(?:car|crash|crashed|road|truck|vehicle|wreck)\b/.test(answer)
+      ? {
+          answered: true,
+          response: 'Yes—you noticed the flames. The object is a ship rather than a crashed road vehicle.',
+        }
+      : { answered: true, response: 'Yes—you spotted the flames and the emergency response.' };
+  }
+
+  if (step.id === 'current_affairs_bridge_notice') {
+    if (/\b(?:auckland|new zealand|nz|waitemata|waitemat)\b/.test(answer)) {
+      return { answered: true, response: 'Yes—you have placed the bridge in New Zealand.' };
+    }
+    if (/\b(?:america|american|united states|usa)\b/.test(answer)) {
+      return {
+        answered: true,
+        response: 'It is understandable to wonder about the location from an old photograph.',
+      };
+    }
+  }
+
+  return null;
+};
 
 export const evaluateAdaptiveFollowUpAnswer = ({ activeAdaptiveFollowUp, content }) =>
-  activeAdaptiveFollowUp && content
+  activeAdaptiveFollowUp && hasMeaningfulUserContent(content)
     ? { answered: true, response: '' }
     : null;
 
@@ -908,7 +989,7 @@ export const canRequestAdaptiveFollowUp = ({
     step?.adaptiveFollowUp?.enabled &&
     !hasActiveFollowUp &&
     effectiveTurnIndex >= (step.turns || 1)
-  );
+    );
 
 export const shouldUseNextSlideResponseOnly = ({ shouldAdvance, nextStep } = {}) =>
   Boolean(shouldAdvance && nextStep?.isAnswerReveal);
@@ -986,7 +1067,7 @@ export const parseActivityRevealEvent = (content = '', step = null) => {
 
 export const isRecordableSessionAnswer = ({ step, content, wheelEvent }) =>
   Boolean(
-    content &&
+    hasMeaningfulUserContent(content) &&
     !wheelEvent &&
     !isAutoAdvanceProtocol(content) &&
     !isActivityRevealProtocol(content) &&
@@ -1236,6 +1317,16 @@ export const buildTopicSessionSummary = (answers = [], { themeSong = null } = {}
       'cst_interests',
       'cst_nutshell',
       'session_themes',
+      'current_affairs_news_sources',
+      'current_affairs_news_then_and_now',
+      'current_affairs_positive_news',
+      'current_affairs_moon_story',
+      'current_affairs_doctors_story',
+      'current_affairs_airport_story',
+      'current_affairs_ship_fire_story',
+      'current_affairs_bridge_history',
+      'current_affairs_bridge_future',
+      'current_affairs_spin_question',
     ].includes(item.stepId)) {
       continue;
     }
@@ -1259,8 +1350,42 @@ export const buildTopicSessionSummary = (answers = [], { themeSong = null } = {}
   if (meaningful.some((item) => item.stepId === 'physical_games_spin_question')) {
     addTopic('reflecting on a physical-games question from the wheel');
   }
-
-  const selectedTopics = topics.slice(0, 4);
+  if (meaningful.some((item) => [
+    'current_affairs_news_sources',
+    'current_affairs_news_then_and_now',
+  ].includes(item.stepId))) {
+    addTopic('comparing how news was followed then and now');
+  }
+  if (meaningful.some((item) => item.stepId === 'current_affairs_positive_news')) {
+    addTopic('responding to a recent positive New Zealand story');
+  }
+  if (meaningful.some((item) => item.stepId === 'current_affairs_moon_story')) {
+    addTopic('reflecting on the Apollo 11 Moon landing');
+  }
+  if (meaningful.some((item) => [
+    'current_affairs_doctors_story',
+    'current_affairs_airport_story',
+    'current_affairs_ship_fire_story',
+  ].includes(item.stepId))) {
+    addTopic('sharing views on New Zealand news photographs');
+  }
+  if (meaningful.some((item) => [
+    'current_affairs_bridge_history',
+    'current_affairs_bridge_future',
+  ].includes(item.stepId))) {
+    addTopic('exploring the Auckland Harbour Bridge and its future');
+  }
+  const wheelAnswer = meaningful.find((item) => item.stepId === 'current_affairs_spin_question');
+  let wheelTopic = '';
+  if (wheelAnswer) {
+    const wheelText = `${wheelAnswer.answer || ''} ${wheelAnswer.adaptiveFollowUp?.answer || ''}`;
+    wheelTopic = SUMMARY_TOPIC_RULES.find(({ pattern }) => pattern.test(wheelText))?.label ||
+      'reflecting on a topic from the question wheel';
+    addTopic(wheelTopic);
+  }
+  const selectedTopics = wheelTopic && topics.length > 4
+    ? [...topics.filter((topic) => topic !== wheelTopic).slice(0, 3), wheelTopic]
+    : topics.slice(0, 4);
   return selectedTopics.length > 0
     ? `Today, you spent time ${joinSummaryTopics(selectedTopics)}.`
     : 'Today, you explored a few memories and ideas together.';
@@ -1490,6 +1615,7 @@ const toSlide = ({ step, index, total }) => ({
   visualHint: step.visualHint,
   accent: step.accent,
   interaction: step.interaction,
+  imageGuidance: step.imageGuidance,
   inactivityTimeoutMs: step.inactivityTimeoutMs,
 });
 
@@ -2285,21 +2411,18 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
   let adaptiveText = '';
   let adaptiveFollowUpQuestion = null;
   let emotionalSupportTurn = null;
-  if (
-    !isQuestionWheelEvent &&
-    !isActivityInteractionEvent &&
-    userContent &&
-    hasDeliveredQuestion
-  ) {
+  let orientationTurn = null;
+  if (!isQuestionWheelEvent && !isActivityInteractionEvent && userContent && hasDeliveredQuestion) {
     emotionalSupportTurn = evaluateEmotionalSupportAnswer({
       content: userContent,
       hasActiveSupport: activeAdaptiveFollowUp?.kind === 'emotional_support',
     });
-    const deterministicTurn = emotionalSupportTurn || evaluateOrientationAnswer({
+    orientationTurn = evaluateOrientationAnswer({
       step,
       content: userContent,
       retryCount: currentRetryCount,
-    }) || evaluateTriviaAnswer({
+    });
+    const deterministicTurn = emotionalSupportTurn || orientationTurn || evaluateTriviaAnswer({
       step,
       content: userContent,
     }) || evaluateMusicCompletionAnswer({
@@ -2320,14 +2443,17 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
     }) || evaluateAdaptiveFollowUpAnswer({
       activeAdaptiveFollowUp,
       content: userContent,
-    }) || evaluateAcceptedAnswer({
+    }) || evaluateImageObservationAnswer({
       step,
       content: userContent,
-      allowAdaptiveFollowUp,
     }) || evaluateNewsElaborationRequest({
       step,
       content: userContent,
       currentAffairs,
+    }) || evaluateAcceptedAnswer({
+      step,
+      content: userContent,
+      allowAdaptiveFollowUp,
     });
     let adaptiveTurn = deterministicTurn;
     if (!adaptiveTurn) {
@@ -2359,11 +2485,17 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
         }
       ));
     }
-    answeredCurrentQuestion = step.acceptAnyAnswer ? true : adaptiveTurn.answered;
+    answeredCurrentQuestion = adaptiveTurn.answered;
     adaptiveText = adaptiveTurn.response;
     adaptiveFollowUpQuestion =
       emotionalSupportTurn?.followUp ||
       (answeredCurrentQuestion && allowAdaptiveFollowUp ? adaptiveTurn.followUp : null);
+
+    if (orientationTurn?.answered) {
+      scriptContext.orientationOutcome = orientationTurn.outcome;
+      scriptContext.orientationAnswer = orientationTurn.suppliedAnswer;
+      scriptContext.orientationExpectedAnswer = orientationTurn.expectedAnswer;
+    }
   }
 
   let themeSongFeedback = '';

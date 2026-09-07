@@ -2,6 +2,7 @@
   cst_intro_reminiscence: 'session1',
   cst_childhood: 'session2',
   cst_physical_games: 'session3',
+  cst_current_affairs: 'session6',
 };
 
 const adaptiveConversation = (guidance) => ({
@@ -24,6 +25,35 @@ const spotifySongInteraction = ({ summarizeOnComplete = false } = {}) => ({
   ...(summarizeOnComplete ? { summarizeOnComplete: true } : {}),
 });
 
+const getCurrentNzYear = () => new Intl.DateTimeFormat('en-NZ', {
+  year: 'numeric',
+  timeZone: 'Pacific/Auckland',
+}).format(new Date());
+
+const orientationRevealReply = ({ answer, detail, context = {} }) => {
+  const normalizedAnswer = String(answer).toLowerCase();
+  const suppliedAnswer = String(context.orientationAnswer || '').toLowerCase();
+
+  if (context.orientationOutcome === 'correct') {
+    return `Yes, ${answer} is right. ${detail}`;
+  }
+  if (
+    context.orientationOutcome === 'incorrect' &&
+    normalizedAnswer === 'spring' &&
+    /\bwinter\b/.test(suppliedAnswer)
+  ) {
+    return `Winter was an understandable answer because the seasons have only just changed. It is spring now. ${detail}`;
+  }
+  if (context.orientationOutcome === 'incorrect') {
+    return `That was a reasonable try. It is ${answer}. ${detail}`;
+  }
+  if (context.orientationOutcome === 'unsure') {
+    return `No problem. It is ${answer}. ${detail}`;
+  }
+
+  return `It is ${answer}. ${detail}`;
+};
+
 const physicalGamesWheelOptions = [
   { label: 'Favorite Sport', question: 'What is a favourite sport you enjoy watching or playing?' },
   { label: 'Sports Team', question: 'Is there a sports team you especially like?' },
@@ -45,6 +75,29 @@ const physicalGamesWheelOptions = [
   { label: 'Exercise Music', question: 'Is there music that makes you want to move or dance?' },
   { label: 'Try Something New', question: 'Is there a physical activity you would like to try?' },
   { label: 'Then and Now', question: 'How have the games or activities you enjoy changed over the years?' },
+];
+
+const currentAffairsWheelOptions = [
+  { label: 'Favourite Sport', question: 'What is a favourite sport you enjoy watching or playing?' },
+  { label: 'Sports Team', question: 'Is there a sports team you especially like?' },
+  { label: 'Your Career', question: 'What part of your working life do you remember most clearly?' },
+  { label: 'Where You Grew Up', question: 'What do you remember about the place where you grew up?' },
+  { label: 'Beach, Mountain or Lake', question: 'Would you choose the beach, the mountains, or a lake?' },
+  { label: 'Birthplace', question: 'What do you remember about the place where you were born?' },
+  { label: 'Morning or Night', question: 'Are you more of a morning person or a night person?' },
+  { label: 'How You Relax', question: 'What do you like to do to relax?' },
+  { label: 'Favourite Book', question: 'Do you have a favourite book, or one you remember enjoying?' },
+  { label: 'Chocolate or Vanilla', question: 'Would you choose chocolate or vanilla?' },
+  { label: 'First Car', question: 'Do you remember your first car, or a car you especially liked?' },
+  { label: 'What Motivates You', question: 'What helps motivate you?' },
+  { label: 'Best Place Visited', question: 'What is one of the best places you have visited?' },
+  { label: 'Who You Admire', question: 'Who is someone you admire?' },
+  { label: 'Favourite Movie', question: 'Do you have a favourite movie?' },
+  { label: 'Favourite Food', question: 'What is one of your favourite foods?' },
+  { label: 'Favourite Trip', question: 'Do you remember a favourite trip or holiday?' },
+  { label: 'Favourite Music', question: 'What kind of music do you most enjoy?' },
+  { label: 'Favourite TV Show', question: 'Do you have a favourite television show?' },
+  { label: 'Favourite Season', question: 'Which season do you enjoy most, and why?' },
 ];
 
 const scripts = {
@@ -517,6 +570,579 @@ const scripts = {
       recordAnswer: false,
       reply: ({ name }) =>
         `That brings us to the end of today's session, ${name}. Our next session will be Physical Games. Take good care, and I will look forward to seeing you next time.`,
+    },
+  ],
+  cst_current_affairs: [
+    {
+      id: 'current_affairs_welcome',
+      turns: 1,
+      acceptAnyAnswer: true,
+      deckSlide: 1,
+      title: 'Virtual Cognitive Stimulation Therapy',
+      subtitle: 'Session 6: Current Affairs',
+      prompt: 'Welcome back',
+      bullets: ['Session 6', 'Current Affairs'],
+      visualHint: 'Source deck: NZ06. Current Affairs, slide 1',
+      accent: '#00AEEF',
+      reply: ({ name }) =>
+        `Welcome back, ${name}. It is lovely to see you again. Today is our sixth session, and our theme is Current Affairs. We will look at how news reaches us and explore a few photographs together. There are no tests, and your ideas are what matter. When you are ready, say "I'm ready" to begin.`,
+    },
+    {
+      id: 'current_affairs_opening_song',
+      turns: 1,
+      deckSlide: 2,
+      title: 'Welcome Back',
+      subtitle: 'Your theme song',
+      prompt: 'Listen to your theme song',
+      bullets: ['Welcome back', 'Theme song'],
+      visualHint: 'Source deck: NZ06. Current Affairs, slide 2',
+      accent: '#F47C20',
+      interaction: spotifySongInteraction(),
+      recordAnswer: false,
+      reply: ({ themeSong }) =>
+        themeSong?.status === 'available'
+          ? `Let us begin with your theme song, ${themeSong.track.name} by ${themeSong.track.artistLabel}. It can play for up to one minute. When you have finished listening, press Done, or say or type done.`
+          : 'I could not find a saved theme song this time. Press Done, or say or type done, when you are ready to continue.',
+    },
+    {
+      id: 'current_affairs_check_in',
+      turns: 1,
+      deckSlide: 3,
+      title: 'Check-in',
+      subtitle: 'How are you doing today?',
+      prompt: 'How are you doing today?',
+      bullets: ['Take your time', 'Share as much as you like'],
+      visualHint: 'Source deck: NZ06. Current Affairs, slide 3',
+      accent: '#F47C20',
+      adaptiveFollowUp: adaptiveConversation(
+        'If they share a positive or neutral feeling with some personal detail, invite one concrete detail about what shaped their day. Do not follow up if they seem tired, distressed, or ready to continue.'
+      ),
+      reply: () => 'Before we begin, how are you doing today?',
+    },
+    {
+      id: 'current_affairs_orientation_day',
+      turns: 1,
+      deckSlide: 4,
+      title: 'What day of the week is it?',
+      subtitle: 'Getting our bearings',
+      prompt: 'What day of the week is it?',
+      bullets: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'],
+      visualHint: 'Source deck: NZ06. Current Affairs, slide 4',
+      accent: '#7A9DAD',
+      reply: () => 'Let us get our bearings together. Do you happen to know what day of the week it is?',
+    },
+    {
+      id: 'current_affairs_orientation_month',
+      turns: 1,
+      deckSlide: 5,
+      title: 'What month are we enjoying?',
+      subtitle: 'Getting our bearings',
+      prompt: 'What month are we enjoying?',
+      bullets: ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'],
+      visualHint: 'Source deck: NZ06. Current Affairs, slide 5',
+      accent: '#00AEEF',
+      reply: () => 'And what month are we enjoying at the moment?',
+    },
+    {
+      id: 'current_affairs_orientation_year',
+      turns: 1,
+      deckSlide: 6,
+      title: 'What year is it?',
+      subtitle: 'Getting our bearings',
+      prompt: 'What year is it?',
+      bullets: ['Year', 'Calendar', 'No pressure'],
+      visualHint: 'Source deck: NZ06. Current Affairs, slide 6',
+      accent: '#F4C8B0',
+      reply: () => 'And do you happen to know what year it is?',
+    },
+    {
+      id: 'current_affairs_orientation_year_reveal',
+      turns: 1,
+      deckSlide: 7,
+      get title() { return getCurrentNzYear(); },
+      subtitle: 'The year we are enjoying',
+      get prompt() { return getCurrentNzYear(); },
+      get bullets() { return [getCurrentNzYear()]; },
+      visualHint: 'Source deck: NZ06. Current Affairs, slide 7',
+      accent: '#4472C4',
+      interaction: { type: 'autoAdvance' },
+      isAnswerReveal: true,
+      recordAnswer: false,
+      reply: (context) => {
+        const year = context.orientationExpectedAnswer || getCurrentNzYear();
+        return orientationRevealReply({
+          answer: year,
+          detail: 'We can keep that date in view as we continue.',
+          context,
+        });
+      },
+    },
+    {
+      id: 'current_affairs_orientation_season',
+      turns: 1,
+      deckSlide: 8,
+      title: 'Which season are we enjoying?',
+      subtitle: 'Getting our bearings',
+      prompt: 'Which season are we enjoying?',
+      bullets: ['Winter', 'Summer', 'Autumn', 'Spring'],
+      visualHint: 'Source deck: NZ06. Current Affairs, slide 8',
+      accent: '#A8C5A0',
+      seasonBranches: {
+        winter: 'current_affairs_season_winter',
+        summer: 'current_affairs_season_summer',
+        autumn: 'current_affairs_season_autumn',
+        spring: 'current_affairs_season_spring',
+      },
+      reply: () => 'Which season are we enjoying here in New Zealand?',
+    },
+    {
+      id: 'current_affairs_season_winter',
+      turns: 1,
+      deckSlide: 9,
+      title: 'Winter',
+      subtitle: 'The season we are enjoying',
+      prompt: 'Winter',
+      bullets: ['Cool weather', 'Shorter days'],
+      visualHint: 'Source deck: NZ06. Current Affairs, slide 9',
+      accent: '#7A9DAD',
+      interaction: { type: 'autoAdvance' },
+      isAnswerReveal: true,
+      nextStepId: 'current_affairs_weather',
+      recordAnswer: false,
+      reply: (context) => orientationRevealReply({
+        answer: 'winter',
+        detail: 'Winter brings cooler weather and shorter days.',
+        context,
+      }),
+    },
+    {
+      id: 'current_affairs_season_summer',
+      turns: 1,
+      deckSlide: 10,
+      title: 'Summer',
+      subtitle: 'The season we are enjoying',
+      prompt: 'Summer',
+      bullets: ['Warm weather', 'Longer days'],
+      visualHint: 'Source deck: NZ06. Current Affairs, slide 10',
+      accent: '#F47C20',
+      interaction: { type: 'autoAdvance' },
+      isAnswerReveal: true,
+      nextStepId: 'current_affairs_weather',
+      recordAnswer: false,
+      reply: (context) => orientationRevealReply({
+        answer: 'summer',
+        detail: 'Summer brings warmer weather and longer days.',
+        context,
+      }),
+    },
+    {
+      id: 'current_affairs_season_autumn',
+      turns: 1,
+      deckSlide: 11,
+      title: 'Autumn',
+      subtitle: 'The season we are enjoying',
+      prompt: 'Autumn',
+      bullets: ['Changing leaves', 'Cooler days'],
+      visualHint: 'Source deck: NZ06. Current Affairs, slide 11',
+      accent: '#F4C8B0',
+      interaction: { type: 'autoAdvance' },
+      isAnswerReveal: true,
+      nextStepId: 'current_affairs_weather',
+      recordAnswer: false,
+      reply: (context) => orientationRevealReply({
+        answer: 'autumn',
+        detail: 'In autumn, the leaves change and the days begin to cool.',
+        context,
+      }),
+    },
+    {
+      id: 'current_affairs_season_spring',
+      turns: 1,
+      deckSlide: 12,
+      title: 'Spring',
+      subtitle: 'The season we are enjoying',
+      prompt: 'Spring',
+      bullets: ['New growth', 'Warmer days'],
+      visualHint: 'Source deck: NZ06. Current Affairs, slide 12',
+      accent: '#A8C5A0',
+      interaction: { type: 'autoAdvance' },
+      isAnswerReveal: true,
+      nextStepId: 'current_affairs_weather',
+      recordAnswer: false,
+      reply: (context) => orientationRevealReply({
+        answer: 'spring',
+        detail: 'Spring brings new growth and warmer days returning.',
+        context,
+      }),
+    },
+    {
+      id: 'current_affairs_weather',
+      turns: 1,
+      deckSlide: 13,
+      title: 'The Weather Is...',
+      subtitle: 'Outside today',
+      prompt: 'What is the weather like?',
+      bullets: ['Sunny', 'Cloudy', 'Windy', 'Rainy', 'Stormy', 'Hot or cold'],
+      visualHint: 'Source deck: NZ06. Current Affairs, slide 13',
+      accent: '#7A9DAD',
+      adaptiveFollowUp: adaptiveConversation(
+        'If they add a meaningful detail, invite one brief sensory observation or a gentle comparison with weather they remember, without turning it into a factual test.'
+      ),
+      reply: () => 'What is the weather like out your window today?',
+    },
+    {
+      id: 'current_affairs_exercise',
+      turns: 1,
+      deckSlide: 14,
+      title: 'Exercises',
+      subtitle: 'Gentle follow along',
+      prompt: 'Try a short seated exercise',
+      bullets: ['Sit safely', 'Only do what feels comfortable', 'Press Done when finished'],
+      visualHint: 'Source deck: NZ06. Current Affairs, slide 14',
+      accent: '#4472C4',
+      interaction: { ...seatedExerciseInteraction },
+      recordAnswer: false,
+      reply: () =>
+        'Next is the same short seated exercise. Please sit comfortably and safely on a sturdy chair. The video will start after I finish speaking. Only do what feels comfortable. When you are finished, press Done, or say or type done.',
+    },
+    {
+      id: 'current_affairs_theme_intro',
+      turns: 1,
+      deckSlide: 15,
+      title: 'Current Affairs',
+      subtitle: 'Our theme for today',
+      prompt: 'Current Affairs',
+      bullets: ['News', 'Photographs', 'Your opinions'],
+      visualHint: 'Source deck: NZ06. Current Affairs, slide 15',
+      accent: '#F47C20',
+      interaction: { type: 'autoAdvance' },
+      recordAnswer: false,
+      reply: () => 'Now it is time to move to our theme for today: Current Affairs.',
+    },
+    {
+      id: 'current_affairs_news_sources',
+      turns: 1,
+      deckSlide: 16,
+      title: 'How Do You Keep Up With the News?',
+      subtitle: 'News then and now',
+      prompt: 'How do you keep up with the news?',
+      bullets: ['Newspapers', 'Radio', 'Television', 'Online'],
+      visualHint: 'Source deck: NZ06. Current Affairs, slide 16',
+      accent: '#00AEEF',
+      adaptiveFollowUp: adaptiveConversation(
+        'Invite one reason they trust, enjoy, or prefer that news source, or one gentle comparison with how they followed news in earlier years.'
+      ),
+      reply: () =>
+        'People can now follow the news in many ways, including newspapers, radio, television, and online. How do you usually keep up with the news?',
+    },
+    {
+      id: 'current_affairs_moon_notice',
+      turns: 1,
+      acceptAnyAnswer: true,
+      deckSlide: 17,
+      title: 'What Do You Notice?',
+      subtitle: 'A grainy historic image',
+      prompt: 'What do you notice in this image?',
+      bullets: ['Look closely', 'There is no wrong answer'],
+      visualHint: 'Source deck: NZ06. Current Affairs, slide 17',
+      accent: '#4472C4',
+      imageGuidance: {
+        confirmedDetails: ['grainy black-and-white image', 'astronauts', 'spacesuits', 'figures on the Moon'],
+        clarification: 'Astronauts are visible, but Apollo 11 should not be named until the story step.',
+      },
+      reply: () =>
+        'Take your time looking at this grainy black-and-white image. What do you notice?',
+    },
+    {
+      id: 'current_affairs_moon_identify',
+      turns: 1,
+      acceptAnyAnswer: true,
+      deckSlide: 17,
+      title: 'What Do You Notice?',
+      subtitle: 'Looking more closely',
+      prompt: 'Can you make out what the photograph shows?',
+      bullets: ['Shapes', 'People', 'Place'],
+      visualHint: 'Source deck: NZ06. Current Affairs, slide 17',
+      accent: '#4472C4',
+      imageGuidance: {
+        confirmedDetails: ['astronauts', 'spacesuits', 'figures on the lunar surface'],
+        clarification: 'Confirm visible details without naming Apollo 11 before the scripted explanation.',
+      },
+      reply: () =>
+        'The picture is not very clear, so there is no pressure to identify it. Can you make out what the photograph shows?',
+    },
+    {
+      id: 'current_affairs_moon_story',
+      turns: 1,
+      acceptAnyAnswer: true,
+      deckSlide: 17,
+      title: 'Apollo 11',
+      subtitle: 'The first Moon landing',
+      prompt: 'What do you remember about the Moon landing?',
+      bullets: ['Apollo 11', 'July 1969', 'Neil Armstrong and Buzz Aldrin'],
+      visualHint: 'Source deck: NZ06. Current Affairs, slide 17',
+      accent: '#7A9DAD',
+      adaptiveFollowUp: adaptiveReminiscence(
+        'If they remember the Moon landing, invite one detail about where they were, who they were with, how they heard the news, or how it felt. If they do not remember it, invite their opinion about the achievement instead.'
+      ),
+      reply: () =>
+        'This is a television image from Apollo 11, the first crewed Moon landing in July 1969. Neil Armstrong and Buzz Aldrin walked on the Moon while Michael Collins remained in orbit, and people around the world followed the event through live broadcasts. Do you remember hearing about the Moon landing, or what do you think of that achievement?',
+    },
+    {
+      id: 'current_affairs_news_then_and_now',
+      turns: 2,
+      acceptAnyAnswer: true,
+      deckSlide: 18,
+      title: 'How Is News Reported Differently Today?',
+      subtitle: 'From newspapers and radio to television and online news',
+      prompt: 'How did you follow the news in earlier years?',
+      bullets: ['Newspapers', 'Radio', 'Television', 'Online'],
+      visualHint: 'Source deck: NZ06. Current Affairs, slide 18',
+      accent: '#00AEEF',
+      adaptiveFollowUp: adaptiveReminiscence(
+        'After both scripted questions, invite one concrete memory or reason connected to their preferred news source, without judging whether one medium is better.'
+      ),
+      reply: () =>
+        'Years ago, newspapers and radio were often the main ways people received the news. How did you usually follow the news in earlier years?',
+      followUps: [
+        () => 'Times have changed. Do you still read a newspaper, or do you now prefer radio, television, or another way of following the news?',
+      ],
+    },
+    {
+      id: 'current_affairs_positive_news',
+      turns: 1,
+      acceptAnyAnswer: true,
+      deckSlide: 18,
+      title: 'A Positive Story From Aotearoa Today',
+      subtitle: 'A current headline from our news service',
+      prompt: 'What do you think about this story?',
+      bullets: ['A recent New Zealand story', 'Your thoughts', 'Ask for more if you wish'],
+      visualHint: 'Live positive-news interlude after source deck slide 18',
+      accent: '#A8C5A0',
+      interaction: { type: 'positiveNews' },
+      adaptiveFollowUp: adaptiveConversation(
+        'Invite one reaction to the current story. If they ask for more, use only the vetted article details supplied by the news service; never invent missing facts.'
+      ),
+      reply: ({ currentAffairs }) =>
+        currentAffairs?.status === 'available'
+          ? `Here is a recent positive story from New Zealand: ${currentAffairs.article.title}. You can ask me to tell you more, or tell me what you think about it.`
+          : 'I could not find a clearly positive New Zealand story just now. Have you heard anything pleasant or interesting lately?',
+    },
+    {
+      id: 'current_affairs_doctors_notice',
+      turns: 1,
+      acceptAnyAnswer: true,
+      deckSlide: 19,
+      title: "What's Going On in This Picture?",
+      subtitle: 'People gathered outside a hospital',
+      prompt: 'What do you think is happening?',
+      bullets: ['People', 'Signs', 'Hospital'],
+      visualHint: 'Source deck: NZ06. Current Affairs, slide 19',
+      accent: '#F47C20',
+      imageGuidance: {
+        confirmedDetails: ['people outside a hospital', 'doctors or hospital staff', 'signs', 'a protest or strike gathering'],
+        clarification: 'Affirm hospital, staff, signs, protest, or strike observations without adding motives beyond the caption.',
+      },
+      reply: () =>
+        'Here is another news photograph. What do you notice, and what do you think might be happening?',
+    },
+    {
+      id: 'current_affairs_doctors_story',
+      turns: 1,
+      acceptAnyAnswer: true,
+      deckSlide: 20,
+      title: 'Wellington Doctors Take Strike Action',
+      subtitle: 'Recruitment and patient care',
+      prompt: 'What is your reaction to this story?',
+      bullets: ['Hospital doctors', 'Staff recruitment', 'Patient care'],
+      visualHint: 'Source deck: NZ06. Current Affairs, slide 20',
+      accent: '#7A9DAD',
+      adaptiveFollowUp: adaptiveConversation(
+        'Explore their opinion about staffing, patient care, or peaceful public action. Do not debate politics, assume personal medical experiences, or press if they prefer to move on.'
+      ),
+      reply: () =>
+        'The caption explains that these Wellington hospital doctors were defending nationwide strike action over recruitment, saying they were struggling to look after patients. What is your reaction to that story?',
+    },
+    {
+      id: 'current_affairs_airport_notice',
+      turns: 1,
+      acceptAnyAnswer: true,
+      deckSlide: 21,
+      title: "What's Going On in This Picture?",
+      subtitle: 'A group in matching uniforms',
+      prompt: 'What do you think is happening?',
+      bullets: ['Uniforms', 'Workplace', 'People'],
+      visualHint: 'Source deck: NZ06. Current Affairs, slide 21',
+      accent: '#A8C5A0',
+      imageGuidance: {
+        confirmedDetails: ['a group of people', 'matching orange uniforms', 'airport or passenger-service staff'],
+        clarification: 'They are passenger-service staff rather than flight attendants.',
+      },
+      reply: () =>
+        'What do you notice about the people in this photograph, and where do you think they might be?',
+    },
+    {
+      id: 'current_affairs_airport_story',
+      turns: 1,
+      acceptAnyAnswer: true,
+      deckSlide: 22,
+      title: 'Fresh Faces for New Flights',
+      subtitle: 'Hamilton Airport',
+      prompt: 'What do you think about this development?',
+      bullets: ['Hamilton Airport', 'New staff', 'International terminal'],
+      visualHint: 'Source deck: NZ06. Current Affairs, slide 22',
+      accent: '#00AEEF',
+      adaptiveFollowUp: adaptiveReminiscence(
+        'Invite one memory or opinion about flying, airports, travel, or seeing a place become better connected. Do not assume they have flown.'
+      ),
+      reply: () =>
+        'The story introduces newly hired passenger-service staff at the blessing of Hamilton Airport’s refurbished international terminal, as the airport prepared for new flights. What do you think about that development?',
+    },
+    {
+      id: 'current_affairs_ship_fire_notice',
+      turns: 1,
+      acceptAnyAnswer: true,
+      deckSlide: 23,
+      title: "What's Going On in This Picture?",
+      subtitle: 'Firefighters at night',
+      prompt: 'What do you notice in this image?',
+      bullets: ['Firefighters', 'Water', 'A vessel'],
+      visualHint: 'Source deck: NZ06. Current Affairs, slide 23',
+      accent: '#F47C20',
+      imageGuidance: {
+        confirmedDetails: ['flames or fire', 'firefighters', 'water', 'a ship or vessel at night'],
+        clarification: 'The burning object is a historic ship, not a crashed road vehicle.',
+      },
+      reply: () =>
+        'This is a more serious photograph. What do you notice? It is also fine to move on if you would rather not discuss it.',
+    },
+    {
+      id: 'current_affairs_ship_fire_story',
+      turns: 1,
+      acceptAnyAnswer: true,
+      deckSlide: 24,
+      title: 'Fire on the Historic Ship The Tui',
+      subtitle: 'Paihia',
+      prompt: 'What stands out to you about this story?',
+      bullets: ['Historic ship', 'Firefighters', 'Investigation'],
+      visualHint: 'Source deck: NZ06. Current Affairs, slide 24',
+      accent: '#7A9DAD',
+      adaptiveFollowUp: adaptiveConversation(
+        'If they want to discuss it, focus on the work of the firefighters, the value of historic objects, or community reactions. Avoid graphic detail and do not speculate about the cause.'
+      ),
+      reply: () =>
+        'The caption says firefighters were working to extinguish a blaze on the historic ship The Tui near the Waitangi Bridge in Paihia, and that an investigation was under way. What stands out to you about this story?',
+    },
+    {
+      id: 'current_affairs_bridge_notice',
+      turns: 1,
+      acceptAnyAnswer: true,
+      deckSlide: 25,
+      title: 'What Do You Notice?',
+      subtitle: 'Auckland Harbour Bridge',
+      prompt: 'What do you notice in this photograph?',
+      bullets: ['Bridge', 'Waitematā Harbour', 'Auckland'],
+      visualHint: 'Source deck: NZ06. Current Affairs, slide 25',
+      accent: '#4472C4',
+      imageGuidance: {
+        confirmedDetails: ['a large bridge', 'water and harbour surroundings', 'the Auckland Harbour Bridge over the Waitematā Harbour'],
+        clarification: 'If the person is unsure whether it is in New Zealand or America, acknowledge the uncertainty without inventing what they imagined.',
+      },
+      reply: () =>
+        'Take a look at this black-and-white photograph. What do you notice about the bridge and the area around it?',
+    },
+    {
+      id: 'current_affairs_bridge_history',
+      turns: 1,
+      acceptAnyAnswer: true,
+      deckSlide: 25,
+      title: 'Auckland Harbour Bridge',
+      subtitle: 'A link since 1959',
+      prompt: 'Do you have a memory connected with the bridge?',
+      bullets: ['Opened 30 May 1959', 'Four original lanes', 'Eight lanes after the clip-ons'],
+      visualHint: 'Source deck: NZ06. Current Affairs, slide 25',
+      accent: '#7A9DAD',
+      adaptiveFollowUp: adaptiveReminiscence(
+        'Invite one memory of crossing the bridge, taking the ferry, visiting the North Shore, seeing Auckland change, or hearing about the bridge. Do not treat dates as a recall test.'
+      ),
+      reply: () =>
+        'This is the Auckland Harbour Bridge across the Waitematā. It opened on 30 May 1959 with four traffic lanes, replacing the ferry as the main direct vehicle link to the North Shore. Traffic grew so quickly that two Japanese-built clip-on sections were added between 1966 and 1969, doubling it to eight lanes. Do you have any memories of crossing the bridge or seeing Auckland change around it?',
+    },
+    {
+      id: 'current_affairs_bridge_future',
+      turns: 1,
+      acceptAnyAnswer: true,
+      deckSlide: 25,
+      title: 'Auckland Harbour Bridge',
+      subtitle: 'Its current role and a possible second crossing',
+      prompt: 'What do you think Auckland should do next?',
+      bullets: ['About 170,000 vehicle crossings daily', 'Ongoing maintenance', 'Bridge and tunnel options'],
+      visualHint: 'Source deck: NZ06. Current Affairs, slide 25',
+      accent: '#00AEEF',
+      adaptiveFollowUp: adaptiveConversation(
+        'Explore their opinion about maintaining the bridge, adding a tunnel or bridge, resilience, travel, or how Auckland has grown. Make clear that the final additional-crossing decision has not been made.'
+      ),
+      reply: () =>
+        'Today the bridge remains an eight-lane part of State Highway 1, carrying about 170,000 vehicles each day while crews maintain the ageing structure. Auckland has discussed another harbour crossing for many years. In August 2026, the NZ Transport Agency board preferred a tunnel, but Cabinet had not selected a final option. A detailed business case is now examining the crossing options, funding, and delivery. What do you think Auckland should do next?',
+    },
+    {
+      id: 'current_affairs_spin_question',
+      turns: 2,
+      deckSlide: 26,
+      title: 'Question Wheel',
+      subtitle: 'Spin',
+      prompt: 'Spin the wheel',
+      bullets: ['Preferences', 'Places', 'Memories', 'Everyday life'],
+      visualHint: 'Source deck: NZ06. Current Affairs, slide 26',
+      accent: '#A8C5A0',
+      interaction: {
+        type: 'questionWheel',
+        options: currentAffairsWheelOptions,
+      },
+      adaptiveFollowUp: adaptiveReminiscence(
+        'Deepen the landed topic with one question about a specific memory, preference, reason, person, place, or then-versus-now comparison.'
+      ),
+      reply: () =>
+        'Now we have the question wheel again. Press spin the wheel, and I will ask the question it lands on.',
+      followUps: [
+        ({ wheelQuestion }) => wheelQuestion || 'What question did the wheel land on?',
+      ],
+    },
+    {
+      id: 'current_affairs_summary_song',
+      turns: 2,
+      deckSlide: 27,
+      title: 'Finally',
+      subtitle: 'Looking back over today',
+      prompt: 'What have we done today?',
+      bullets: ['Theme song', 'Summarise today'],
+      visualHint: 'Source deck: NZ06. Current Affairs, slide 27',
+      accent: '#F4C8B0',
+      interaction: spotifySongInteraction({ summarizeOnComplete: true }),
+      recordAnswer: false,
+      reply: ({ themeSong }) =>
+        themeSong?.status === 'available'
+          ? `Before we look back over today, your theme song, ${themeSong.track.name} by ${themeSong.track.artistLabel}, is ready to play again. When you have finished listening, press Done, or say or type done.`
+          : 'Before we look back over today, I was not able to prepare the theme song this time. Press Done, or say or type done, when you are ready to continue.',
+      followUps: [
+        ({ sessionSummary }) =>
+          `Now let us look back over what we have done today. ${sessionSummary || 'Today, you explored news, historic photographs, and how Auckland has changed.'} What is one part of today that you would like to remember?`,
+      ],
+    },
+    {
+      id: 'current_affairs_closing',
+      turns: 1,
+      autoCompleteAfterNarration: true,
+      deckSlide: 28,
+      title: 'The Theme of the Next Session',
+      subtitle: 'Session 7: Faces and Scenes',
+      prompt: 'See you next time',
+      bullets: ['Thank you', 'Next session', 'Faces and Scenes'],
+      visualHint: 'Source deck: NZ06. Current Affairs, slide 28',
+      accent: '#4472C4',
+      recordAnswer: false,
+      reply: ({ name }) =>
+        `That brings us to the end of today's session, ${name}. Our next session will explore Faces and Scenes. Thank you, ka kite anō, and I will look forward to seeing you next time.`,
     },
   ],
   cst_physical_games: [

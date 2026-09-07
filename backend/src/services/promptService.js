@@ -38,6 +38,13 @@ const SESSION_SCRIPTS = {
     .split(/\r?\n---\r?\n/)
     .map((s) => s.trim())
     .filter(Boolean),
+  cst_current_affairs: readFileSync(
+    join(CONTEXT_ROOT, 'vCST_Session6_AI_Script.md'),
+    'utf8'
+  )
+    .split(/\r?\n---\r?\n/)
+    .map((s) => s.trim())
+    .filter(Boolean),
 };
 
 const RECENT_PROMPT_MESSAGE_LIMIT = 8;
@@ -78,6 +85,31 @@ const formatRecentMessages = (messages = []) =>
         .slice(-RECENT_PROMPT_MESSAGE_LIMIT)
         .map((message) => `{"role":${quoteData(message.role)},"content":${quoteData(message.content)}}`)
         .join('\n');
+
+const formatAcknowledgementVarietyGuidance = (messages = []) => {
+  const recentOpeners = messages
+    .filter((message) => message.role === 'assistant')
+    .slice(-4)
+    .map((message) => (String(message.content).match(/[\p{L}\p{N}'’-]+/gu) || []).slice(0, 4).join(' '))
+    .filter(Boolean);
+
+  return `- Vary sentence openings and grammatical structure across the conversation.
+- Do not use stock openings such as "I hear you", "It sounds like", or "That sounds like" merely to signal listening.
+- Prefer leading naturally with a concrete detail from the answer, a concise direct reaction, or a specific affirmation. Do not force every acknowledgement into a reflective paraphrase.
+${recentOpeners.length > 0
+  ? `- Recent assistant opening phrases were ${JSON.stringify(recentOpeners)}. Do not reuse those openings in this response.`
+  : '- There are no recent assistant openings to avoid yet.'}`;
+};
+
+const formatImageGuidance = (slide = {}) =>
+  slide.imageGuidance
+    ? `# Image Grounding
+The following is trusted, step-specific grounding for the displayed photograph:
+${JSON.stringify(slide.imageGuidance)}
+- Explicitly affirm any detail the person identified that matches confirmedDetails.
+- If an answer mixes a correct observation with a mistaken interpretation, affirm the correct part first and clarify the mismatch gently.
+- Do not validate speculation as fact, invent what the person pictured, or reveal an identity earlier than the clarification permits.`
+    : '';
 
 const getCurrentStepScript = (scriptId, slide) => {
   const scriptSections = SESSION_SCRIPTS[scriptId] || SESSION_SCRIPTS.cst_intro_reminiscence;
@@ -130,6 +162,8 @@ ${currentStepScript}
 Title: ${slide.title}
 Prompt: ${slide.prompt}
 
+${formatImageGuidance(slide)}
+
 # User
 The person's display name is ${quoteData(displayName)}.
 Today in New Zealand is ${getTodayLine()}.
@@ -160,6 +194,7 @@ ${answerState === 'repeat_question'
 Return ONLY Aria's adaptive response to the latest user message.
 - Maximum 1 sentence.
 - Always acknowledge the latest answer; when possible, mention one concrete detail from it.
+${formatAcknowledgementVarietyGuidance(recentMessages)}
 - Do not address the person by name in this response. Scripted greetings handle their name separately.
 - Do not ask a question.
 - Do not introduce a new slide or future step.
@@ -196,6 +231,8 @@ ${currentStepScript}
 Title: ${slide.title}
 Prompt: ${slide.prompt}
 
+${formatImageGuidance(slide)}
+
 # Question They Were Asked
 ${quoteData(expectedQuestion || slide.prompt)}
 
@@ -222,7 +259,7 @@ ${formatRecentMessages(recentMessages)}
 
 # Decision Rules
 ${acceptAnyAnswer
-  ? `This step accepts every non-empty response. Always use answered=true, including when the response is brief, indirect, uncertain, or declines to elaborate. Use the response and followUp fields to adapt warmly without pressuring the person.`
+  ? `This step accepts every meaningful response containing a letter or number. Use answered=true when it is brief, indirect, or uncertain, including when the response politely declines to elaborate. Punctuation alone is not an answer. Use the response and followUp fields to adapt warmly without pressuring the person.`
   : `Use answered=true when the message:
 - Directly answers the question, even briefly.
 - Gives a related memory, opinion, feeling, place, name, song, weather, or preference.
@@ -237,6 +274,7 @@ Use answered=false when the message:
 # Adaptive Response Rules
 - Maximum 1 sentence.
 - Always acknowledge the latest answer; when possible, mention one concrete detail from it.
+${formatAcknowledgementVarietyGuidance(recentMessages)}
 - Do not address the person by name. Scripted greetings handle their name separately.
 - The response field must not ask a question.
 - Do not introduce a new slide or future step.
@@ -262,8 +300,8 @@ ${followUpGuidance ? `- Step-specific focus: ${followUpGuidance}` : ''}`
 # Output
 Return only compact JSON:
 ${allowFollowUp
-  ? '{"answered":true,"response":"That sounds lovely.","followUp":"What made that especially memorable for you?"}'
-  : '{"answered":true,"response":"That sounds lovely.","followUp":null}'}
+  ? '{"answered":true,"response":"The garden was clearly a special place for you.","followUp":"What made that especially memorable for you?"}'
+  : '{"answered":true,"response":"The garden was clearly a special place for you.","followUp":null}'}
 
 The followUp value must be either one question string or null. If answered=false, followUp must be null.`;
 };
