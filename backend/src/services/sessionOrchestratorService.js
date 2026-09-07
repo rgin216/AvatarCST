@@ -12,6 +12,7 @@ import {
 import {
   buildCstAdaptiveResponseInstructions,
   buildCstAdaptiveTurnInstructions,
+  buildCstInstrumentGuessInstructions,
   buildCstNameThatTuneInstructions,
 } from './promptService.js';
 import { generateResponse } from './llmService.js';
@@ -2636,7 +2637,7 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
     const deterministicTurn = (namingSlotStep
       ? {
           answered: newlyFilledNamingSlots.length > 0 || namingSlotsComplete,
-          response: namingSlotAcknowledgement?.response || '',
+          response: '',
         }
       : null) || emotionalSupportTurn || orientationTurn || evaluateTriviaAnswer({
       step,
@@ -2738,6 +2739,43 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
     );
     if (!collapseRepeatedAdjacentSpeech(adaptiveText || '').trim()) {
       adaptiveText = `That was ${step.tuneAnswer}.`;
+    }
+  }
+
+  // The instrument-naming slide acknowledges each guessed sound with an adaptive
+  // line so speech-to-text near-misses still land; the deterministic per-slot
+  // acknowledgement is the fallback when the model returns nothing.
+  if (
+    namingSlotStep &&
+    SCRIPTED_INSTRUMENT_RULES[step.id] &&
+    userContent &&
+    hasDeliveredQuestion &&
+    newlyFilledNamingSlots.length > 0
+  ) {
+    const rules = SCRIPTED_INSTRUMENT_RULES[step.id];
+    const namedSounds = newlyFilledNamingSlots
+      .filter((slotIndex) => rules[slotIndex])
+      .map(
+        (slotIndex) =>
+          `the ${step.namingSlots.labels?.[slotIndex] || `${slotIndex + 1}`} sound is ${rules[slotIndex].label}`
+      );
+    adaptiveText = await generateResponse(
+      [
+        {
+          role: 'system',
+          content: buildCstInstrumentGuessInstructions({ recentMessages, namedSounds }),
+        },
+        { role: 'user', content: userContent },
+      ],
+      {
+        provider: llmProvider,
+        temperature: 0.4,
+        maxTokens: 80,
+        model: useFastScriptedTurn ? process.env.OPENAI_FAST_TEXT_MODEL : undefined,
+      }
+    );
+    if (!collapseRepeatedAdjacentSpeech(adaptiveText || '').trim()) {
+      adaptiveText = namingSlotAcknowledgement?.response || '';
     }
   }
 

@@ -45,6 +45,7 @@ import {
 import {
   buildCstAdaptiveResponseInstructions,
   buildCstAdaptiveTurnInstructions,
+  buildCstInstrumentGuessInstructions,
 } from './promptService.js';
 import { getScript, getScriptStep, renderScriptFollowUp, renderScriptReply } from './cstScriptService.js';
 import Message from '../models/Message.js';
@@ -647,6 +648,18 @@ test('judges each listed slot against its own fragment, not the whole message', 
     slotIndices: [0, 1],
   });
   assert.deepEqual(mixed.outcomes.map((o) => o.outcome), ['incorrect', 'correct']);
+});
+
+test('builds the instrument acknowledgement prompt from the sounds just guessed', () => {
+  const prompt = buildCstInstrumentGuessInstructions({
+    recentMessages: [{ role: 'user', content: 'first is a trumpit' }],
+    namedSounds: ['the first sound is a trumpet', 'the second sound is a bass guitar'],
+  });
+  assert.match(prompt, /the first sound is a trumpet/);
+  assert.match(prompt, /the second sound is a bass guitar/);
+  // It must not pre-empt the reveal slide.
+  assert.match(prompt, /Do not say that all three sounds are instruments/i);
+  assert.match(prompt, /misspellings, phonetic spellings and mishearings/i);
 });
 
 test('carries the Name That Tune answer on the step and in its markdown guidance', () => {
