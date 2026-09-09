@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import {
   buildSessionSummary,
   buildTopicSessionSummary,
@@ -9,9 +10,13 @@ import {
   canRequestAdaptiveFollowUp,
   collapseRepeatedAdjacentSpeech,
   createActivityRevealState,
+  createNamingSlotState,
+  parseNamingSlotAnswer,
+  buildNamingSlotPrompt,
   getRetryDecision,
   extractPreferredNameAnswer,
   evaluateAdaptiveFollowUpAnswer,
+  evaluateNamedInstrumentSlots,
   evaluateAcceptedAnswer,
   evaluateEmotionalSupportAnswer,
   evaluateImageObservationAnswer,
@@ -19,6 +24,7 @@ import {
   evaluateOrientationAnswer,
   hasMeaningfulUserContent,
   evaluateTriviaAnswer,
+  isNameThatTuneStep,
   hasSubstantialSpeechOverlap,
   inferMemorySuggestions,
   isRecordableSessionAnswer,
@@ -39,8 +45,9 @@ import {
 import {
   buildCstAdaptiveResponseInstructions,
   buildCstAdaptiveTurnInstructions,
+  buildCstInstrumentGuessInstructions,
 } from './promptService.js';
-import { getScriptStep, renderScriptFollowUp, renderScriptReply } from './cstScriptService.js';
+import { getScript, getScriptStep, renderScriptFollowUp, renderScriptReply } from './cstScriptService.js';
 import Message from '../models/Message.js';
 import Session from '../models/Session.js';
 import User from '../models/User.js';
@@ -446,6 +453,254 @@ test('gently handles uncertainty during Session 3 trivia', () => {
     response: 'No problem. Let us reveal the answer.',
     outcome: 'unsure',
   });
+});
+
+test('gives Session 4 a 31-step script aligned one-to-one with its markdown sections', () => {
+  const script = getScript('cst_sounds');
+  assert.equal(script.length, 31);
+
+  const md = readFileSync(
+    new URL('../../context/vCST_Session4_AI_Script.md', import.meta.url),
+    'utf8'
+  );
+  const sections = md.split(/\r?\n---\r?\n/).map((s) => s.trim()).filter(Boolean);
+  // One preamble section plus one section per executable step, in order.
+  assert.equal(sections.length, script.length + 1);
+
+  // Every step maps to exactly one deck slide, 1..31 with no gaps.
+  assert.deepEqual(
+    script.map((step) => step.deckSlide),
+    Array.from({ length: 31 }, (_, i) => i + 1)
+  );
+});
+
+test('ports reusable ready-state, season branching, and closing behaviour to Session 4', () => {
+  const welcomeStep = getScriptStep('cst_sounds', 0).step;
+  const seasonStep = getScriptStep('cst_sounds', 6).step;
+  const trivia1Step = getScriptStep('cst_sounds', 17).step;
+  const closingStep = getScriptStep('cst_sounds', 30).step;
+
+  assert.equal(welcomeStep.id, 'sounds_welcome');
+  assert.equal(welcomeStep.acceptAnyAnswer, true);
+  assert.deepEqual(seasonStep.seasonBranches, {
+    winter: 'sounds_season_winter',
+    summer: 'sounds_season_summer',
+    autumn: 'sounds_season_autumn',
+    spring: 'sounds_season_spring',
+  });
+  // The trivia intro was merged into the first trivia question.
+  assert.equal(trivia1Step.id, 'sounds_trivia_1');
+  assert.equal(trivia1Step.acceptAnyAnswer, true);
+  assert.match(renderScriptReply(trivia1Step, {}), /just for fun|fine to guess|alright to guess/i);
+  assert.equal(closingStep.autoCompleteAfterNarration, true);
+  assert.match(renderScriptReply(closingStep, { name: 'Sam' }), /explore Food/i);
+});
+
+test('uses distinct confirmations for the Session 4 orientation questions', () => {
+  const steps = [
+    { id: 'sounds_orientation_day' },
+    { id: 'sounds_orientation_month' },
+    { id: 'sounds_orientation_year' },
+    { id: 'sounds_orientation_season' },
+  ];
+  const responses = steps.map((step) => {
+    const type = {
+      sounds_orientation_day: 'weekday',
+      sounds_orientation_month: 'month',
+      sounds_orientation_year: 'year',
+      sounds_orientation_season: 'season',
+    }[step.id];
+    const expected = type === 'season'
+      ? ['summer', 'autumn', 'winter', 'spring'][Math.floor((new Date(new Date().toLocaleString('en-US', { timeZone: 'Pacific/Auckland' })).getMonth() + 1) / 3) % 4]
+      : new Intl.DateTimeFormat('en-NZ', {
+          ...(type === 'weekday' ? { weekday: 'long' } : {}),
+          ...(type === 'month' ? { month: 'long' } : {}),
+          ...(type === 'year' ? { year: 'numeric' } : {}),
+          timeZone: 'Pacific/Auckland',
+        }).format(new Date());
+    return evaluateOrientationAnswer({ step, content: expected, retryCount: 0 }).response;
+  });
+
+  assert.equal(new Set(responses).size, responses.length);
+});
+
+test('acknowledges correct and incorrect Session 4 sound trivia answers', () => {
+  const cases = [
+    [17, 'It is by vibrations, and about 1,200 km/hr', 'By our ears, 300 km per second'],
+    [19, 'An echo, and you cannot hear sound in space', 'A reflection, underwater'],
+  ];
+  for (const [stepIndex, correctAnswer, incorrectAnswer] of cases) {
+    const step = getScriptStep('cst_sounds', stepIndex).step;
+    const correct = evaluateTriviaAnswer({ step, content: correctAnswer });
+    const incorrect = evaluateTriviaAnswer({ step, content: incorrectAnswer });
+
+    assert.equal(correct.outcome, 'correct', step.id);
+    assert.equal(incorrect.outcome, 'incorrect', step.id);
+
+    const unsure = evaluateTriviaAnswer({ step, content: "I'm not sure" });
+    assert.equal(unsure.outcome, 'unsure', step.id);
+  }
+});
+
+test('tracks which of the three instrument sounds have been named', () => {
+  const step = getScriptStep('cst_sounds', 15).step;
+  assert.equal(step.id, 'sounds_naming_instruments');
+  assert.equal(step.namingSlots.count, 3);
+
+  let state = createNamingSlotState(step);
+  assert.deepEqual(state.filled, [false, false, false]);
+
+  // "first sound like a trumpet" -> fills slot 0 only
+  let parsed = parseNamingSlotAnswer('first sound like a trumpet', state);
+  assert.deepEqual(parsed.slots, [0]);
+  state = createNamingSlotState(step, { filled: [true, false, false] });
+
+  // "the second sound like flute, third sound like accordion" -> fills 1 and 2
+  parsed = parseNamingSlotAnswer('the second sound like flute, third sound like accordion', state);
+  assert.deepEqual(parsed.slots, [1, 2]);
+
+  // A message that names nothing fills nothing
+  assert.deepEqual(parseNamingSlotAnswer('what do i do now', state).slots, []);
+});
+
+test('fills instrument sounds in order when no ordinal is given, and handles "all three"', () => {
+  const step = getScriptStep('cst_sounds', 15).step;
+  const fresh = createNamingSlotState(step);
+
+  assert.deepEqual(parseNamingSlotAnswer('a violin', fresh).slots, [0]);
+  assert.deepEqual(parseNamingSlotAnswer('violin and then a piano', fresh).slots, [0, 1]);
+  assert.deepEqual(parseNamingSlotAnswer('they are all drums', fresh).slots, [0, 1, 2]);
+
+  const partial = createNamingSlotState(step, { filled: [true, false, false] });
+  assert.deepEqual(parseNamingSlotAnswer('the last two sound like brass', partial).slots, [1, 2]);
+});
+
+test('re-prompts only for the instrument sounds still missing', () => {
+  assert.match(buildNamingSlotPrompt(['second', 'third'], 'sound'), /second and third sounds/i);
+  assert.match(buildNamingSlotPrompt(['third'], 'sound'), /the third sound/i);
+  assert.equal(buildNamingSlotPrompt([], 'sound'), '');
+});
+
+test('gives the instrument and Name That Tune slides playable audio clips', () => {
+  const instrumentStep = getScriptStep('cst_sounds', 15).step;
+  assert.equal(instrumentStep.interaction.type, 'audioClips');
+  assert.equal(instrumentStep.interaction.clips.length, 3);
+  assert.ok(instrumentStep.interaction.clips.every((clip) => clip.id && clip.src));
+
+  for (const stepIndex of [22, 23, 24, 25, 26]) {
+    const step = getScriptStep('cst_sounds', stepIndex).step;
+    assert.equal(step.interaction.type, 'audioClips', step.id);
+    assert.equal(step.interaction.clips.length, 1, step.id);
+  }
+});
+
+test('acknowledges instrument-sound guesses leniently, by family', () => {
+  const step = getScriptStep('cst_sounds', 15).step;
+  assert.equal(step.id, 'sounds_naming_instruments');
+
+  // Right family counts, even loosely.
+  assert.equal(
+    evaluateNamedInstrumentSlots({ step, content: 'the first one is a trumpet', slotIndices: [0] }).outcomes[0].outcome,
+    'correct'
+  );
+  assert.equal(
+    evaluateNamedInstrumentSlots({ step, content: 'sounds like a plucked bass', slotIndices: [1] }).outcomes[0].outcome,
+    'correct'
+  );
+  assert.equal(
+    evaluateNamedInstrumentSlots({ step, content: 'a church organ maybe', slotIndices: [2] }).outcomes[0].outcome,
+    'correct'
+  );
+
+  // Wrong family is gently flagged, unsure is neither.
+  const wrong = evaluateNamedInstrumentSlots({ step, content: 'a flute', slotIndices: [0] });
+  assert.equal(wrong.outcomes[0].outcome, 'incorrect');
+  assert.match(wrong.response, /fair guess/i);
+
+  const unsure = evaluateNamedInstrumentSlots({ step, content: "I'm not sure", slotIndices: [1] });
+  assert.equal(unsure.outcomes[0].outcome, 'unsure');
+
+  // A single message naming several slots is scored per slot.
+  const many = evaluateNamedInstrumentSlots({
+    step,
+    content: 'second is a bass, third is an organ',
+    slotIndices: [1, 2],
+  });
+  assert.deepEqual(many.outcomes.map((o) => o.outcome), ['correct', 'correct']);
+
+  // Non naming steps are ignored.
+  assert.equal(
+    evaluateNamedInstrumentSlots({ step: { id: 'sounds_weather' }, content: 'trumpet', slotIndices: [0] }),
+    null
+  );
+});
+
+test('judges each listed slot against its own fragment, not the whole message', () => {
+  const step = getScriptStep('cst_sounds', 15).step;
+  assert.equal(step.id, 'sounds_naming_instruments');
+
+  // One reply naming two slots: slot 0 is a wrong "drum" guess, slot 1 is a
+  // right "bass" guess. The word "horn" sits in slot 1's fragment and must not
+  // leak across to mark slot 0 (the trumpet family) correct.
+  const mixed = evaluateNamedInstrumentSlots({
+    step,
+    content: 'the first is a drum and the second is a bass, lower than a horn',
+    slotIndices: [0, 1],
+  });
+  assert.deepEqual(mixed.outcomes.map((o) => o.outcome), ['incorrect', 'correct']);
+});
+
+test('builds the instrument acknowledgement prompt from the sounds just guessed', () => {
+  const prompt = buildCstInstrumentGuessInstructions({
+    recentMessages: [{ role: 'user', content: 'first is a trumpit' }],
+    namedSounds: ['the first sound is a trumpet', 'the second sound is a bass guitar'],
+  });
+  assert.match(prompt, /the first sound is a trumpet/);
+  assert.match(prompt, /the second sound is a bass guitar/);
+  // It must not pre-empt the reveal slide.
+  assert.match(prompt, /Do not say that all three sounds are instruments/i);
+  assert.match(prompt, /misspellings, phonetic spellings and mishearings/i);
+});
+
+test('carries the Name That Tune answer on the step and in its markdown guidance', () => {
+  const md = readFileSync(
+    new URL('../../context/vCST_Session4_AI_Script.md', import.meta.url),
+    'utf8'
+  );
+  const expected = [
+    [22, 'sounds_name_that_tune_1950s', 'Jailhouse Rock', 'Elvis Presley'],
+    [23, 'sounds_name_that_tune_1960s', 'Sympathy for the Devil', 'The Rolling Stones'],
+    [24, 'sounds_name_that_tune_motown', 'Superstition', 'Stevie Wonder'],
+    [25, 'sounds_name_that_tune_classical', 'Für Elise', 'Beethoven'],
+  ];
+
+  for (const [index, id, title, artist] of expected) {
+    const step = getScriptStep('cst_sounds', index).step;
+    assert.equal(step.id, id);
+    assert.equal(isNameThatTuneStep(step), true, id);
+    assert.equal(step.tuneAnswer, `${title}, by ${artist}`);
+    // The step reply asks for a guess without giving the answer away.
+    assert.doesNotMatch(renderScriptReply(step, {}), new RegExp(title, 'i'));
+    // The markdown guidance names the answer for the acknowledgement prompt.
+    assert.ok(md.includes(title) && md.includes(artist), id);
+  }
+  // Guidance is about judging garbled speech-to-text guesses by sound.
+  assert.match(md, /Judge (?:their|the) guess by (?:how it sounds|sound)/i);
+
+  assert.equal(isNameThatTuneStep(getScriptStep('cst_sounds', 26).step), false);
+});
+
+test('summarises Session 4 sound activities', () => {
+  const summary = buildTopicSessionSummary([
+    { stepId: 'sounds_naming_instruments', answer: 'That one sounded like a violin.' },
+    { stepId: 'sounds_name_that_tune_1950s', answer: 'I think that is an Elvis song.' },
+    { stepId: 'sounds_onomatopoeia', answer: 'Boom, crash, and hiss.' },
+    { stepId: 'sounds_spin_question', answer: 'I loved listening to the radio in the evenings.' },
+  ]);
+
+  assert.match(summary, /naming instruments/i);
+  assert.match(summary, /Name That Tune/i);
+  assert.match(summary, /sound words/i);
 });
 
 test('recognises button, typed, and spoken music completion answers', () => {

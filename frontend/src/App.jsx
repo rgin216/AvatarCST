@@ -67,8 +67,14 @@ const TEST_SESSIONS = [
     title: "Physical Games",
     theme: "Physical Games",
   },
-  ...Array.from({ length: 2 }, (_, i) => {
-    const n = i + 4;
+  {
+    id: "cst_sounds",
+    label: "Session 4",
+    title: "Sounds",
+    theme: "Sounds",
+  },
+  ...Array.from({ length: 1 }, (_, i) => {
+    const n = i + 5;
     return {
       id: `placeholder_session_${n}`,
       label: `Session ${n}`,
