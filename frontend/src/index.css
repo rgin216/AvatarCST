@@ -1529,3 +1529,8 @@ body {
     font-size: 12px;
   }
 }
+
+.real-ai-choices { position:absolute; bottom:1rem; left:0; right:0; display:flex; justify-content:center; gap:1rem; z-index:3; }
+.real-ai-choices button { padding:.7rem 1.2rem; min-height:48px; border:2px solid #275f72; border-radius:10px; background:white; color:#193943; font:inherit; cursor:pointer; }
+.real-ai-choices button:hover, .real-ai-choices button:focus-visible { background:#fff0b5; outline:3px solid #e7b738; }
+.real-ai-choices button:disabled { opacity:.6; cursor:wait; }

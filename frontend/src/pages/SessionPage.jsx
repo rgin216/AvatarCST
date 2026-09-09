@@ -1,3 +1,4 @@
+import MatchingActivity from "../components/MatchingActivity.jsx";
 import { useEffect, useRef, useState } from "react";
 import AvatarViewer from "../components/avatar/AvatarViewer";
 import api from "../services/api.js";
@@ -295,12 +296,14 @@ export default function SessionPage({
     INACTIVITY_TIMEOUT_MS,
     Number(slide.inactivityTimeoutMs) || 0
   );
+  const matchingInteraction = slide.interaction?.type === "matching" ? slide.interaction : null;
+  const realOrAiInteraction = slide.interaction?.type === "realOrAi";
   const hasSlideInteraction =
     hasWheelInteraction ||
     Boolean(exerciseVideo) ||
     hasPositiveNewsInteraction ||
     Boolean(musicInteraction) ||
-    hasActivityRevealInteraction;
+    hasActivityRevealInteraction || Boolean(matchingInteraction);
   const landedWheelResult = questionWheel?.status === "landed" ? questionWheel : null;
   const sessionInputDisabled =
     typing ||
@@ -1532,6 +1535,10 @@ export default function SessionPage({
               </footer>
             </div>
           )}
+          {matchingInteraction && <MatchingActivity key={slide.id || slide.index} interaction={matchingInteraction} title={slide.title} disabled={sessionInputDisabled} onComplete={sendMessage} />}
+          {realOrAiInteraction && <div className="real-ai-choices" aria-label="Choose your guess">
+            {['Real person', 'AI generated', 'Not sure'].map((answer) => <button type="button" key={answer} disabled={sessionInputDisabled} onClick={() => sendMessage(answer)}>{answer}</button>)}
+          </div>}
           {hasWheelInteraction && (
             <div className="slide-wheel-overlay">
               <div className="slide-wheel-pointer" aria-hidden="true" />

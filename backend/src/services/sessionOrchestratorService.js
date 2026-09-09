@@ -67,6 +67,10 @@ const UNSAFE_MEMORY_PATTERNS = [
   /\b(?:self[- ]harm|suicid(?:e|al)|sexual assault|rape|abuse)\b/i,
 ];
 const ORIENTATION_STEP_TYPES = {
+  faces_scenes_orientation_day: 'weekday',
+  faces_scenes_orientation_month: 'month',
+  faces_scenes_orientation_year: 'year',
+  faces_scenes_orientation_season: 'season',
   childhood_orientation_day: 'weekday',
   childhood_orientation_month: 'month',
   childhood_orientation_year: 'year',
@@ -1274,6 +1278,15 @@ export const buildTopicSessionSummary = (answers = [], { themeSong = null } = {}
     if (topic && !topics.includes(topic)) topics.push(topic);
   };
 
+  for (const [pattern, topic] of [
+    [/^faces_scenes_match_/, 'matching descriptions to famous people'],
+    [/^faces_scenes_(celebrities|people)_/, 'comparing similarities and differences between people'],
+    [/^faces_scenes_(scene_preference|landmarks|queen_street)$/, 'exploring scenes and how Queen Street has changed'],
+    [/^faces_scenes_real_ai_\d+$/, 'trying real-or-AI picture guesses'],
+  ]) {
+    if (meaningful.some((item) => pattern.test(item.stepId))) addTopic(topic);
+  }
+
   if (meaningful.some((item) => item.stepId === 'theme_song_choice')) {
     const trackName = String(themeSong?.track?.name || '').trim();
     const artistName = String(themeSong?.track?.artistLabel || '').trim();
@@ -1311,6 +1324,7 @@ export const buildTopicSessionSummary = (answers = [], { themeSong = null } = {}
   }
 
   for (const item of meaningful) {
+    if (item.stepId?.startsWith('faces_scenes_')) continue;
     if ([
       'introduce_yourself',
       'what_is_cst',
@@ -1375,7 +1389,7 @@ export const buildTopicSessionSummary = (answers = [], { themeSong = null } = {}
   ].includes(item.stepId))) {
     addTopic('exploring the Auckland Harbour Bridge and its future');
   }
-  const wheelAnswer = meaningful.find((item) => item.stepId === 'current_affairs_spin_question');
+  const wheelAnswer = meaningful.find((item) => ['current_affairs_spin_question', 'faces_scenes_spin_question'].includes(item.stepId));
   let wheelTopic = '';
   if (wheelAnswer) {
     const wheelText = `${wheelAnswer.answer || ''} ${wheelAnswer.adaptiveFollowUp?.answer || ''}`;
@@ -2363,6 +2377,7 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
     : null;
   let themeSong = getThemeSongForSession(session, user);
   const scriptContext = {
+    previousAnswer: userContent,
     name: getDisplayName(user),
     wheelQuestion: wheelEvent?.question || session.interactionState?.questionWheel?.question,
     currentAffairs,

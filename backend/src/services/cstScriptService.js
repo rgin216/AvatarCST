@@ -1,8 +1,11 @@
+import { createFacesScenesScript } from './facesScenesScript.js';
+
 ﻿const scriptSlideFolders = {
   cst_intro_reminiscence: 'session1',
   cst_childhood: 'session2',
   cst_physical_games: 'session3',
   cst_current_affairs: 'session6',
+  cst_faces_scenes: 'session7',
 };
 
 const adaptiveConversation = (guidance) => ({
@@ -1734,6 +1737,8 @@ const scripts = {
     },
   ],
 };
+
+scripts.cst_faces_scenes = createFacesScenesScript(scripts.cst_current_affairs);
 
 export const getScript = (scriptId = 'cst_intro_reminiscence') =>
   scripts[scriptId] || scripts.cst_intro_reminiscence;

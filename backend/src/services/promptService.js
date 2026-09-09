@@ -17,6 +17,9 @@ const BASE_INSTRUCTIONS = readFileSync(
 //   2. Add an entry here using the same scriptId set on the Session document
 //   3. The fallback is cst_intro_reminiscence if no match is found
 const SESSION_SCRIPTS = {
+  cst_faces_scenes: readFileSync(
+    join(CONTEXT_ROOT, 'vCST_Session7_AI_Script.md'), 'utf8'
+  ).split(/\r?\n---\r?\n/).map((s) => s.trim()).filter(Boolean),
   cst_intro_reminiscence: readFileSync(
     join(CONTEXT_ROOT, 'vCST_Session1_AI_Script.md'),
     'utf8'
