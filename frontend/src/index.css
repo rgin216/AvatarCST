@@ -36,6 +36,11 @@ body {
   0%   { transform: scale(0.8); opacity: 0.6; }
   100% { transform: scale(2.2); opacity: 0; }
 }
+@keyframes audioclipPulse {
+  0%   { transform: scale(1);    opacity: 0.55; }
+  70%  { opacity: 0; }
+  100% { transform: scale(1.26); opacity: 0; }
+}
 @keyframes typing {
   0%, 60%, 100% { opacity: 0.3; }
   30%            { opacity: 1; }
@@ -278,6 +283,38 @@ body {
   overflow: hidden;
 }
 
+.slide-loading-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #1D2A32;
+  border-radius: 8px;
+}
+
+.session-loading-spinner {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 3px solid rgba(255, 255, 255, 0.18);
+  border-top-color: #F4C8B0;
+  animation: session-loading-spin 0.8s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .session-loading-spinner {
+    animation: none;
+  }
+}
+
+@keyframes session-loading-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .session-topbar {
   height: 62px;
   padding: 0 24px;
@@ -441,6 +478,11 @@ body {
 .ppt-slide.has-music-interaction {
   border-top: 10px solid #1DB954;
   background: #EEF4EF;
+}
+
+.ppt-slide.has-audioclips-interaction {
+  border-top: 10px solid #7A54D6;
+  background: #F2EEF9;
 }
 
 .ppt-slide.has-activity-reveal-interaction {
@@ -609,6 +651,171 @@ body {
 .slide-activity-done:disabled {
   cursor: default;
   opacity: 0.55;
+}
+
+.slide-audioclips-overlay {
+  position: absolute;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Multi-clip (e.g. slide 16): a small opaque patch sitting only over the slide's
+   own "Audio 1/2/3" artwork and their labels, so those non-functional buttons
+   cannot be clicked. Tuned to the slide-16 image; nudge these four offsets if
+   the deck changes so the patch hugs the fake buttons and nothing else. */
+.slide-audioclips-overlay.is-panel {
+  left: 14.5%;
+  right: 44%;
+  top: 38%;
+  bottom: 30%;
+  padding: clamp(4px, 1.2cqh, 12px);
+  background: #fff;
+}
+
+/* Single clip (Name That Tune / modern music): a theme-song-style card with the
+   mp3 player where the album artwork would sit. */
+.slide-audioclips-overlay.is-single {
+  inset: clamp(40px, 6cqh, 74px) clamp(26px, 4cqw, 60px);
+  z-index: 2;
+  display: grid;
+  grid-template-columns: minmax(160px, 0.62fr) minmax(0, 1.38fr);
+  align-items: center;
+  gap: clamp(24px, 5cqw, 60px);
+  padding: clamp(20px, 4cqw, 56px);
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: 0 22px 56px rgba(22, 34, 29, 0.22);
+  overflow: hidden;
+}
+
+.slide-audioclips-overlay.is-single .slide-audioclips-row {
+  justify-self: end;
+}
+
+.slide-audioclip-details {
+  min-width: 0;
+  color: #1c1730;
+}
+
+.slide-audioclips-overlay.is-single .slide-music-eyebrow {
+  color: #5B3E9E;
+}
+
+.ppt-slide .slide-audioclip-details h1 {
+  max-width: 20ch;
+  margin: 0;
+  color: #1c1730;
+  font-family: Nunito, sans-serif;
+  font-size: clamp(28px, 4cqw, 56px);
+  line-height: 1.05;
+}
+
+.ppt-slide .slide-audioclip-prompt {
+  margin: clamp(6px, 1.4cqh, 14px) 0 0;
+  color: #2c2740;
+  font-size: clamp(15px, 1.7cqw, 24px);
+  font-weight: 600;
+}
+
+.slide-audioclip-status {
+  margin: clamp(10px, 2cqh, 20px) 0 0;
+  max-width: 36ch;
+  font-size: clamp(13px, 1.3cqw, 18px);
+  color: #6b6480;
+}
+
+.slide-audioclips-overlay.is-single .slide-audioclip-label {
+  margin-top: 0.5em;
+  color: #5B3E9E;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.slide-audioclips-row {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: flex-start;
+  justify-content: center;
+  gap: clamp(6px, 2cqw, 20px);
+}
+
+.slide-audioclip-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: clamp(6px, 1.4cqh, 12px);
+  min-width: 0;
+}
+
+.slide-audioclip {
+  display: grid;
+  place-items: center;
+  width: clamp(40px, 8cqw, 82px);
+  height: clamp(40px, 8cqw, 82px);
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: linear-gradient(140deg, #3E8BEF 0%, #7A54D6 100%);
+  color: #fff;
+  cursor: pointer;
+  box-shadow: 0 10px 24px rgba(34, 40, 96, 0.32);
+  transition: transform 0.14s ease, box-shadow 0.14s ease, filter 0.14s ease;
+}
+
+.slide-audioclip:hover,
+.slide-audioclip:focus-visible {
+  transform: translateY(-2px);
+  box-shadow: 0 14px 30px rgba(34, 40, 96, 0.4);
+  outline: none;
+}
+
+.slide-audioclip.is-playing {
+  filter: brightness(0.92);
+  box-shadow: 0 0 0 4px rgba(122, 84, 214, 0.35), 0 10px 24px rgba(34, 40, 96, 0.32);
+}
+
+.slide-audioclip-lg {
+  position: relative;
+  width: clamp(118px, 23cqw, 232px);
+  height: clamp(118px, 23cqw, 232px);
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 4px rgba(255, 255, 255, 0.85), 0 16px 40px rgba(34, 40, 96, 0.34);
+}
+
+.slide-audioclip-lg .slide-audioclip-glyph {
+  width: 36%;
+  height: 36%;
+}
+
+/* An outward pulse so the disc clearly reads as a tappable control while idle. */
+.slide-audioclip-lg:not(.is-playing)::after {
+  content: "";
+  position: absolute;
+  inset: -8px;
+  border-radius: 50%;
+  border: 3px solid rgba(122, 84, 214, 0.55);
+  animation: audioclipPulse 2s ease-out infinite;
+  pointer-events: none;
+}
+
+.slide-audioclip-lg.is-playing {
+  box-shadow: inset 0 0 0 4px rgba(255, 255, 255, 0.85),
+    0 0 0 6px rgba(122, 84, 214, 0.32), 0 16px 40px rgba(34, 40, 96, 0.34);
+}
+
+.slide-audioclip-glyph {
+  width: 42%;
+  height: 42%;
+  fill: currentColor;
+}
+
+.slide-audioclip-label {
+  font-size: clamp(0.72rem, 1.7cqh, 0.95rem);
+  font-weight: 600;
+  color: #202124;
+  text-align: center;
 }
 
 .slide-music-overlay {
@@ -956,7 +1163,60 @@ body {
 .slide-video-frame-shell {
   height: 100%;
   max-width: 100%;
-  aspect-ratio: 9 / 16;
+  aspect-ratio: var(--video-aspect-ratio, 9 / 16);
+}
+
+/* A landscape (16:9) exercise video is much wider than tall, so it no longer
+   fits beside the instructions as a portrait Short does - stack a compact
+   instructions block above the player, and let the player fill whatever space
+   is left over (constrained on both axes so it always stays inside the slide,
+   never overflowing under the header or over the Done button). */
+.slide-video-overlay.is-landscape-video {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
+  justify-items: center;
+  align-items: center;
+  row-gap: clamp(10px, 1.6cqh, 18px);
+}
+
+.slide-video-overlay.is-landscape-video .slide-video-ready {
+  width: min(560px, 100%);
+}
+
+.slide-video-overlay.is-landscape-video .slide-video-ready .slide-video-eyebrow {
+  margin-bottom: 4px;
+  font-size: clamp(11px, 1.1cqw, 15px);
+}
+
+.slide-video-overlay.is-landscape-video .slide-video-ready h1 {
+  margin-bottom: 4px;
+  font-size: clamp(22px, 3cqw, 34px);
+}
+
+.slide-video-overlay.is-landscape-video .slide-video-ready > p:not(.slide-video-eyebrow) {
+  margin-bottom: 6px;
+  font-size: clamp(14px, 1.6cqw, 19px);
+}
+
+.slide-video-overlay.is-landscape-video .slide-video-ready small {
+  margin-top: 6px;
+  font-size: clamp(11px, 1.1cqw, 14px);
+}
+
+.slide-video-overlay.is-landscape-video .slide-video-status {
+  margin-top: 4px;
+  min-height: 1.2em;
+}
+
+.slide-video-overlay.is-landscape-video .slide-video-ready .slide-media-done {
+  margin-top: clamp(8px, 1.2cqh, 14px);
+}
+
+.slide-video-overlay.is-landscape-video .slide-video-frame-shell {
+  width: 100%;
+  height: auto;
+  max-width: 100%;
+  max-height: 100%;
 }
 
 .slide-video-player-mount {
@@ -1422,6 +1682,21 @@ body {
 
   .ppt-slide.has-activity-reveal-interaction {
     min-height: 620px;
+  }
+
+  .ppt-slide.has-audioclips-interaction {
+    min-height: 520px;
+  }
+
+  .slide-audioclips-overlay.is-single {
+    grid-template-columns: 1fr;
+    justify-items: center;
+    gap: 18px;
+    overflow: auto;
+  }
+
+  .slide-audioclips-overlay.is-single .slide-audioclips-row {
+    justify-self: center;
   }
 
   .slide-activity-overlay {
