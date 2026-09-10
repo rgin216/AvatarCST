@@ -8,16 +8,19 @@ import {
 } from "../utils/lipSync.js";
 import theme from "../utils/theme";
 
+// Placeholder shown only until the real opening slide for this session loads -
+// intentionally has no imageUrl/title/bullets from any specific session, so the
+// first paint never flashes another session's slide before snapping to this one.
 const defaultSlide = {
   index: 0,
-  total: 8,
-  deckSlide: 1,
-  imageUrl: "/slides/session1/slide-01.jpg",
-  title: "AI-supported Individual Cognitive Stimulation Therapy",
-  subtitle: "Session 1: Introduction & Welcome",
-  prompt: "How are you feeling right now?",
-  bullets: ["Introduction & Welcome", "AI-supported CST", "University of Auckland"],
-  visualHint: "Source deck: NZ01. Welcome, slide 1",
+  total: 1,
+  deckSlide: null,
+  imageUrl: "",
+  title: "",
+  subtitle: "",
+  prompt: "",
+  bullets: [],
+  visualHint: "",
   accent: "#00AEEF",
 };
 
@@ -193,6 +196,7 @@ export default function SessionPage({
   pipelineMode: initialPipelineMode = "free",
   defaultAvatarMode = "male",
 }) {
+  const [sessionReady, setSessionReady] = useState(false);
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [isRecording, setIsRecording] = useState(false);
@@ -274,6 +278,8 @@ export default function SessionPage({
   const hasWheelInteraction = wheelOptions.length > 0;
   const exerciseVideo = slide.interaction?.type === "youtubeShort" ? slide.interaction : null;
   const exerciseVideoId = exerciseVideo?.videoId || null;
+  const exerciseVideoIsLandscape = exerciseVideo?.orientation === "landscape";
+  const exerciseVideoAspectRatio = exerciseVideo?.aspectRatio || (exerciseVideoIsLandscape ? "16 / 9" : "9 / 16");
   const exerciseAwaitingCompletion =
     Boolean(exerciseVideo) && exercisePlayback?.status !== "complete";
   const hasPositiveNewsInteraction = slide.interaction?.type === "positiveNews";
@@ -874,6 +880,7 @@ export default function SessionPage({
         setMessages([{ from: "avatar", text: fallback }]);
       } finally {
         setTyping(false);
+        setSessionReady(true);
       }
     };
 
@@ -1520,6 +1527,11 @@ export default function SessionPage({
             backgroundImage: slide.imageUrl && !hasSlideInteraction ? `url(${slide.imageUrl})` : undefined,
           }}
         >
+          {!sessionReady && (
+            <div className="slide-loading-overlay" aria-label="Preparing your session">
+              <div className="session-loading-spinner" />
+            </div>
+          )}
           <div className="ppt-slide-progress">
             Session step {slide.index + 1} / {slide.total}
             {slide.deckSlide ? ` / Deck slide ${slide.deckSlide}` : ""}
@@ -1616,7 +1628,7 @@ export default function SessionPage({
             </div>
           )}
           {exerciseVideo && (
-            <div className="slide-video-overlay">
+            <div className={`slide-video-overlay${exerciseVideoIsLandscape ? " is-landscape-video" : ""}`}>
               <div className="slide-video-ready">
                 <p className="slide-video-eyebrow">Seated exercise</p>
                 <h1>Ready to move?</h1>
@@ -1640,7 +1652,10 @@ export default function SessionPage({
                   Done
                 </button>
               </div>
-              <div className="slide-video-frame-shell">
+              <div
+                className="slide-video-frame-shell"
+                style={{ "--video-aspect-ratio": exerciseVideoAspectRatio }}
+              >
                 <div className="slide-video-player-mount" ref={videoMountRef} />
               </div>
             </div>

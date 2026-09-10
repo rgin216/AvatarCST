@@ -1,58 +1,17 @@
-﻿const scriptSlideFolders = {
+﻿import {
+  adaptiveConversation,
+  adaptiveReminiscence,
+  seatedExerciseInteraction,
+  spotifySongInteraction,
+} from './cstScriptHelpers.js';
+import { buildStandardSessionOpening } from './cstSessionOpening.js';
+
+const scriptSlideFolders = {
   cst_intro_reminiscence: 'session1',
   cst_childhood: 'session2',
   cst_physical_games: 'session3',
   cst_sounds: 'session4',
   cst_current_affairs: 'session6',
-};
-
-const adaptiveConversation = (guidance) => ({
-  enabled: true,
-  guidance,
-});
-
-const adaptiveReminiscence = adaptiveConversation;
-
-const seatedExerciseInteraction = {
-  type: 'youtubeShort',
-  videoId: 'xVdKRNiAmqI',
-  videoUrl: 'https://www.youtube.com/shorts/xVdKRNiAmqI',
-  completionPrompt: 'When you are finished, press Done, or say or type "done" to continue.',
-};
-
-const spotifySongInteraction = ({ summarizeOnComplete = false } = {}) => ({
-  type: 'spotifySong',
-  playbackSeconds: 60,
-  ...(summarizeOnComplete ? { summarizeOnComplete: true } : {}),
-});
-
-const getCurrentNzYear = () => new Intl.DateTimeFormat('en-NZ', {
-  year: 'numeric',
-  timeZone: 'Pacific/Auckland',
-}).format(new Date());
-
-const orientationRevealReply = ({ answer, detail, context = {} }) => {
-  const normalizedAnswer = String(answer).toLowerCase();
-  const suppliedAnswer = String(context.orientationAnswer || '').toLowerCase();
-
-  if (context.orientationOutcome === 'correct') {
-    return `Yes, ${answer} is right. ${detail}`;
-  }
-  if (
-    context.orientationOutcome === 'incorrect' &&
-    normalizedAnswer === 'spring' &&
-    /\bwinter\b/.test(suppliedAnswer)
-  ) {
-    return `Winter was an understandable answer because the seasons have only just changed. It is spring now. ${detail}`;
-  }
-  if (context.orientationOutcome === 'incorrect') {
-    return `That was a reasonable try. It is ${answer}. ${detail}`;
-  }
-  if (context.orientationOutcome === 'unsure') {
-    return `No problem. It is ${answer}. ${detail}`;
-  }
-
-  return `It is ${answer}. ${detail}`;
 };
 
 const physicalGamesWheelOptions = [
@@ -597,252 +556,47 @@ const scripts = {
     },
   ],
   cst_current_affairs: [
-    {
-      id: 'current_affairs_welcome',
-      turns: 1,
-      acceptAnyAnswer: true,
-      deckSlide: 1,
-      title: 'Virtual Cognitive Stimulation Therapy',
-      subtitle: 'Session 6: Current Affairs',
-      prompt: 'Welcome back',
-      bullets: ['Session 6', 'Current Affairs'],
-      visualHint: 'Source deck: NZ06. Current Affairs, slide 1',
-      accent: '#00AEEF',
-      reply: ({ name }) =>
-        `Welcome back, ${name}. It is lovely to see you again. Today is our sixth session, and our theme is Current Affairs. We will look at how news reaches us and explore a few photographs together. There are no tests, and your ideas are what matter. When you are ready, say "I'm ready" to begin.`,
-    },
-    {
-      id: 'current_affairs_opening_song',
-      turns: 1,
-      deckSlide: 2,
-      title: 'Welcome Back',
-      subtitle: 'Your theme song',
-      prompt: 'Listen to your theme song',
-      bullets: ['Welcome back', 'Theme song'],
-      visualHint: 'Source deck: NZ06. Current Affairs, slide 2',
-      accent: '#F47C20',
-      interaction: spotifySongInteraction(),
-      recordAnswer: false,
-      reply: ({ themeSong }) =>
-        themeSong?.status === 'available'
-          ? `Let us begin with your theme song, ${themeSong.track.name} by ${themeSong.track.artistLabel}. It can play for up to one minute. When you have finished listening, press Done, or say or type done.`
-          : 'I could not find a saved theme song this time. Press Done, or say or type done, when you are ready to continue.',
-    },
-    {
-      id: 'current_affairs_check_in',
-      turns: 1,
-      deckSlide: 3,
-      title: 'Check-in',
-      subtitle: 'How are you doing today?',
-      prompt: 'How are you doing today?',
-      bullets: ['Take your time', 'Share as much as you like'],
-      visualHint: 'Source deck: NZ06. Current Affairs, slide 3',
-      accent: '#F47C20',
-      adaptiveFollowUp: adaptiveConversation(
-        'If they share a positive or neutral feeling with some personal detail, invite one concrete detail about what shaped their day. Do not follow up if they seem tired, distressed, or ready to continue.'
-      ),
-      reply: () => 'Before we begin, how are you doing today?',
-    },
-    {
-      id: 'current_affairs_orientation_day',
-      turns: 1,
-      deckSlide: 4,
-      title: 'What day of the week is it?',
-      subtitle: 'Getting our bearings',
-      prompt: 'What day of the week is it?',
-      bullets: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'],
-      visualHint: 'Source deck: NZ06. Current Affairs, slide 4',
-      accent: '#7A9DAD',
-      reply: () => 'Let us get our bearings together. Do you happen to know what day of the week it is?',
-    },
-    {
-      id: 'current_affairs_orientation_month',
-      turns: 1,
-      deckSlide: 5,
-      title: 'What month are we enjoying?',
-      subtitle: 'Getting our bearings',
-      prompt: 'What month are we enjoying?',
-      bullets: ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'],
-      visualHint: 'Source deck: NZ06. Current Affairs, slide 5',
-      accent: '#00AEEF',
-      reply: () => 'And what month are we enjoying at the moment?',
-    },
-    {
-      id: 'current_affairs_orientation_year',
-      turns: 1,
-      deckSlide: 6,
-      title: 'What year is it?',
-      subtitle: 'Getting our bearings',
-      prompt: 'What year is it?',
-      bullets: ['Year', 'Calendar', 'No pressure'],
-      visualHint: 'Source deck: NZ06. Current Affairs, slide 6',
-      accent: '#F4C8B0',
-      reply: () => 'And do you happen to know what year it is?',
-    },
-    {
-      id: 'current_affairs_orientation_year_reveal',
-      turns: 1,
-      deckSlide: 7,
-      get title() { return getCurrentNzYear(); },
-      subtitle: 'The year we are enjoying',
-      get prompt() { return getCurrentNzYear(); },
-      get bullets() { return [getCurrentNzYear()]; },
-      visualHint: 'Source deck: NZ06. Current Affairs, slide 7',
-      accent: '#4472C4',
-      interaction: { type: 'autoAdvance' },
-      isAnswerReveal: true,
-      recordAnswer: false,
-      reply: (context) => {
-        const year = context.orientationExpectedAnswer || getCurrentNzYear();
-        return orientationRevealReply({
-          answer: year,
-          detail: 'We can keep that date in view as we continue.',
-          context,
-        });
+    ...buildStandardSessionOpening({
+      prefix: 'current_affairs',
+      deckLabel: 'NZ06. Current Affairs',
+      welcome: {
+        title: 'Virtual Cognitive Stimulation Therapy',
+        sessionNumber: 6,
+        sessionTitle: 'Current Affairs',
+        reply: ({ name }) =>
+          `Welcome back, ${name}. It is lovely to see you again. Today is our sixth session, and our theme is Current Affairs. We will look at how news reaches us and explore a few photographs together. There are no tests, and your ideas are what matter. When you are ready, say "I'm ready" to begin.`,
       },
-    },
-    {
-      id: 'current_affairs_orientation_season',
-      turns: 1,
-      deckSlide: 8,
-      title: 'Which season are we enjoying?',
-      subtitle: 'Getting our bearings',
-      prompt: 'Which season are we enjoying?',
-      bullets: ['Winter', 'Summer', 'Autumn', 'Spring'],
-      visualHint: 'Source deck: NZ06. Current Affairs, slide 8',
-      accent: '#A8C5A0',
-      seasonBranches: {
-        winter: 'current_affairs_season_winter',
-        summer: 'current_affairs_season_summer',
-        autumn: 'current_affairs_season_autumn',
-        spring: 'current_affairs_season_spring',
+      themeSong: {
+        title: 'Welcome Back',
+        subtitle: 'Your theme song',
+        bullets: ['Welcome back', 'Theme song'],
+        reply: ({ themeSong }) =>
+          themeSong?.status === 'available'
+            ? `Let us begin with your theme song, ${themeSong.track.name} by ${themeSong.track.artistLabel}. It can play for up to one minute. When you have finished listening, press Done, or say or type done.`
+            : 'I could not find a saved theme song this time. Press Done, or say or type done, when you are ready to continue.',
       },
-      reply: () => 'Which season are we enjoying here in New Zealand?',
-    },
-    {
-      id: 'current_affairs_season_winter',
-      turns: 1,
-      deckSlide: 9,
-      title: 'Winter',
-      subtitle: 'The season we are enjoying',
-      prompt: 'Winter',
-      bullets: ['Cool weather', 'Shorter days'],
-      visualHint: 'Source deck: NZ06. Current Affairs, slide 9',
-      accent: '#7A9DAD',
-      interaction: { type: 'autoAdvance' },
-      isAnswerReveal: true,
-      nextStepId: 'current_affairs_weather',
-      recordAnswer: false,
-      reply: (context) => orientationRevealReply({
-        answer: 'winter',
-        detail: 'Winter brings cooler weather and shorter days.',
-        context,
-      }),
-    },
-    {
-      id: 'current_affairs_season_summer',
-      turns: 1,
-      deckSlide: 10,
-      title: 'Summer',
-      subtitle: 'The season we are enjoying',
-      prompt: 'Summer',
-      bullets: ['Warm weather', 'Longer days'],
-      visualHint: 'Source deck: NZ06. Current Affairs, slide 10',
-      accent: '#F47C20',
-      interaction: { type: 'autoAdvance' },
-      isAnswerReveal: true,
-      nextStepId: 'current_affairs_weather',
-      recordAnswer: false,
-      reply: (context) => orientationRevealReply({
-        answer: 'summer',
-        detail: 'Summer brings warmer weather and longer days.',
-        context,
-      }),
-    },
-    {
-      id: 'current_affairs_season_autumn',
-      turns: 1,
-      deckSlide: 11,
-      title: 'Autumn',
-      subtitle: 'The season we are enjoying',
-      prompt: 'Autumn',
-      bullets: ['Changing leaves', 'Cooler days'],
-      visualHint: 'Source deck: NZ06. Current Affairs, slide 11',
-      accent: '#F4C8B0',
-      interaction: { type: 'autoAdvance' },
-      isAnswerReveal: true,
-      nextStepId: 'current_affairs_weather',
-      recordAnswer: false,
-      reply: (context) => orientationRevealReply({
-        answer: 'autumn',
-        detail: 'In autumn, the leaves change and the days begin to cool.',
-        context,
-      }),
-    },
-    {
-      id: 'current_affairs_season_spring',
-      turns: 1,
-      deckSlide: 12,
-      title: 'Spring',
-      subtitle: 'The season we are enjoying',
-      prompt: 'Spring',
-      bullets: ['New growth', 'Warmer days'],
-      visualHint: 'Source deck: NZ06. Current Affairs, slide 12',
-      accent: '#A8C5A0',
-      interaction: { type: 'autoAdvance' },
-      isAnswerReveal: true,
-      nextStepId: 'current_affairs_weather',
-      recordAnswer: false,
-      reply: (context) => orientationRevealReply({
-        answer: 'spring',
-        detail: 'Spring brings new growth and warmer days returning.',
-        context,
-      }),
-    },
-    {
-      id: 'current_affairs_weather',
-      turns: 1,
-      deckSlide: 13,
-      title: 'The Weather Is...',
-      subtitle: 'Outside today',
-      prompt: 'What is the weather like?',
-      bullets: ['Sunny', 'Cloudy', 'Windy', 'Rainy', 'Stormy', 'Hot or cold'],
-      visualHint: 'Source deck: NZ06. Current Affairs, slide 13',
-      accent: '#7A9DAD',
-      adaptiveFollowUp: adaptiveConversation(
-        'If they add a meaningful detail, invite one brief sensory observation or a gentle comparison with weather they remember, without turning it into a factual test.'
-      ),
-      reply: () => 'What is the weather like out your window today?',
-    },
-    {
-      id: 'current_affairs_exercise',
-      turns: 1,
-      deckSlide: 14,
-      title: 'Exercises',
-      subtitle: 'Gentle follow along',
-      prompt: 'Try a short seated exercise',
-      bullets: ['Sit safely', 'Only do what feels comfortable', 'Press Done when finished'],
-      visualHint: 'Source deck: NZ06. Current Affairs, slide 14',
-      accent: '#4472C4',
-      interaction: { ...seatedExerciseInteraction },
-      recordAnswer: false,
-      reply: () =>
-        'Next is the same short seated exercise. Please sit comfortably and safely on a sturdy chair. The video will start after I finish speaking. Only do what feels comfortable. When you are finished, press Done, or say or type done.',
-    },
-    {
-      id: 'current_affairs_theme_intro',
-      turns: 1,
-      deckSlide: 15,
-      title: 'Current Affairs',
-      subtitle: 'Our theme for today',
-      prompt: 'Current Affairs',
-      bullets: ['News', 'Photographs', 'Your opinions'],
-      visualHint: 'Source deck: NZ06. Current Affairs, slide 15',
-      accent: '#F47C20',
-      interaction: { type: 'autoAdvance' },
-      recordAnswer: false,
-      reply: () => 'Now it is time to move to our theme for today: Current Affairs.',
-    },
+      checkIn: {
+        adaptiveFollowUp: adaptiveConversation(
+          'If they share a positive or neutral feeling with some personal detail, invite one concrete detail about what shaped their day. Do not follow up if they seem tired, distressed, or ready to continue.'
+        ),
+      },
+      includeYearReveal: true,
+      seasonReplyStyle: 'dynamic',
+      weather: {
+        adaptiveFollowUp: adaptiveConversation(
+          'If they add a meaningful detail, invite one brief sensory observation or a gentle comparison with weather they remember, without turning it into a factual test.'
+        ),
+      },
+      currentAffairsSlide: null,
+      exercise: {
+        reply: () =>
+          'Next is the same short seated exercise. Please sit comfortably and safely on a sturdy chair. The video will start after I finish speaking. Only do what feels comfortable. When you are finished, press Done, or say or type done.',
+      },
+      themeIntro: {
+        sessionTitle: 'Current Affairs',
+        bullets: ['News', 'Photographs', 'Your opinions'],
+      },
+    }),
     {
       id: 'current_affairs_news_sources',
       turns: 1,
@@ -1170,224 +924,41 @@ const scripts = {
     },
   ],
   cst_physical_games: [
-    {
-      id: 'physical_games_welcome',
-      turns: 1,
-      acceptAnyAnswer: true,
-      deckSlide: 1,
-      title: 'AI-supported Individual Cognitive Stimulation Therapy',
-      subtitle: 'Session 3: Physical Games',
-      prompt: 'Welcome back',
-      bullets: ['Session 3', 'Physical Games'],
-      visualHint: 'Source deck: NZ03. Physical Games, slide 1',
-      accent: '#00AEEF',
-      reply: ({ name }) =>
-        `Welcome back, ${name}. It is lovely to see you again. Today is our third session, and our theme will be Physical Games. When you are ready, say "I'm ready" to begin.`,
-    },
-    {
-      id: 'physical_games_opening_song',
-      turns: 1,
-      deckSlide: 2,
-      title: 'Theme Song',
-      subtitle: 'Our song from Session 2',
-      prompt: 'Listen to your theme song',
-      bullets: ['Theme song', 'Listen together'],
-      visualHint: 'Source deck: NZ03. Physical Games, slide 2',
-      accent: '#F47C20',
-      interaction: spotifySongInteraction(),
-      recordAnswer: false,
-      reply: ({ themeSong }) =>
-        themeSong?.status === 'available'
-          ? `Let us begin with the theme song you chose last time, ${themeSong.track.name} by ${themeSong.track.artistLabel}. It can play for up to one minute. When you have finished listening, press Done, or say or type done.`
-          : 'I could not find a saved theme song from last time. Press Done, or say or type done, when you are ready to continue.',
-    },
-    {
-      id: 'physical_games_check_in',
-      turns: 1,
-      deckSlide: 3,
-      title: 'Check-in',
-      subtitle: 'How are you doing today?',
-      prompt: 'How are you doing today?',
-      bullets: ['Take your time', 'Share as much as you like'],
-      visualHint: 'Source deck: NZ03. Physical Games, slide 3',
-      accent: '#F47C20',
-      reply: () => 'Before we begin, how are you doing today?',
-    },
-    {
-      id: 'physical_games_orientation_day',
-      turns: 1,
-      deckSlide: 4,
-      title: 'What day of the week is it?',
-      subtitle: 'Getting our bearings',
-      prompt: 'What day of the week is it?',
-      bullets: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'],
-      visualHint: 'Source deck: NZ03. Physical Games, slide 4',
-      accent: '#7A9DAD',
-      reply: () => 'Let us get our bearings together. Do you happen to know what day of the week it is?',
-    },
-    {
-      id: 'physical_games_orientation_month',
-      turns: 1,
-      deckSlide: 5,
-      title: 'What month are we enjoying?',
-      subtitle: 'Getting our bearings',
-      prompt: 'What month are we enjoying?',
-      bullets: ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'],
-      visualHint: 'Source deck: NZ03. Physical Games, slide 5',
-      accent: '#00AEEF',
-      reply: () => 'And what month are we enjoying at the moment?',
-    },
-    {
-      id: 'physical_games_orientation_year',
-      turns: 1,
-      deckSlide: 6,
-      title: 'What year is it?',
-      subtitle: 'Getting our bearings',
-      prompt: 'What year is it?',
-      bullets: ['Year', 'Calendar', 'No pressure'],
-      visualHint: 'Source deck: NZ03. Physical Games, slide 6',
-      accent: '#F4C8B0',
-      reply: () => 'And do you happen to know what year it is?',
-    },
-    {
-      id: 'physical_games_orientation_season',
-      turns: 1,
-      deckSlide: 7,
-      title: 'Which season are we enjoying?',
-      subtitle: 'Getting our bearings',
-      prompt: 'Which season are we enjoying?',
-      bullets: ['Winter', 'Summer', 'Autumn', 'Spring'],
-      visualHint: 'Source deck: NZ03. Physical Games, slide 7',
-      accent: '#A8C5A0',
-      seasonBranches: {
-        winter: 'physical_games_season_winter',
-        summer: 'physical_games_season_summer',
-        autumn: 'physical_games_season_autumn',
-        spring: 'physical_games_season_spring',
+    ...buildStandardSessionOpening({
+      prefix: 'physical_games',
+      deckLabel: 'NZ03. Physical Games',
+      welcome: {
+        title: 'AI-supported Individual Cognitive Stimulation Therapy',
+        sessionNumber: 3,
+        sessionTitle: 'Physical Games',
+        reply: ({ name }) =>
+          `Welcome back, ${name}. It is lovely to see you again. Today is our third session, and our theme will be Physical Games. When you are ready, say "I'm ready" to begin.`,
       },
-      reply: () => 'Which season are we enjoying here in New Zealand?',
-    },
-    {
-      id: 'physical_games_season_winter',
-      turns: 1,
-      deckSlide: 8,
-      title: 'Winter',
-      subtitle: 'The season we are enjoying',
-      prompt: 'Winter',
-      bullets: ['Cool weather', 'Shorter days'],
-      visualHint: 'Source deck: NZ03. Physical Games, slide 8',
-      accent: '#7A9DAD',
-      interaction: { type: 'autoAdvance' },
-      isAnswerReveal: true,
-      nextStepId: 'physical_games_weather',
-      recordAnswer: false,
-      reply: () => 'That is winter, with cooler weather and shorter days.',
-    },
-    {
-      id: 'physical_games_season_summer',
-      turns: 1,
-      deckSlide: 9,
-      title: 'Summer',
-      subtitle: 'The season we are enjoying',
-      prompt: 'Summer',
-      bullets: ['Warm weather', 'Longer days'],
-      visualHint: 'Source deck: NZ03. Physical Games, slide 9',
-      accent: '#F47C20',
-      interaction: { type: 'autoAdvance' },
-      isAnswerReveal: true,
-      nextStepId: 'physical_games_weather',
-      recordAnswer: false,
-      reply: () => 'That is summer, with warmer weather and longer days.',
-    },
-    {
-      id: 'physical_games_season_autumn',
-      turns: 1,
-      deckSlide: 10,
-      title: 'Autumn',
-      subtitle: 'The season we are enjoying',
-      prompt: 'Autumn',
-      bullets: ['Changing leaves', 'Cooler days'],
-      visualHint: 'Source deck: NZ03. Physical Games, slide 10',
-      accent: '#F4C8B0',
-      interaction: { type: 'autoAdvance' },
-      isAnswerReveal: true,
-      nextStepId: 'physical_games_weather',
-      recordAnswer: false,
-      reply: () => 'That is autumn, when the leaves change and the days begin to cool.',
-    },
-    {
-      id: 'physical_games_season_spring',
-      turns: 1,
-      deckSlide: 11,
-      title: 'Spring',
-      subtitle: 'The season we are enjoying',
-      prompt: 'Spring',
-      bullets: ['New growth', 'Warmer days'],
-      visualHint: 'Source deck: NZ03. Physical Games, slide 11',
-      accent: '#A8C5A0',
-      interaction: { type: 'autoAdvance' },
-      isAnswerReveal: true,
-      nextStepId: 'physical_games_weather',
-      recordAnswer: false,
-      reply: () => 'That is spring, with new growth and warmer days returning.',
-    },
-    {
-      id: 'physical_games_weather',
-      turns: 1,
-      deckSlide: 12,
-      title: 'The Weather Is...',
-      subtitle: 'Outside today',
-      prompt: 'What is the weather like?',
-      bullets: ['Sunny', 'Cloudy', 'Windy', 'Rainy', 'Stormy', 'Hot or cold'],
-      visualHint: 'Source deck: NZ03. Physical Games, slide 12',
-      accent: '#7A9DAD',
-      reply: () => 'What is the weather like out your window today?',
-    },
-    {
-      id: 'physical_games_current_affairs',
-      turns: 1,
-      deckSlide: 13,
-      title: 'Current Affairs',
-      subtitle: 'A different positive story',
-      prompt: 'What do you think about that story?',
-      bullets: ['New Zealand', 'Positive news', 'Ask for more'],
-      visualHint: 'Source deck: NZ03. Physical Games, slide 13',
-      accent: '#00AEEF',
-      interaction: { type: 'positiveNews' },
-      reply: ({ currentAffairs }) =>
-        currentAffairs?.status === 'available'
-          ? `Here is a different positive story from New Zealand: ${currentAffairs.article.title}. You can ask me to tell you more, or tell me what you think about it.`
-          : 'I could not find a new positive New Zealand story just now. Have you heard anything pleasant or interesting lately?',
-    },
-    {
-      id: 'physical_games_exercise',
-      turns: 1,
-      deckSlide: 14,
-      title: 'Exercises',
-      subtitle: 'Gentle follow along',
-      prompt: 'Try a short seated exercise',
-      bullets: ['Sit safely', 'Only do what feels comfortable', 'Press Done when finished'],
-      visualHint: 'Source deck: NZ03. Physical Games, slide 14',
-      accent: '#4472C4',
-      interaction: { ...seatedExerciseInteraction },
-      recordAnswer: false,
-      reply: () =>
-        'Next is the same short seated exercise. Please sit comfortably and safely on a sturdy chair. The video will start after I finish speaking. Only do what feels comfortable. When you are finished, press Done, or say or type done.',
-    },
-    {
-      id: 'physical_games_theme_intro',
-      turns: 1,
-      deckSlide: 15,
-      title: 'Physical Games',
-      subtitle: 'Our theme for today',
-      prompt: 'Physical Games',
-      bullets: ['Sports', 'Activities', 'Movement'],
-      visualHint: 'Source deck: NZ03. Physical Games, slide 15',
-      accent: '#F47C20',
-      interaction: { type: 'autoAdvance' },
-      recordAnswer: false,
-      reply: () => 'Now it is time to move to our theme for today: Physical Games.',
-    },
+      themeSong: {
+        title: 'Theme Song',
+        subtitle: 'Our song from Session 2',
+        bullets: ['Theme song', 'Listen together'],
+        reply: ({ themeSong }) =>
+          themeSong?.status === 'available'
+            ? `Let us begin with the theme song you chose last time, ${themeSong.track.name} by ${themeSong.track.artistLabel}. It can play for up to one minute. When you have finished listening, press Done, or say or type done.`
+            : 'I could not find a saved theme song from last time. Press Done, or say or type done, when you are ready to continue.',
+      },
+      currentAffairsSlide: {
+        subtitle: 'A different positive story',
+        reply: ({ currentAffairs }) =>
+          currentAffairs?.status === 'available'
+            ? `Here is a different positive story from New Zealand: ${currentAffairs.article.title}. You can ask me to tell you more, or tell me what you think about it.`
+            : 'I could not find a new positive New Zealand story just now. Have you heard anything pleasant or interesting lately?',
+      },
+      exercise: {
+        reply: () =>
+          'Next is the same short seated exercise. Please sit comfortably and safely on a sturdy chair. The video will start after I finish speaking. Only do what feels comfortable. When you are finished, press Done, or say or type done.',
+      },
+      themeIntro: {
+        sessionTitle: 'Physical Games',
+        bullets: ['Sports', 'Activities', 'Movement'],
+      },
+    }),
     {
       id: 'physical_games_favourite_sport',
       turns: 1,
@@ -1758,229 +1329,42 @@ const scripts = {
     },
   ],
   cst_sounds: [
-    {
-      id: 'sounds_welcome',
-      turns: 1,
-      acceptAnyAnswer: true,
-      deckSlide: 1,
-      title: 'AI-supported Individual Cognitive Stimulation Therapy',
-      subtitle: 'Session 4: Sounds',
-      prompt: 'Welcome back',
-      bullets: ['Session 4', 'Sounds'],
-      visualHint: 'Source deck: NZ04. Sounds, slide 1',
-      accent: '#00AEEF',
-      reply: ({ name }) =>
-        `Welcome back, ${name}. It is lovely to see you again. Today is our fourth session, and our theme will be Sounds. When you are ready, say "I'm ready" to begin.`,
-    },
-    {
-      id: 'sounds_opening_song',
-      turns: 1,
-      deckSlide: 2,
-      title: 'Theme Song',
-      subtitle: 'Our song from an earlier session',
-      prompt: 'Listen to your theme song',
-      bullets: ['Theme song', 'Listen together'],
-      visualHint: 'Source deck: NZ04. Sounds, slide 2',
-      accent: '#F47C20',
-      interaction: spotifySongInteraction(),
-      recordAnswer: false,
-      reply: ({ themeSong }) =>
-        themeSong?.status === 'available'
-          ? `Let us begin with the theme song you chose earlier, ${themeSong.track.name} by ${themeSong.track.artistLabel}. It can play for up to one minute. When you have finished listening, press Done, or say or type done.`
-          : 'I could not find a saved theme song from an earlier session. Press Done, or say or type done, when you are ready to continue.',
-    },
-    {
-      id: 'sounds_check_in',
-      turns: 1,
-      deckSlide: 3,
-      title: 'Check-in',
-      subtitle: 'How are you doing today?',
-      prompt: 'How are you doing today?',
-      bullets: ['Take your time', 'Share as much as you like'],
-      visualHint: 'Source deck: NZ04. Sounds, slide 3',
-      accent: '#F47C20',
-      reply: () => 'Before we begin, how are you doing today?',
-    },
-    {
-      id: 'sounds_orientation_day',
-      turns: 1,
-      deckSlide: 4,
-      title: 'What day of the week is it?',
-      subtitle: 'Getting our bearings',
-      prompt: 'What day of the week is it?',
-      bullets: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'],
-      visualHint: 'Source deck: NZ04. Sounds, slide 4',
-      accent: '#7A9DAD',
-      reply: () => 'Let us get our bearings together. Do you happen to know what day of the week it is?',
-    },
-    {
-      id: 'sounds_orientation_month',
-      turns: 1,
-      deckSlide: 5,
-      title: 'What month are we enjoying?',
-      subtitle: 'Getting our bearings',
-      prompt: 'What month are we enjoying?',
-      bullets: ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'],
-      visualHint: 'Source deck: NZ04. Sounds, slide 5',
-      accent: '#00AEEF',
-      reply: () => 'And what month are we enjoying at the moment?',
-    },
-    {
-      id: 'sounds_orientation_year',
-      turns: 1,
-      deckSlide: 6,
-      title: 'What year is it?',
-      subtitle: 'Getting our bearings',
-      prompt: 'What year is it?',
-      bullets: ['Year', 'Calendar', 'No pressure'],
-      visualHint: 'Source deck: NZ04. Sounds, slide 6',
-      accent: '#F4C8B0',
-      reply: () => 'And do you happen to know what year it is?',
-    },
-    {
-      id: 'sounds_orientation_season',
-      turns: 1,
-      deckSlide: 7,
-      title: 'Which season are we enjoying?',
-      subtitle: 'Getting our bearings',
-      prompt: 'Which season are we enjoying?',
-      bullets: ['Winter', 'Summer', 'Autumn', 'Spring'],
-      visualHint: 'Source deck: NZ04. Sounds, slide 7',
-      accent: '#A8C5A0',
-      seasonBranches: {
-        winter: 'sounds_season_winter',
-        summer: 'sounds_season_summer',
-        autumn: 'sounds_season_autumn',
-        spring: 'sounds_season_spring',
+    ...buildStandardSessionOpening({
+      prefix: 'sounds',
+      deckLabel: 'NZ04. Sounds',
+      welcome: {
+        title: 'AI-supported Individual Cognitive Stimulation Therapy',
+        sessionNumber: 4,
+        sessionTitle: 'Sounds',
+        reply: ({ name }) =>
+          `Welcome back, ${name}. It is lovely to see you again. Today is our fourth session, and our theme will be Sounds. When you are ready, say "I'm ready" to begin.`,
       },
-      reply: () => 'Which season are we enjoying here in New Zealand?',
-    },
-    {
-      id: 'sounds_season_winter',
-      turns: 1,
-      deckSlide: 8,
-      title: 'Winter',
-      subtitle: 'The season we are enjoying',
-      prompt: 'Winter',
-      bullets: ['Cool weather', 'Shorter days'],
-      visualHint: 'Source deck: NZ04. Sounds, slide 8',
-      accent: '#7A9DAD',
-      interaction: { type: 'autoAdvance' },
-      isAnswerReveal: true,
-      nextStepId: 'sounds_weather',
-      recordAnswer: false,
-      reply: () => 'That is winter, with cooler weather and shorter days.',
-    },
-    {
-      id: 'sounds_season_summer',
-      turns: 1,
-      deckSlide: 9,
-      title: 'Summer',
-      subtitle: 'The season we are enjoying',
-      prompt: 'Summer',
-      bullets: ['Warm weather', 'Longer days'],
-      visualHint: 'Source deck: NZ04. Sounds, slide 9',
-      accent: '#F47C20',
-      interaction: { type: 'autoAdvance' },
-      isAnswerReveal: true,
-      nextStepId: 'sounds_weather',
-      recordAnswer: false,
-      reply: () => 'That is summer, with warmer weather and longer days.',
-    },
-    {
-      id: 'sounds_season_autumn',
-      turns: 1,
-      deckSlide: 10,
-      title: 'Autumn',
-      subtitle: 'The season we are enjoying',
-      prompt: 'Autumn',
-      bullets: ['Changing leaves', 'Cooler days'],
-      visualHint: 'Source deck: NZ04. Sounds, slide 10',
-      accent: '#F4C8B0',
-      interaction: { type: 'autoAdvance' },
-      isAnswerReveal: true,
-      nextStepId: 'sounds_weather',
-      recordAnswer: false,
-      reply: () => 'That is autumn, when the leaves change and the days begin to cool.',
-    },
-    {
-      id: 'sounds_season_spring',
-      turns: 1,
-      deckSlide: 11,
-      title: 'Spring',
-      subtitle: 'The season we are enjoying',
-      prompt: 'Spring',
-      bullets: ['New growth', 'Warmer days'],
-      visualHint: 'Source deck: NZ04. Sounds, slide 11',
-      accent: '#A8C5A0',
-      interaction: { type: 'autoAdvance' },
-      isAnswerReveal: true,
-      nextStepId: 'sounds_weather',
-      recordAnswer: false,
-      reply: () => 'That is spring, with new growth and warmer days returning.',
-    },
-    {
-      id: 'sounds_weather',
-      turns: 1,
-      deckSlide: 12,
-      title: 'The Weather Is...',
-      subtitle: 'Outside today',
-      prompt: 'What is the weather like?',
-      bullets: ['Sunny', 'Cloudy', 'Windy', 'Rainy', 'Stormy', 'Hot or cold'],
-      visualHint: 'Source deck: NZ04. Sounds, slide 12',
-      accent: '#7A9DAD',
-      reply: () => 'What is the weather like out your window today?',
-    },
-    {
-      id: 'sounds_current_affairs',
-      turns: 1,
-      deckSlide: 13,
-      title: 'Current Affairs',
-      subtitle: 'A positive story',
-      prompt: 'What do you think about that story?',
-      bullets: ['New Zealand', 'Positive news', 'Ask for more'],
-      visualHint: 'Source deck: NZ04. Sounds, slide 13',
-      accent: '#00AEEF',
-      interaction: { type: 'positiveNews' },
-      reply: ({ currentAffairs }) =>
-        currentAffairs?.status === 'available'
-          ? `Here is a positive story from New Zealand: ${currentAffairs.article.title}. You can ask me to tell you more, or tell me what you think about it.`
-          : 'I could not find a new positive New Zealand story just now. Have you heard anything pleasant or interesting lately?',
-    },
-    {
-      id: 'sounds_exercise',
-      turns: 1,
-      deckSlide: 14,
-      title: 'Exercises',
-      subtitle: 'Gentle follow along',
-      prompt: 'Try a short seated exercise',
-      bullets: ['Sit safely', 'Only do what feels comfortable', 'Press Done when finished'],
-      visualHint: 'Source deck: NZ04. Sounds, slide 14',
-      accent: '#4472C4',
-      // TODO: swap in the Session 4 exercise video by overriding videoId/videoUrl here.
-      interaction: {
-        ...seatedExerciseInteraction,
-        videoId: seatedExerciseInteraction.videoId,
-        videoUrl: seatedExerciseInteraction.videoUrl,
+      themeSong: {
+        title: 'Theme Song',
+        subtitle: 'Our song from an earlier session',
+        bullets: ['Theme song', 'Listen together'],
+        reply: ({ themeSong }) =>
+          themeSong?.status === 'available'
+            ? `Let us begin with the theme song you chose earlier, ${themeSong.track.name} by ${themeSong.track.artistLabel}. It can play for up to one minute. When you have finished listening, press Done, or say or type done.`
+            : 'I could not find a saved theme song from an earlier session. Press Done, or say or type done, when you are ready to continue.',
       },
-      recordAnswer: false,
-      reply: () =>
-        'Next is a short seated exercise to get the blood flowing. Please sit comfortably and safely on a sturdy chair. The video will start after I finish speaking. Only do what feels comfortable. When you are finished, press Done, or say or type done.',
-    },
-    {
-      id: 'sounds_theme_intro',
-      turns: 1,
-      deckSlide: 15,
-      title: 'Sounds',
-      subtitle: 'Our theme for today',
-      prompt: 'Sounds',
-      bullets: ['Music', 'Instruments', 'Everyday sounds'],
-      visualHint: 'Source deck: NZ04. Sounds, slide 15',
-      accent: '#F47C20',
-      interaction: { type: 'autoAdvance' },
-      recordAnswer: false,
-      reply: () => 'Now it is time to move to our theme for today: Sounds.',
-    },
+      currentAffairsSlide: {
+        subtitle: 'A positive story',
+        reply: ({ currentAffairs }) =>
+          currentAffairs?.status === 'available'
+            ? `Here is a positive story from New Zealand: ${currentAffairs.article.title}. You can ask me to tell you more, or tell me what you think about it.`
+            : 'I could not find a new positive New Zealand story just now. Have you heard anything pleasant or interesting lately?',
+      },
+      exercise: {
+        // TODO: swap in the Session 4 exercise video by overriding interaction.videoId/videoUrl here.
+        reply: () =>
+          'Next is a short seated exercise to get the blood flowing. Please sit comfortably and safely on a sturdy chair. The video will start after I finish speaking. Only do what feels comfortable. When you are finished, press Done, or say or type done.',
+      },
+      themeIntro: {
+        sessionTitle: 'Sounds',
+        bullets: ['Music', 'Instruments', 'Everyday sounds'],
+      },
+    }),
     {
       id: 'sounds_naming_instruments',
       turns: 1,
