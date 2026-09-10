@@ -1356,7 +1356,6 @@ const scripts = {
             : 'I could not find a new positive New Zealand story just now. Have you heard anything pleasant or interesting lately?',
       },
       exercise: {
-        // TODO: swap in the Session 4 exercise video by overriding interaction.videoId/videoUrl here.
         reply: () =>
           'Next is a short seated exercise to get the blood flowing. Please sit comfortably and safely on a sturdy chair. The video will start after I finish speaking. Only do what feels comfortable. When you are finished, press Done, or say or type done.',
       },

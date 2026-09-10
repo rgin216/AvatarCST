@@ -303,6 +303,12 @@ body {
   animation: session-loading-spin 0.8s linear infinite;
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .session-loading-spinner {
+    animation: none;
+  }
+}
+
 @keyframes session-loading-spin {
   to {
     transform: rotate(360deg);

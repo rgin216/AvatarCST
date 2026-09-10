@@ -41,7 +41,7 @@ export const orientationRevealReply = ({ answer, detail, context = {} }) => {
     normalizedAnswer === 'spring' &&
     /\bwinter\b/.test(suppliedAnswer)
   ) {
-    return `Winter was an understandable answer because the seasons have only just changed. It is spring now. ${detail}`;
+    return `Winter was an understandable answer, since it is easy to mix up neighbouring seasons. It is spring now. ${detail}`;
   }
   if (context.orientationOutcome === 'incorrect') {
     return `That was a reasonable try. It is ${answer}. ${detail}`;
