@@ -68,23 +68,20 @@ const UNSAFE_MEMORY_PATTERNS = [
   /\b(?:diagnosed with|medication dose|prescription is)\b/i,
   /\b(?:self[- ]harm|suicid(?:e|al)|sexual assault|rape|abuse)\b/i,
 ];
-const ORIENTATION_STEP_TYPES = {
-  childhood_orientation_day: 'weekday',
-  childhood_orientation_month: 'month',
-  childhood_orientation_year: 'year',
-  childhood_orientation_season: 'season',
-  current_affairs_orientation_day: 'weekday',
-  current_affairs_orientation_month: 'month',
-  current_affairs_orientation_year: 'year',
-  current_affairs_orientation_season: 'season',
-  physical_games_orientation_day: 'weekday',
-  physical_games_orientation_month: 'month',
-  physical_games_orientation_year: 'year',
-  physical_games_orientation_season: 'season',
-  sounds_orientation_day: 'weekday',
-  sounds_orientation_month: 'month',
-  sounds_orientation_year: 'year',
-  sounds_orientation_season: 'season',
+// Any step id ending in one of these suffixes is treated as that orientation type,
+// regardless of which session's prefix it belongs to - so a new session's
+// `<topic>_orientation_day/month/year/season` steps are recognized automatically,
+// with no per-session registration needed here.
+const ORIENTATION_SUFFIXES = {
+  day: 'weekday',
+  month: 'month',
+  year: 'year',
+  season: 'season',
+};
+
+const getOrientationType = (stepId = '') => {
+  const suffix = String(stepId).match(/_orientation_(day|month|year|season)$/)?.[1];
+  return suffix ? ORIENTATION_SUFFIXES[suffix] : undefined;
 };
 const SEASON_BY_MONTH = [
   'summer',
@@ -591,7 +588,7 @@ const isCorrectOrientationAnswer = (content = '', expected = '') => {
 };
 
 export const evaluateOrientationAnswer = ({ step, content, retryCount }) => {
-  const type = ORIENTATION_STEP_TYPES[step.id];
+  const type = getOrientationType(step.id);
   if (!type || !content) return null;
 
   const expected = getExpectedOrientationAnswer(type);
@@ -1363,7 +1360,7 @@ export const buildSessionSummary = (answers = []) => {
 
   if (highlights.length === 0) {
     const fallback = meaningful
-      .filter((item) => !ORIENTATION_STEP_TYPES[item.stepId])
+      .filter((item) => !getOrientationType(item.stepId))
       .slice(-3)
       .map((item) => asSummaryClause(item.answer, 'you shared'))
       .filter(Boolean);
@@ -1645,7 +1642,7 @@ export const generateSessionSummary = async ({
   const fallback = buildTopicSessionSummary(answers, { themeSong });
   const summaryInputs = answers
     .filter(isMeaningfulSummaryAnswer)
-    .filter((item) => !ORIENTATION_STEP_TYPES[item.stepId])
+    .filter((item) => !getOrientationType(item.stepId))
     .filter((item) => item.stepId !== 'theme_song_choice')
     .map((item) => ({
       topic: item.title || item.stepId,

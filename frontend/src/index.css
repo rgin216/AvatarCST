@@ -283,6 +283,38 @@ body {
   overflow: hidden;
 }
 
+.slide-loading-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #1D2A32;
+  border-radius: 8px;
+}
+
+.session-loading-spinner {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 3px solid rgba(255, 255, 255, 0.18);
+  border-top-color: #F4C8B0;
+  animation: session-loading-spin 0.8s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .session-loading-spinner {
+    animation: none;
+  }
+}
+
+@keyframes session-loading-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .session-topbar {
   height: 62px;
   padding: 0 24px;
@@ -1131,7 +1163,60 @@ body {
 .slide-video-frame-shell {
   height: 100%;
   max-width: 100%;
-  aspect-ratio: 9 / 16;
+  aspect-ratio: var(--video-aspect-ratio, 9 / 16);
+}
+
+/* A landscape (16:9) exercise video is much wider than tall, so it no longer
+   fits beside the instructions as a portrait Short does - stack a compact
+   instructions block above the player, and let the player fill whatever space
+   is left over (constrained on both axes so it always stays inside the slide,
+   never overflowing under the header or over the Done button). */
+.slide-video-overlay.is-landscape-video {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
+  justify-items: center;
+  align-items: center;
+  row-gap: clamp(10px, 1.6cqh, 18px);
+}
+
+.slide-video-overlay.is-landscape-video .slide-video-ready {
+  width: min(560px, 100%);
+}
+
+.slide-video-overlay.is-landscape-video .slide-video-ready .slide-video-eyebrow {
+  margin-bottom: 4px;
+  font-size: clamp(11px, 1.1cqw, 15px);
+}
+
+.slide-video-overlay.is-landscape-video .slide-video-ready h1 {
+  margin-bottom: 4px;
+  font-size: clamp(22px, 3cqw, 34px);
+}
+
+.slide-video-overlay.is-landscape-video .slide-video-ready > p:not(.slide-video-eyebrow) {
+  margin-bottom: 6px;
+  font-size: clamp(14px, 1.6cqw, 19px);
+}
+
+.slide-video-overlay.is-landscape-video .slide-video-ready small {
+  margin-top: 6px;
+  font-size: clamp(11px, 1.1cqw, 14px);
+}
+
+.slide-video-overlay.is-landscape-video .slide-video-status {
+  margin-top: 4px;
+  min-height: 1.2em;
+}
+
+.slide-video-overlay.is-landscape-video .slide-video-ready .slide-media-done {
+  margin-top: clamp(8px, 1.2cqh, 14px);
+}
+
+.slide-video-overlay.is-landscape-video .slide-video-frame-shell {
+  width: 100%;
+  height: auto;
+  max-width: 100%;
+  max-height: 100%;
 }
 
 .slide-video-player-mount {
