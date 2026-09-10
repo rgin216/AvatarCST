@@ -1,4 +1,8 @@
-// Shared steps are cloned from the previous session so media and branching stay aligned.
+import { buildStandardSessionOpening } from './cstSessionOpening.js';
+import { adaptiveConversation } from './cstScriptHelpers.js';
+import { pictureRevealReply } from './pictureAnswerService.js';
+
+// Only the closing activities are reused from Session 6; the opening uses the shared builder.
 export function createFacesScenesScript(shared) {
   const clone = (suffix, deckSlide, overrides = {}) => {
     const source = shared.find((step) => step.id === `current_affairs_${suffix}`);
@@ -18,12 +22,12 @@ export function createFacesScenesScript(shared) {
   });
   const matching = (suffix, deckSlide, title, descriptions, names, answers) => ({
     ...discussion(suffix, deckSlide, title,
-      'Let us match each description to a famous person. Drag from a description to a name, or tap a description and then tap a name. The selected description will be highlighted. You can change a match, tell me your ideas, or press Done matching when you are ready.',
+      'Match each clue to a name. Drag between them, or tap a clue then a name. Press Check matches when you are ready.',
       descriptions.map((description, index) => `${description}: ${names[answers[index]]}`),
       'Use these associations to respond gently to matches. Never demand a perfect score. The original NZ slide omitted Michael Jones; he is included in this activity.'),
     adaptiveFollowUp: undefined,
     inactivityTimeoutMs: 180000,
-    interaction: { type: 'matching', left: descriptions.map((label, index) => ({ id: `clue-${index}`, label })), right: names.map((label, index) => ({ id: `name-${index}`, label })) },
+    interaction: { type: 'matching', left: descriptions.map((label, index) => ({ id: `clue-${index}`, label, answerId: `name-${answers[index]}` })), right: names.map((label, index) => ({ id: `name-${index}`, label })) },
   });
   const celebrities = ['Billy T James: New Zealand comedian and entertainer', 'Dame Kiri Te Kanawa: New Zealand operatic soprano', 'Elvis Presley: American singer and actor', 'all three are well-known entertainers who performed on stage', 'two are from New Zealand', 'all three have sung'];
   const quiz = (slide, answer) => [
@@ -36,24 +40,59 @@ export function createFacesScenesScript(shared) {
     },
     {
       id: `faces_scenes_real_ai_${slide}_reveal`, deckSlide: slide + 1,
-      title: answer === 'real' ? 'Real person' : 'AI generated', subtitle: 'The answer from the deck',
+      title: answer === 'real' ? 'Real person' : 'AI generated', subtitle: 'The answer',
       prompt: 'Let us see the answer', bullets: [], turns: 1,
       interaction: { type: 'autoAdvance' }, isAnswerReveal: true, recordAnswer: false,
-      reply: () => `The deck labels this picture as ${answer === 'real' ? 'a real person' : 'AI generated'}. It can be difficult to tell from a picture alone. Thank you for having a go.`,
+      reply: (context = {}) => pictureRevealReply({ ...context, answer }),
     },
   ];
   return [
-    clone('welcome', 1, { subtitle: 'Session 7: Faces and Scenes', bullets: ['Session 7', 'Faces and Scenes'], reply: ({ name }) => `Welcome back, ${name}. Today is our seventh session: Faces and Scenes. We will look at familiar faces, compare places, and try a few picture activities together. Take your time. Say ready when you would like to begin.` }),
-    clone('opening_song', 2), clone('check_in', 2),
-    clone('orientation_day', 3), clone('orientation_month', 4), clone('orientation_year', 5), clone('orientation_year_reveal', 6), clone('orientation_season', 7),
-    clone('season_winter', 8), clone('season_summer', 9), clone('season_autumn', 10), clone('season_spring', 11), clone('weather', 12),
-    clone('positive_news', 13), clone('exercise', 14),
-    clone('theme_intro', 15, { title: 'Faces and Scenes', prompt: 'Faces and Scenes', bullets: ['Faces', 'Places', 'Your ideas'], reply: () => 'Our theme today is Faces and Scenes. We will start with some familiar names, then explore photographs together.' }),
+    ...buildStandardSessionOpening({
+      prefix: 'faces_scenes',
+      deckLabel: 'NZ07. Faces & Scenes',
+      welcome: {
+        title: 'Virtual Cognitive Stimulation Therapy',
+        sessionNumber: 7,
+        sessionTitle: 'Faces and Scenes',
+        reply: ({ name }) => `Welcome back, ${name}. Today is our seventh session: Faces and Scenes. We will look at familiar faces, compare places, and try a few picture activities together. Take your time. Say ready when you would like to begin.`,
+      },
+      themeSong: {
+        title: 'Welcome Back', subtitle: 'Your theme song', bullets: ['Welcome back', 'Theme song'],
+        reply: ({ themeSong }) => themeSong?.status === 'available'
+          ? `Let us begin with your theme song, ${themeSong.track.name} by ${themeSong.track.artistLabel}. It can play for up to one minute. When you have finished listening, press Done, or say or type done.`
+          : 'I could not find a saved theme song this time. Press Done, or say or type done, when you are ready to continue.',
+      },
+      checkIn: {
+        shareThemeSongSlide: true,
+        adaptiveFollowUp: adaptiveConversation('If they share a positive or neutral feeling with some personal detail, invite one concrete detail about what shaped their day. Do not follow up if they seem tired, distressed, or ready to continue.'),
+      },
+      includeYearReveal: true,
+      yearReveal: { detail: '' },
+      seasonReplyStyle: 'dynamic',
+      weather: {
+        adaptiveFollowUp: adaptiveConversation('If they add a meaningful detail, invite one brief sensory observation or a gentle comparison with weather they remember, without turning it into a factual test.'),
+      },
+      currentAffairsSlide: {
+        id: 'faces_scenes_positive_news',
+        subtitle: 'A current headline from our news service',
+        adaptiveFollowUp: adaptiveConversation('Invite one reaction to the current story. If they ask for more, use only the vetted article details supplied by the news service; never invent missing facts.'),
+        reply: ({ currentAffairs }) => currentAffairs?.status === 'available'
+          ? `Here is a recent positive story from New Zealand: ${currentAffairs.article.title}. You can ask me to tell you more, or tell me what you think about it.`
+          : 'I could not find a clearly positive New Zealand story just now. Have you heard anything pleasant or interesting lately?',
+      },
+      exercise: {
+        reply: () => 'Next is the same short seated exercise. Please sit comfortably and safely on a sturdy chair. The video will start after I finish speaking. Only do what feels comfortable. When you are finished, press Done, or say or type done.',
+      },
+      themeIntro: {
+        sessionTitle: 'Faces and Scenes', bullets: ['Faces', 'Places', 'Your ideas'],
+        reply: () => 'Our theme today is Faces and Scenes. We will start with some familiar names, then explore photographs together.',
+      },
+    }),
     matching('match_nz', 16, 'Match the description to the famous New Zealander', [
       'Climbed Mount Everest with Tenzing Norgay in 1953', 'Directed The Lord of the Rings films', 'All Black flanker nicknamed the Iceman', 'Played rugby league and union, and was a heavyweight boxer', 'Olympic gold medallist in shot put', 'Legendary All Black often called one of New Zealand’s greatest rugby players',
     ], ['Sonny Bill Williams', 'Edmund Hillary', 'Colin Meads', 'Peter Jackson', 'Valerie Adams', 'Michael Jones'], [1, 3, 5, 0, 4, 2]),
-    matching('match_international', 17, 'Match the description to the famous international person', [
-      'Known as the King of Rock and Roll', 'Hollywood actress in Some Like It Hot', 'Late Queen of the United Kingdom who reigned for over 70 years', 'Catholic nun known for charitable work with poor people in India', 'British Prime Minister during World War II, remembered for his speeches',
+    matching('match_international', 17, 'Match the famous person', [
+      'The King of Rock and Roll', 'Actress in Some Like It Hot', 'British queen for over 70 years', 'Nun who helped poor people in India', 'British Prime Minister during World War II',
     ], ['Queen Elizabeth II', 'Elvis Presley', 'Winston Churchill', 'Marilyn Monroe', 'Mother Teresa'], [1, 3, 0, 4, 2]),
     discussion('celebrities_similar', 18, 'What is similar about these three people?', 'These pictures show Billy T James, Dame Kiri Te Kanawa, and Elvis Presley. What do you think they have in common?', celebrities,
       'Accept entertainers, singers, famous people, stage performers, or that two are New Zealanders. They do not all have the same nationality. Other visible similarities are welcome.'),

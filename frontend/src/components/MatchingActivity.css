@@ -1,19 +1,28 @@
-.matching-activity { width:100%; padding:2.5rem 1.5rem 1rem; overflow:auto; max-height:100%; color:#193943; background:#fff; box-sizing:border-box; }
-.ppt-slide .matching-activity h1 { font-size:clamp(1.2rem,2vw,2rem); margin:0 0 .5rem; color:#193943; }
-.matching-activity p { margin:.3rem 0; font-size:clamp(.85rem,1.1vw,1.1rem); }
-.matching-status { font-weight:700; min-height:1.5em; }
-.matching-board { position:relative; display:flex; justify-content:space-between; margin:.6rem 0; }
-.matching-column { width:44%; display:grid; grid-auto-rows:1fr; gap:.4rem; z-index:1; }
-.matching-column:last-child { width:39%; }
-.matching-column button { min-height:48px; padding:.5rem .7rem; border:2px solid #819ba4; border-radius:10px; color:#193943; background:#f3f7f8; text-align:left; font:inherit; font-size:clamp(.8rem,1.05vw,1.1rem); cursor:pointer; touch-action:none; }
-.matching-column small { display:block; font-size:.72em; margin-top:.2rem; }
-.matching-column button:hover,.matching-column button.is-hovered { background:#d8edf5; border-color:#146381; outline:3px solid #9dcedf; }
+.ppt-slide.has-matching-interaction { background:#fff; }
+.ppt-slide.has-matching-interaction::before { display:none; }
+.matching-activity { position:absolute; inset:0; display:flex; flex-direction:column; gap:clamp(6px,1cqh,12px); padding:clamp(36px,6cqh,54px) clamp(16px,2.6cqw,36px) clamp(12px,2cqh,24px); color:#193943; background:#fff; box-sizing:border-box; }
+.ppt-slide .matching-activity h1 { font-size:clamp(20px,2.7cqw,32px); line-height:1.15; margin:0 0 6px; color:#193943; }
+.matching-activity p { margin:0; font-size:clamp(14px,1.55cqw,19px); line-height:1.3; }
+.matching-status { font-weight:700; min-height:1.3em; }
+.matching-scroll { flex:1; min-height:0; overflow:auto; padding:5px; }
+.matching-board { position:relative; display:flex; justify-content:space-between; min-height:100%; }
+.matching-column { width:46%; display:grid; grid-auto-rows:1fr; gap:clamp(8px,1.3cqh,14px); z-index:1; }
+.matching-column:last-child { width:35%; }
+.matching-column button { min-height:48px; padding:clamp(8px,1.2cqh,14px); border:2px solid #819ba4; border-radius:10px; color:#193943; background:#f3f7f8; text-align:left; font:inherit; font-size:clamp(14px,1.7cqw,20px); line-height:1.25; cursor:grab; touch-action:none; }
+.matching-column:last-child button { cursor:pointer; }
+.matching-column small { display:block; font-size:.82em; margin-top:4px; }
+.matching-column button:hover,.matching-column button.is-hovered { background:#d8edf5; border-color:#146381; outline:2px solid #9dcedf; }
 .matching-column button:focus-visible,.matching-column button.is-selected { background:#fff0b5; border-color:#795800; outline:3px solid #e7b738; }
-.matching-column button.is-connected { border-color:#275f72; }
-.matching-column button:disabled { opacity:.6; cursor:wait; }
+.matching-column button.is-correct { border-color:#247442; background:#edf8f0; }
+.matching-column button.is-incorrect { border-color:#a34332; background:#fff2ed; }
+.matching-column button:disabled { opacity:.65; cursor:default; }
 .matching-arrows { position:absolute; inset:0; width:100%; height:100%; overflow:visible; pointer-events:none; }
-.matching-arrows line { stroke:#275f72; stroke-width:.5; }
-.matching-arrows .matching-preview { stroke-dasharray:1; }
-.matching-actions { position:sticky; bottom:0; background:white; padding:.5rem 0; z-index:2; display:flex; justify-content:flex-end; gap:.7rem; }
-.matching-actions button { min-height:44px; padding:.5rem 1rem; border-radius:8px; border:2px solid #275f72; background:white; color:#193943; font:inherit; cursor:pointer; }
+.matching-arrows line { stroke-width:2.5; }
+.matching-arrows .arrow-neutral,.matching-preview { stroke:#275f72; fill:#275f72; }
+.matching-arrows .arrow-correct { stroke:#247442; fill:#247442; }
+.matching-arrows .arrow-incorrect { stroke:#a34332; fill:#a34332; }
+.matching-arrows .matching-preview { stroke-dasharray:5; }
+.matching-actions { flex:none; display:flex; justify-content:flex-end; gap:12px; padding-top:8px; border-top:1px solid #d7e2e6; }
+.matching-actions button { min-height:44px; padding:8px 16px; border-radius:8px; border:2px solid #275f72; background:white; color:#193943; font:inherit; cursor:pointer; }
 .matching-actions button:last-child { color:white; background:#275f72; }
+.matching-actions button:disabled { opacity:.6; cursor:default; }

@@ -22,10 +22,32 @@ export function getVoiceOptionsForAvatar(avatarMode = 'male') {
   };
 }
 
+// Reused verbatim for acknowledgements and script segments. These are delivery
+// targets, not a hard fundamental-frequency limiter (neither provider exposes one).
+export function getVoiceDeliveryOptions(options = {}) {
+  const female = options.avatarMode === 'female' || (!options.avatarMode &&
+    [EDGE_FEMALE_VOICE, OPENAI_FEMALE_VOICE].includes(options.voice));
+  const mode = female ? 'FEMALE' : 'MALE';
+  const configuredPitch = process.env[`EDGE_TTS_${mode}_PITCH_HZ`];
+  const pitchHz = Number(configuredPitch ?? 0);
+  const safePitch = Number.isFinite(pitchHz) ? Math.max(-20, Math.min(20, pitchHz)) : 0;
+  return {
+    edgeProsody: { pitch: `${safePitch >= 0 ? '+' : ''}${safePitch}Hz`, rate: '+0%', volume: '+0%' },
+    instructions: [
+      process.env.OPENAI_TTS_INSTRUCTIONS || 'Speak clearly and gently to an older adult.',
+      `Voice delivery: maintain the selected voice's natural ${female ? 'female' : 'male'} speaking register throughout.`,
+      'Keep a narrow pitch range and a stable, comfortable baseline. Use restrained, nearly level intonation with only small natural inflections.',
+      'Use the same pitch, resonance, volume, and measured conversational pace for brief acknowledgements, longer narration, and questions.',
+      'Begin directly in that register. Do not start acknowledgements higher, brighten praise, add sing-song emphasis, or make exaggerated upward question endings.',
+      'Stay warm through clear articulation and gentle pacing, without whispering, theatrical emotion, or exaggerated enthusiasm. Read only the supplied text.',
+    ].join(' '),
+  };
+}
+
 async function streamEdgeSpeech(text, writable, options = {}) {
   const tts = new MsEdgeTTS();
   await tts.setMetadata(options.voice || EDGE_MALE_VOICE, OUTPUT_FORMAT.AUDIO_24KHZ_96KBITRATE_MONO_MP3);
-  const { audioStream } = tts.toStream(text);
+  const { audioStream } = tts.toStream(text, getVoiceDeliveryOptions(options).edgeProsody);
   await pipeline(audioStream, writable);
 }
 
@@ -49,8 +71,8 @@ async function fetchOpenAISpeech(text, options = {}) {
       voice: options.voice || OPENAI_FEMALE_VOICE,
       input: text,
       response_format: options.responseFormat || 'mp3',
-      instructions: process.env.OPENAI_TTS_INSTRUCTIONS
-        || 'Speak warmly, clearly, and gently for an older adult in a cognitive stimulation therapy session.',
+      instructions: getVoiceDeliveryOptions(options).instructions,
+      speed: 1.0,
     }),
     signal: AbortSignal.timeout(30_000),
   });

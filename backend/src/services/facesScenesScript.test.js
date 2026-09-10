@@ -7,6 +7,25 @@ import { buildTopicSessionSummary, evaluateOrientationAnswer, shouldUseNextSlide
 const script = getScript('cst_faces_scenes');
 const find = (suffix) => script.find((step) => step.id === `faces_scenes_${suffix}`);
 
+test('Session 7 shared opening preserves its deck layout and progression fixes', () => {
+  const expected = { welcome: 1, opening_song: 2, check_in: 2, orientation_day: 3,
+    orientation_month: 4, orientation_year: 5, orientation_year_reveal: 6,
+    orientation_season: 7, season_winter: 8, season_summer: 9, season_autumn: 10,
+    season_spring: 11, weather: 12, positive_news: 13, exercise: 14, theme_intro: 15 };
+  for (const [suffix, slide] of Object.entries(expected)) {
+    assert.equal(find(suffix).deckSlide, slide, suffix);
+    assert.match(find(suffix).visualHint, new RegExp(`NZ07.*slide ${slide}$`));
+  }
+  assert.equal(find('check_in').acceptAnyAnswer, true);
+  assert.equal(find('weather').acceptAnyAnswer, true);
+  assert.equal(find('positive_news').interaction.type, 'positiveNews');
+  assert.equal(find('positive_news').adaptiveFollowUp.enabled, true);
+  assert.equal(find('exercise').interaction.orientation, 'landscape');
+  assert.equal(find('theme_intro').interaction.type, 'autoAdvance');
+  assert.equal(script[script.indexOf(find('theme_intro')) + 1].id, 'faces_scenes_match_nz');
+  assert.doesNotMatch(find('orientation_year_reveal').reply({}), /keep that date in view/);
+});
+
 test('Session 7 covers the deck and all branch targets resolve within this session', () => {
   assert.deepEqual([...new Set(script.map((step) => step.deckSlide))].sort((a,b) => a-b), Array.from({ length:33 }, (_,i) => i+1));
   assert.equal(new Set(script.map((step) => step.id)).size, script.length);

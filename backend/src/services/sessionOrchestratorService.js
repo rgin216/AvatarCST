@@ -1,3 +1,4 @@
+import { parseMatchingAnswer } from './matchingService.js';
 import Message from '../models/Message.js';
 import Session from '../models/Session.js';
 import User from '../models/User.js';
@@ -840,6 +841,9 @@ export const evaluateAcceptedAnswer = ({ step, content, allowAdaptiveFollowUp = 
 export const evaluateImageObservationAnswer = ({ step, content }) => {
   const answer = normalizeAnswer(content);
   if (!step?.imageGuidance || !answer) return null;
+  if (/^faces_scenes_people_/.test(step.id) && /\b(?:egotis\w*|arrogant|selfish|narciss\w*|untrustworthy|dishonest|criminal|lazy|stupid)\b/.test(answer)) {
+    return { answered: true, response: 'We cannot tell their personalities from a photograph. We can compare their hair, clothes, or expressions.' };
+  }
 
   if (
     ['current_affairs_moon_notice', 'current_affairs_moon_identify'].includes(step.id) &&
@@ -1632,6 +1636,7 @@ export const isSafeGeneratedSessionSummary = (summary, answers = []) => {
   const wordCount = normalized.match(/\b[\w'\u2019-]+\b/g)?.length || 0;
   return Boolean(
     /^Today, you\b/i.test(normalized) &&
+    /[.!][\"'”’)]?$/.test(normalized) &&
     wordCount >= 6 &&
     wordCount <= 65 &&
     !normalized.includes('?') &&
@@ -1694,7 +1699,7 @@ export const generateSessionSummary = async ({
       {
         provider,
         temperature: 0.2,
-        maxTokens: 90,
+        maxTokens: 384,
         model,
       }
     );
@@ -2444,6 +2449,7 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
     throw err;
   }
 
+  const matchingAnswer = parseMatchingAnswer(step, userContent || '');
   let userMessage = null;
   const hasAutomatedProtocol = /^\[\[[^\]]+\]\]$/.test(userContent || '');
   if (
@@ -2451,7 +2457,7 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
     !hasAutoAdvanceProtocol &&
     !(safetySupportTurn && hasAutomatedProtocol)
   ) {
-    const messageContent = wheelEvent
+    const messageContent = matchingAnswer ? matchingAnswer.transcript : wheelEvent
       ? `Question wheel landed on ${wheelEvent.label}.`
       : activityRevealEvent
       ? `Revealed ${activityRevealEvent.option.label}.`
@@ -2550,6 +2556,7 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
   let themeSong = getThemeSongForSession(session, user);
   const scriptContext = {
     previousAnswer: userContent,
+    recentMessages,
     name: getDisplayName(user),
     wheelQuestion: wheelEvent?.question || session.interactionState?.questionWheel?.question,
     currentAffairs,
@@ -2647,7 +2654,7 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
           answered: newlyFilledNamingSlots.length > 0 || namingSlotsComplete,
           response: '',
         }
-      : null) || emotionalSupportTurn || orientationTurn || evaluateTriviaAnswer({
+      : null) || emotionalSupportTurn || orientationTurn || (matchingAnswer ? { answered: true, response: matchingAnswer.response } : null) || evaluateTriviaAnswer({
       step,
       content: userContent,
     }) || evaluateMusicCompletionAnswer({
@@ -2705,16 +2712,29 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
         {
           provider: llmProvider,
           temperature: 0.25,
-          maxTokens: 110,
+          maxTokens: 512,
           model: useFastScriptedTurn ? process.env.OPENAI_FAST_TEXT_MODEL : undefined,
         }
-      ));
+      ).catch((error) => {
+        console.warn('[session] Using complete scripted fallback:', error.message);
+        return JSON.stringify({ answered: true, response: 'Thank you for sharing your thoughts.', followUp: null });
+      }));
     }
     answeredCurrentQuestion = adaptiveTurn.answered;
     adaptiveText = adaptiveTurn.response;
     adaptiveFollowUpQuestion =
       emotionalSupportTurn?.followUp ||
       (answeredCurrentQuestion && allowAdaptiveFollowUp ? adaptiveTurn.followUp : null);
+
+    // A follow-up stays on the current slide. Never let a copied upcoming
+    // question describe a picture that has not been displayed yet.
+    if (
+      adaptiveFollowUpQuestion &&
+      (normalizeAnswer(adaptiveFollowUpQuestion) === normalizeAnswer(plannedNextLine) ||
+        hasSubstantialSpeechOverlap(adaptiveFollowUpQuestion, plannedNextLine))
+    ) {
+      adaptiveFollowUpQuestion = null;
+    }
 
     if (orientationTurn?.answered) {
       scriptContext.orientationOutcome = orientationTurn.outcome;
@@ -2802,7 +2822,7 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
           question: activeAdaptiveFollowUp.question,
           content: userContent,
         })
-      : [...storedAnswers, toSessionAnswer({ step, content: userContent })];
+      : [...storedAnswers, toSessionAnswer({ step, content: matchingAnswer?.transcript || userContent })];
 
     if (step.id === 'theme_song_choice' && !activeAdaptiveFollowUp) {
       const themeSongSearchAnswer = resolveThemeSongSelectionAnswer(userContent, themeSong);
@@ -3003,8 +3023,11 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
     adaptiveText = await generateResponse(llmMessages, {
       provider: llmProvider,
       temperature: 0.4,
-      maxTokens: 60,
+      maxTokens: 256,
       model: useFastScriptedTurn ? process.env.OPENAI_FAST_TEXT_MODEL : undefined,
+    }).catch((error) => {
+      console.warn('[session] Using acknowledgement fallback:', error.message);
+      return 'Thank you for sharing your thoughts.';
     });
   }
 

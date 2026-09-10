@@ -14,12 +14,12 @@ import theme from "../utils/theme";
 // first paint never flashes another session's slide before snapping to this one.
 const defaultSlide = {
   index: 0,
-  total: 1,
+  total: 0,
   deckSlide: null,
   imageUrl: "",
-  title: "",
+  title: "Preparing your session…",
   subtitle: "",
-  prompt: "",
+  prompt: "Your first slide will appear shortly.",
   bullets: [],
   visualHint: "",
   accent: "#00AEEF",
@@ -1215,12 +1215,12 @@ export default function SessionPage({
 
   // --- Text input ---
 
-  async function sendMessage(text) {
+  async function sendMessage(text, displayText = text) {
     const content = text.trim();
     if (!content || typing || wheelResultPendingRef.current) return;
     registerUserActivity();
 
-    setMessages((items) => [...items, { from: "user", text: content }]);
+    setMessages((items) => [...items, { from: "user", text: displayText.trim() }]);
     setInput("");
     setTyping(true);
 
@@ -1523,7 +1523,7 @@ export default function SessionPage({
 
       <main className="session-slide-shell">
         <section
-          className={`ppt-slide${slide.imageUrl && !hasSlideInteraction ? " has-slide-image" : ""}${hasSlideInteraction ? " has-slide-interaction" : ""}${exerciseVideo ? " has-video-interaction" : ""}${hasPositiveNewsInteraction ? " has-news-interaction" : ""}${musicInteraction ? " has-music-interaction" : ""}${hasActivityRevealInteraction ? " has-activity-reveal-interaction" : ""}${isSingleAudioClip ? " has-audioclips-interaction" : ""}`}
+          className={`ppt-slide${slide.imageUrl && !hasSlideInteraction ? " has-slide-image" : ""}${hasSlideInteraction ? " has-slide-interaction" : ""}${exerciseVideo ? " has-video-interaction" : ""}${hasPositiveNewsInteraction ? " has-news-interaction" : ""}${musicInteraction ? " has-music-interaction" : ""}${hasActivityRevealInteraction ? " has-activity-reveal-interaction" : ""}${matchingInteraction ? " has-matching-interaction" : ""}${isSingleAudioClip ? " has-audioclips-interaction" : ""}`}
           style={{
             "--slide-accent": slide.accent || theme.blush,
             backgroundImage: slide.imageUrl && !hasSlideInteraction ? `url(${slide.imageUrl})` : undefined,
@@ -1534,10 +1534,12 @@ export default function SessionPage({
               <div className="session-loading-spinner" />
             </div>
           )}
-          <div className="ppt-slide-progress">
-            Session step {slide.index + 1} / {slide.total}
-            {slide.deckSlide ? ` / Deck slide ${slide.deckSlide}` : ""}
-          </div>
+          {slide.total > 0 && (
+            <div className="ppt-slide-progress">
+              Session step {slide.index + 1} / {slide.total}
+              {slide.deckSlide ? ` / Deck slide ${slide.deckSlide}` : ""}
+            </div>
+          )}
           {hasActivityRevealInteraction && (
             <div className="slide-activity-overlay">
               <header className="slide-activity-heading">
@@ -1595,7 +1597,7 @@ export default function SessionPage({
               </footer>
             </div>
           )}
-          {matchingInteraction && <MatchingActivity key={slide.id || slide.index} interaction={matchingInteraction} title={slide.title} disabled={sessionInputDisabled} onComplete={sendMessage} />}
+          {matchingInteraction && <MatchingActivity key={slide.id || slide.index} interaction={matchingInteraction} title={slide.title} disabled={typing || wheelResultPending} submitDisabled={sessionInputDisabled} onActivity={registerUserActivity} onComplete={(content) => sendMessage(content, "My matches are ready.")} />}
           {realOrAiInteraction && <div className="real-ai-choices" aria-label="Choose your guess">
             {['Real person', 'AI generated', 'Not sure'].map((answer) => <button type="button" key={answer} disabled={sessionInputDisabled} onClick={() => sendMessage(answer)}>{answer}</button>)}
           </div>}

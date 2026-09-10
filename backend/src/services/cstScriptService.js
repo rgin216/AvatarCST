@@ -583,6 +583,7 @@ const scripts = {
         ),
       },
       includeYearReveal: true,
+      yearReveal: { detail: '' },
       seasonReplyStyle: 'dynamic',
       weather: {
         adaptiveFollowUp: adaptiveConversation(
