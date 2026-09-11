@@ -15,7 +15,9 @@ export function parseMatchingAnswer(step, content = '') {
     correct: matches[item.id] === item.answerId,
   }));
   const correctCount = results.filter((item) => item.correct).length;
-  const corrections = results.filter((item) => !item.correct).map((item) => `${item.clue}: ${item.answer}.`);
+  const corrections = results.filter((item) => !item.correct).map((item) => item.chosen
+    ? `For "${item.clue}", you chose ${item.chosen}. The correct match is ${item.answer}.`
+    : `For "${item.clue}", the missing match is ${item.answer}.`);
   return {
     results,
     transcript: `My matches: ${results.map((item) => `${item.clue} — ${item.chosen || 'not matched'}`).join('; ')}.`,

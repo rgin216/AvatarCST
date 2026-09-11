@@ -27,5 +27,8 @@ export function pictureRevealReply({ answer, previousAnswer = '', recentMessages
   const recent = recentMessages.filter((message) => message.role === 'assistant').slice(-8).map((message) => message.content || '');
   const available = options.filter((option) => !recent.some((text) => text.includes(option.split(/[.!—]/)[0].trim())));
   const pool = available.length ? available : options;
-  return pool[Math.min(pool.length - 1, Math.floor(random() * pool.length))];
+  const reply = pool[Math.min(pool.length - 1, Math.floor(random() * pool.length))];
+  return guess !== 'unsure' && guess !== answer
+    ? reply + ' AI technology can now create very lifelike faces, so it can easily fool our eyes. Even real photographs can look artificial; appearance alone is not a reliable way to tell.'
+    : reply;
 }

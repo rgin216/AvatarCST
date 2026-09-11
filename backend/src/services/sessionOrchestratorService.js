@@ -1,3 +1,4 @@
+import { answerNewsQuestion, newsContext } from './newsConversationService.js';
 import { parseMatchingAnswer } from './matchingService.js';
 import Message from '../models/Message.js';
 import Session from '../models/Session.js';
@@ -627,8 +628,8 @@ export const evaluateOrientationAnswer = ({ step, content, retryCount }) => {
     return {
       answered: false,
       response: soundsTentative
-        ? 'That is an understandable question. Let\'s take another look together.'
-        : 'Good try. Let\'s take another look together.',
+        ? 'That is an understandable question. Take your time.'
+        : 'Good try. Take your time.',
       outcome: 'retry',
       suppliedAnswer: String(content).trim(),
       expectedAnswer: expected,
@@ -913,18 +914,12 @@ export const buildNewsElaboration = (currentAffairs) => {
     return 'I do not have a vetted story with more detail available right now.';
   }
 
-  const cleanDetail = (value = '') => {
-    const rawDetail = String(value);
-    if (/(?:\u2026|\.\.\.)?\s*\[\+\d+\s+chars\]\s*$/i.test(rawDetail)) return '';
-    const detail = rawDetail.trim();
-    return /(?:\u2026|\.\.\.)$/.test(detail) ? '' : detail;
-  };
-  const detail = cleanDetail(article.content) || cleanDetail(article.description);
+  const detail = newsContext(article);
   if (!detail) {
     return `The verified information I have only gives the headline, ${article.title}.`;
   }
 
-  return `The report adds: ${detail}`;
+  return detail;
 };
 
 const evaluateNewsElaborationRequest = ({ step, content, currentAffairs }) => {
@@ -2736,6 +2731,14 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
       adaptiveFollowUpQuestion = null;
     }
 
+    if (newsElaborationRequested && !emotionalSupportTurn) {
+      const asksForOverview = /^(?:can you |could you |please )?(?:tell me more|say more|more details|go on)[?.! ]*$/i.test(userContent);
+      adaptiveText = asksForOverview ? buildNewsElaboration(currentAffairs) : await answerNewsQuestion({
+        currentAffairs, question: userContent, recentMessages, provider: llmProvider,
+        model: useFastScriptedTurn ? process.env.OPENAI_FAST_TEXT_MODEL : undefined,
+      });
+      adaptiveFollowUpQuestion = null;
+    }
     if (orientationTurn?.answered) {
       scriptContext.orientationOutcome = orientationTurn.outcome;
       scriptContext.orientationAnswer = orientationTurn.suppliedAnswer;
@@ -2980,7 +2983,7 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
     ? adaptiveFollowUpQuestion
     : shouldElaborateNews
     ? currentAffairs?.status === 'available'
-      ? 'What part of that story stands out to you?'
+      ? ''
       : PLEASANT_NEWS_PROMPT
     : hasUserContent && hasDeliveredQuestion
     ? sessionCompleteAfterResponse && completionReply
@@ -3045,9 +3048,9 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
   const shouldDeferSlideTransition = Boolean(
     shouldAdvance && adaptiveText && scriptedNextLine && !hasSubstantialSpeechOverlap(adaptiveText, scriptedNextLine)
   );
-  const speechSegments = shouldDeferSlideTransition
+  const speechSegments = adaptiveText && scriptedNextLine && !hasSubstantialSpeechOverlap(adaptiveText, scriptedNextLine)
     ? [
-        { text: adaptiveText, role: 'acknowledgement', advanceSlideAfter: true },
+        { text: adaptiveText, role: 'acknowledgement', advanceSlideAfter: shouldDeferSlideTransition },
         { text: scriptedNextLine, role: 'script' },
       ]
     : [{ text: assistantText, role: 'script' }];

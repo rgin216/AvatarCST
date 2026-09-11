@@ -260,6 +260,7 @@ export default function SessionPage({
   const videoAutoplayFallbackRef = useRef(null);
   const avatarNarrationActiveRef = useRef(false);
   const playLiveAudioRef = useRef(null);
+  const narrationPauseRef = useRef(null);
   const narrationQueueRef = useRef([]);
   const activeNarrationSegmentRef = useRef(null);
   const pendingSlideTransitionRef = useRef(null);
@@ -388,6 +389,7 @@ export default function SessionPage({
   }, []);
 
   useEffect(() => () => {
+    if (narrationPauseRef.current) window.clearTimeout(narrationPauseRef.current);
     if (sessionEndTimeoutRef.current) window.clearTimeout(sessionEndTimeoutRef.current);
   }, []);
 
@@ -488,6 +490,8 @@ export default function SessionPage({
         }]
       : [];
     const hasAvatarNarration = audioSegments.length > 0;
+    if (narrationPauseRef.current) window.clearTimeout(narrationPauseRef.current);
+    narrationPauseRef.current = null;
     narrationQueueRef.current = audioSegments.slice(1);
     activeNarrationSegmentRef.current = audioSegments[0] || null;
     endAfterNarrationRef.current = Boolean(turn.sessionCompleteAfterResponse);
@@ -626,6 +630,7 @@ export default function SessionPage({
   }
 
   function continueNarrationSequence() {
+    if (narrationPauseRef.current) return;
     const completedSegment = activeNarrationSegmentRef.current;
     if (completedSegment?.advanceSlideAfter && pendingSlideTransitionRef.current?.to) {
       commitPendingSlideTransition();
@@ -636,9 +641,17 @@ export default function SessionPage({
     if (nextSegment) {
       avatarNarrationActiveRef.current = true;
       setAvatarNarrationActive(true);
-      playLiveAudio(getBackendBase() + nextSegment.url, {
-        rhubarbJson: nextSegment.rhubarbJson,
-      });
+      const playNext = () => {
+        narrationPauseRef.current = null;
+        playLiveAudio(getBackendBase() + nextSegment.url, {
+          rhubarbJson: nextSegment.rhubarbJson,
+        });
+      };
+      if (completedSegment?.role === "acknowledgement" && nextSegment.role === "script") {
+        narrationPauseRef.current = window.setTimeout(playNext, 400);
+      } else {
+        playNext();
+      }
       return;
     }
 

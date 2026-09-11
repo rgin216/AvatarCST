@@ -16,8 +16,8 @@ const wrong={'clue-0':'name-3','clue-2':'name-0','clue-3':'name-4','clue-4':'nam
 test('reports the incorrect and missing pairs from the latest matching conversation',()=>{
  const result=parseMatchingAnswer(step,encode(wrong));
  assert.equal(result.results.filter(r=>r.correct).length,3);
- assert.match(result.response,/King of Rock and Roll: Elvis Presley/);
- assert.match(result.response,/Actress in Some Like It Hot: Marilyn Monroe/);
+ assert.match(result.response,/King of Rock and Roll.*you chose Marilyn Monroe.*correct match is Elvis Presley/);
+ assert.match(result.response,/Actress in Some Like It Hot.*missing match is Marilyn Monroe/);
  assert.equal(result.results[1].chosen,null);
  assert.doesNotMatch(result.transcript,/\[\[matching/);
 });
@@ -35,6 +35,7 @@ test('picture reveals distinguish correct, mistaken and uncertain answers withou
   const right=pictureRevealReply({answer,previousAnswer:answer,random:()=>0});
   const mistaken=pictureRevealReply({answer,previousAnswer:answer==='real'?'AI generated':'Real person',random:()=>0});
   const uncertain=pictureRevealReply({answer,previousAnswer:'Not sure',random:()=>0});
+  assert.match(mistaken,/technology.*fool our eyes/); assert.doesNotMatch(right,/fool our eyes/);
   assert.match(right,/You got it/); assert.match(mistaken,/actually/); assert.notEqual(uncertain,right);
   for(const reply of [right,mistaken,uncertain]) assert.doesNotMatch(reply,/deck|labels/i);
   assert.notEqual(pictureRevealReply({answer,previousAnswer:answer,recentMessages:[{role:'assistant',content:right}],random:()=>0}),right);
@@ -83,6 +84,9 @@ for (const echoNextQuestion of [true, false]) {
    assert.equal(result.speechSegments[0].advanceSlideAfter,true);
    assert.equal(result.speechSegments[1].text,scenes.reply());
   } else {
+   assert.equal(result.speechSegments[0].role, "acknowledgement");
+   assert.equal(result.speechSegments[0].advanceSlideAfter, false);
+   assert.equal(result.speechSegments[1].role, "script");
    assert.equal(result.slideTransition,null);
    assert.match(result.assistantText,/Which of those clothes/);
   }
