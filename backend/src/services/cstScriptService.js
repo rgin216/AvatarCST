@@ -1,3 +1,4 @@
+import { createFacesScenesScript } from './facesScenesScript.js';
 ﻿import {
   adaptiveConversation,
   adaptiveReminiscence,
@@ -12,6 +13,7 @@ const scriptSlideFolders = {
   cst_physical_games: 'session3',
   cst_sounds: 'session4',
   cst_current_affairs: 'session6',
+  cst_faces_scenes: 'session7',
 };
 
 const physicalGamesWheelOptions = [
@@ -581,6 +583,7 @@ const scripts = {
         ),
       },
       includeYearReveal: true,
+      yearReveal: { detail: '' },
       seasonReplyStyle: 'dynamic',
       weather: {
         adaptiveFollowUp: adaptiveConversation(
@@ -1652,6 +1655,8 @@ const scripts = {
     },
   ],
 };
+
+scripts.cst_faces_scenes = createFacesScenesScript(scripts.cst_current_affairs);
 
 export const getScript = (scriptId = 'cst_intro_reminiscence') =>
   scripts[scriptId] || scripts.cst_intro_reminiscence;

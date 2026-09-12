@@ -45,7 +45,8 @@ const extractResponsesText = (data = {}) => {
 
 const generateGroqResponse = async (messages, options = {}) => {
   const temperature = options.temperature ?? 0.7;
-  const maxTokens = options.maxTokens ?? 140;
+  // GPT-OSS shares its completion allowance between reasoning and visible text.
+  const maxTokens = Math.max(options.maxTokens ?? 140, /^openai\/gpt-oss-/.test(GROQ_MODEL) ? 512 : 0);
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), GROQ_TIMEOUT_MS);
 
@@ -79,7 +80,13 @@ const generateGroqResponse = async (messages, options = {}) => {
   }
 
   const data = await response.json();
-  const raw = data.choices[0]?.message?.content?.trim() || '';
+  const choice = data.choices?.[0];
+  const raw = choice?.message?.content?.trim() || '';
+  if (choice?.finish_reason === 'length' || !raw) {
+    console.warn(`[llm] Groq ${choice?.finish_reason || 'empty'} output at ${maxTokens} tokens; ${options.completionRetry ? 'using caller fallback' : 'retrying once'}.`);
+    if (!options.completionRetry) return generateGroqResponse(messages, { ...options, maxTokens: Math.min(maxTokens * 2, 2048), completionRetry: true });
+    throw new Error('Groq did not produce a complete response');
+  }
   return stripAssistantPrefix(raw);
 };
 

@@ -1,3 +1,4 @@
+import MatchingActivity from "../components/MatchingActivity.jsx";
 import { useEffect, useRef, useState } from "react";
 import AvatarViewer from "../components/avatar/AvatarViewer";
 import api from "../services/api.js";
@@ -13,12 +14,12 @@ import theme from "../utils/theme";
 // first paint never flashes another session's slide before snapping to this one.
 const defaultSlide = {
   index: 0,
-  total: 1,
+  total: 0,
   deckSlide: null,
   imageUrl: "",
-  title: "",
+  title: "Preparing your session…",
   subtitle: "",
-  prompt: "",
+  prompt: "Your first slide will appear shortly.",
   bullets: [],
   visualHint: "",
   accent: "#00AEEF",
@@ -259,6 +260,7 @@ export default function SessionPage({
   const videoAutoplayFallbackRef = useRef(null);
   const avatarNarrationActiveRef = useRef(false);
   const playLiveAudioRef = useRef(null);
+  const narrationPauseRef = useRef(null);
   const narrationQueueRef = useRef([]);
   const activeNarrationSegmentRef = useRef(null);
   const pendingSlideTransitionRef = useRef(null);
@@ -311,13 +313,14 @@ export default function SessionPage({
     INACTIVITY_TIMEOUT_MS,
     Number(slide.inactivityTimeoutMs) || 0
   );
+  const matchingInteraction = slide.interaction?.type === "matching" ? slide.interaction : null;
+  const realOrAiInteraction = slide.interaction?.type === "realOrAi";
   const hasSlideInteraction =
     hasWheelInteraction ||
     Boolean(exerciseVideo) ||
     hasPositiveNewsInteraction ||
     Boolean(musicInteraction) ||
-    hasActivityRevealInteraction ||
-    isSingleAudioClip;
+    hasActivityRevealInteraction || Boolean(matchingInteraction) || isSingleAudioClip;
   const landedWheelResult = questionWheel?.status === "landed" ? questionWheel : null;
   const sessionInputDisabled =
     typing ||
@@ -386,6 +389,7 @@ export default function SessionPage({
   }, []);
 
   useEffect(() => () => {
+    if (narrationPauseRef.current) window.clearTimeout(narrationPauseRef.current);
     if (sessionEndTimeoutRef.current) window.clearTimeout(sessionEndTimeoutRef.current);
   }, []);
 
@@ -486,6 +490,8 @@ export default function SessionPage({
         }]
       : [];
     const hasAvatarNarration = audioSegments.length > 0;
+    if (narrationPauseRef.current) window.clearTimeout(narrationPauseRef.current);
+    narrationPauseRef.current = null;
     narrationQueueRef.current = audioSegments.slice(1);
     activeNarrationSegmentRef.current = audioSegments[0] || null;
     endAfterNarrationRef.current = Boolean(turn.sessionCompleteAfterResponse);
@@ -624,6 +630,7 @@ export default function SessionPage({
   }
 
   function continueNarrationSequence() {
+    if (narrationPauseRef.current) return;
     const completedSegment = activeNarrationSegmentRef.current;
     if (completedSegment?.advanceSlideAfter && pendingSlideTransitionRef.current?.to) {
       commitPendingSlideTransition();
@@ -634,9 +641,17 @@ export default function SessionPage({
     if (nextSegment) {
       avatarNarrationActiveRef.current = true;
       setAvatarNarrationActive(true);
-      playLiveAudio(getBackendBase() + nextSegment.url, {
-        rhubarbJson: nextSegment.rhubarbJson,
-      });
+      const playNext = () => {
+        narrationPauseRef.current = null;
+        playLiveAudio(getBackendBase() + nextSegment.url, {
+          rhubarbJson: nextSegment.rhubarbJson,
+        });
+      };
+      if (completedSegment?.role === "acknowledgement" && nextSegment.role === "script") {
+        narrationPauseRef.current = window.setTimeout(playNext, 400);
+      } else {
+        playNext();
+      }
       return;
     }
 
@@ -1213,12 +1228,12 @@ export default function SessionPage({
 
   // --- Text input ---
 
-  async function sendMessage(text) {
+  async function sendMessage(text, displayText = text) {
     const content = text.trim();
     if (!content || typing || wheelResultPendingRef.current) return;
     registerUserActivity();
 
-    setMessages((items) => [...items, { from: "user", text: content }]);
+    setMessages((items) => [...items, { from: "user", text: displayText.trim() }]);
     setInput("");
     setTyping(true);
 
@@ -1521,7 +1536,7 @@ export default function SessionPage({
 
       <main className="session-slide-shell">
         <section
-          className={`ppt-slide${slide.imageUrl && !hasSlideInteraction ? " has-slide-image" : ""}${hasSlideInteraction ? " has-slide-interaction" : ""}${exerciseVideo ? " has-video-interaction" : ""}${hasPositiveNewsInteraction ? " has-news-interaction" : ""}${musicInteraction ? " has-music-interaction" : ""}${hasActivityRevealInteraction ? " has-activity-reveal-interaction" : ""}${isSingleAudioClip ? " has-audioclips-interaction" : ""}`}
+          className={`ppt-slide${slide.imageUrl && !hasSlideInteraction ? " has-slide-image" : ""}${hasSlideInteraction ? " has-slide-interaction" : ""}${exerciseVideo ? " has-video-interaction" : ""}${hasPositiveNewsInteraction ? " has-news-interaction" : ""}${musicInteraction ? " has-music-interaction" : ""}${hasActivityRevealInteraction ? " has-activity-reveal-interaction" : ""}${matchingInteraction ? " has-matching-interaction" : ""}${isSingleAudioClip ? " has-audioclips-interaction" : ""}`}
           style={{
             "--slide-accent": slide.accent || theme.blush,
             backgroundImage: slide.imageUrl && !hasSlideInteraction ? `url(${slide.imageUrl})` : undefined,
@@ -1532,10 +1547,12 @@ export default function SessionPage({
               <div className="session-loading-spinner" />
             </div>
           )}
-          <div className="ppt-slide-progress">
-            Session step {slide.index + 1} / {slide.total}
-            {slide.deckSlide ? ` / Deck slide ${slide.deckSlide}` : ""}
-          </div>
+          {slide.total > 0 && (
+            <div className="ppt-slide-progress">
+              Session step {slide.index + 1} / {slide.total}
+              {slide.deckSlide ? ` / Deck slide ${slide.deckSlide}` : ""}
+            </div>
+          )}
           {hasActivityRevealInteraction && (
             <div className="slide-activity-overlay">
               <header className="slide-activity-heading">
@@ -1593,6 +1610,10 @@ export default function SessionPage({
               </footer>
             </div>
           )}
+          {matchingInteraction && <MatchingActivity key={slide.id || slide.index} interaction={matchingInteraction} title={slide.title} disabled={typing || wheelResultPending} submitDisabled={sessionInputDisabled} onActivity={registerUserActivity} onComplete={(content) => sendMessage(content, "My matches are ready.")} />}
+          {realOrAiInteraction && <div className="real-ai-choices" aria-label="Choose your guess">
+            {['Real person', 'AI generated', 'Not sure'].map((answer) => <button type="button" key={answer} disabled={sessionInputDisabled} onClick={() => sendMessage(answer)}>{answer}</button>)}
+          </div>}
           {hasWheelInteraction && (
             <div className="slide-wheel-overlay">
               <div className="slide-wheel-pointer" aria-hidden="true" />

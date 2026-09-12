@@ -1,3 +1,5 @@
+import { answerNewsQuestion, newsContext } from './newsConversationService.js';
+import { parseMatchingAnswer } from './matchingService.js';
 import Message from '../models/Message.js';
 import Session from '../models/Session.js';
 import User from '../models/User.js';
@@ -626,8 +628,8 @@ export const evaluateOrientationAnswer = ({ step, content, retryCount }) => {
     return {
       answered: false,
       response: soundsTentative
-        ? 'That is an understandable question. Let\'s take another look together.'
-        : 'Good try. Let\'s take another look together.',
+        ? 'That is an understandable question. Take your time.'
+        : 'Good try. Take your time.',
       outcome: 'retry',
       suppliedAnswer: String(content).trim(),
       expectedAnswer: expected,
@@ -840,6 +842,9 @@ export const evaluateAcceptedAnswer = ({ step, content, allowAdaptiveFollowUp = 
 export const evaluateImageObservationAnswer = ({ step, content }) => {
   const answer = normalizeAnswer(content);
   if (!step?.imageGuidance || !answer) return null;
+  if (/^faces_scenes_people_/.test(step.id) && /\b(?:egotis\w*|arrogant|selfish|narciss\w*|untrustworthy|dishonest|criminal|lazy|stupid)\b/.test(answer)) {
+    return { answered: true, response: 'We cannot tell their personalities from a photograph. We can compare their hair, clothes, or expressions.' };
+  }
 
   if (
     ['current_affairs_moon_notice', 'current_affairs_moon_identify'].includes(step.id) &&
@@ -909,18 +914,12 @@ export const buildNewsElaboration = (currentAffairs) => {
     return 'I do not have a vetted story with more detail available right now.';
   }
 
-  const cleanDetail = (value = '') => {
-    const rawDetail = String(value);
-    if (/(?:\u2026|\.\.\.)?\s*\[\+\d+\s+chars\]\s*$/i.test(rawDetail)) return '';
-    const detail = rawDetail.trim();
-    return /(?:\u2026|\.\.\.)$/.test(detail) ? '' : detail;
-  };
-  const detail = cleanDetail(article.content) || cleanDetail(article.description);
+  const detail = newsContext(article);
   if (!detail) {
     return `The verified information I have only gives the headline, ${article.title}.`;
   }
 
-  return `The report adds: ${detail}`;
+  return detail;
 };
 
 const evaluateNewsElaborationRequest = ({ step, content, currentAffairs }) => {
@@ -1429,6 +1428,15 @@ export const buildTopicSessionSummary = (answers = [], { themeSong = null } = {}
     if (topic && !topics.includes(topic)) topics.push(topic);
   };
 
+  for (const [pattern, topic] of [
+    [/^faces_scenes_match_/, 'matching descriptions to famous people'],
+    [/^faces_scenes_(celebrities|people)_/, 'comparing similarities and differences between people'],
+    [/^faces_scenes_(scene_preference|landmarks|queen_street)$/, 'exploring scenes and how Queen Street has changed'],
+    [/^faces_scenes_real_ai_\d+$/, 'trying real-or-AI picture guesses'],
+  ]) {
+    if (meaningful.some((item) => pattern.test(item.stepId))) addTopic(topic);
+  }
+
   if (meaningful.some((item) => item.stepId === 'theme_song_choice')) {
     const trackName = String(themeSong?.track?.name || '').trim();
     const artistName = String(themeSong?.track?.artistLabel || '').trim();
@@ -1466,6 +1474,7 @@ export const buildTopicSessionSummary = (answers = [], { themeSong = null } = {}
   }
 
   for (const item of meaningful) {
+    if (item.stepId?.startsWith('faces_scenes_')) continue;
     if ([
       'introduce_yourself',
       'what_is_cst',
@@ -1542,7 +1551,7 @@ export const buildTopicSessionSummary = (answers = [], { themeSong = null } = {}
   ].includes(item.stepId))) {
     addTopic('exploring the Auckland Harbour Bridge and its future');
   }
-  const wheelAnswer = meaningful.find((item) => item.stepId === 'current_affairs_spin_question');
+  const wheelAnswer = meaningful.find((item) => ['current_affairs_spin_question', 'faces_scenes_spin_question'].includes(item.stepId));
   let wheelTopic = '';
   if (wheelAnswer) {
     const wheelText = `${wheelAnswer.answer || ''} ${wheelAnswer.adaptiveFollowUp?.answer || ''}`;
@@ -1622,6 +1631,7 @@ export const isSafeGeneratedSessionSummary = (summary, answers = []) => {
   const wordCount = normalized.match(/\b[\w'\u2019-]+\b/g)?.length || 0;
   return Boolean(
     /^Today, you\b/i.test(normalized) &&
+    /[.!][\"'”’)]?$/.test(normalized) &&
     wordCount >= 6 &&
     wordCount <= 65 &&
     !normalized.includes('?') &&
@@ -1684,7 +1694,7 @@ export const generateSessionSummary = async ({
       {
         provider,
         temperature: 0.2,
-        maxTokens: 90,
+        maxTokens: 384,
         model,
       }
     );
@@ -2434,28 +2444,10 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
     throw err;
   }
 
-  let userMessage = null;
-  const hasAutomatedProtocol = /^\[\[[^\]]+\]\]$/.test(userContent || '');
-  if (
-    userContent &&
-    !hasAutoAdvanceProtocol &&
-    !(safetySupportTurn && hasAutomatedProtocol)
-  ) {
-    const messageContent = wheelEvent
-      ? `Question wheel landed on ${wheelEvent.label}.`
-      : activityRevealEvent
-      ? `Revealed ${activityRevealEvent.option.label}.`
-      : hasActivityCompletionProtocol
-      ? `Finished reenacting ${currentActivityOption.label}.`
-      : hasMusicCompletionProtocol
-      ? 'Music playback completed.'
-      : hasVideoCompletionProtocol
-      ? 'Exercise video completed.'
-      : userContent;
-    userMessage = await Message.create({ sessionId, role: 'user', content: messageContent });
-  }
-
   if (safetySupportTurn) {
+    const userMessage = userContent && !hasAutoAdvanceProtocol && !/^\[\[[^\]]+\]\]$/.test(userContent)
+      ? await Message.create({ sessionId, role: 'user', content: userContent })
+      : null;
     const assistantText = safetySupportTurn.response;
     const assistantMessage = await Message.create({
       sessionId,
@@ -2508,6 +2500,28 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
     };
   }
 
+  const matchingAnswer = parseMatchingAnswer(step, userContent || '');
+  let userMessage = null;
+  const hasAutomatedProtocol = /^\[\[[^\]]+\]\]$/.test(userContent || '');
+  if (
+    userContent &&
+    !hasAutoAdvanceProtocol &&
+    !(safetySupportTurn && hasAutomatedProtocol)
+  ) {
+    const messageContent = matchingAnswer ? matchingAnswer.transcript : wheelEvent
+      ? `Question wheel landed on ${wheelEvent.label}.`
+      : activityRevealEvent
+      ? `Revealed ${activityRevealEvent.option.label}.`
+      : hasActivityCompletionProtocol
+      ? `Finished reenacting ${currentActivityOption.label}.`
+      : hasMusicCompletionProtocol
+      ? 'Music playback completed.'
+      : hasVideoCompletionProtocol
+      ? 'Exercise video completed.'
+      : userContent;
+    userMessage = await Message.create({ sessionId, role: 'user', content: messageContent });
+  }
+
   if (step.id === 'facilitator_role' && userContent) {
     const preferredName = extractPreferredNameAnswer(userContent, getDisplayName(user));
     if (preferredName && preferredName.toLowerCase() !== getDisplayName(user).toLowerCase()) {
@@ -2539,6 +2553,8 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
     : null;
   let themeSong = getThemeSongForSession(session, user);
   const scriptContext = {
+    previousAnswer: userContent,
+    recentMessages,
     name: getDisplayName(user),
     wheelQuestion: wheelEvent?.question || session.interactionState?.questionWheel?.question,
     currentAffairs,
@@ -2636,7 +2652,7 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
           answered: newlyFilledNamingSlots.length > 0 || namingSlotsComplete,
           response: '',
         }
-      : null) || emotionalSupportTurn || orientationTurn || evaluateTriviaAnswer({
+      : null) || emotionalSupportTurn || orientationTurn || (matchingAnswer ? { answered: true, response: matchingAnswer.response } : null) || evaluateTriviaAnswer({
       step,
       content: userContent,
     }) || evaluateMusicCompletionAnswer({
@@ -2694,10 +2710,13 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
         {
           provider: llmProvider,
           temperature: 0.25,
-          maxTokens: 110,
+          maxTokens: 512,
           model: useFastScriptedTurn ? process.env.OPENAI_FAST_TEXT_MODEL : undefined,
         }
-      ));
+      ).catch((error) => {
+        console.warn('[session] Using complete scripted fallback:', error.message);
+        return JSON.stringify({ answered: false, response: 'Thank you for sharing your thoughts.', followUp: null });
+      }));
     }
     answeredCurrentQuestion = adaptiveTurn.answered;
     adaptiveText = adaptiveTurn.response;
@@ -2705,6 +2724,24 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
       emotionalSupportTurn?.followUp ||
       (answeredCurrentQuestion && allowAdaptiveFollowUp ? adaptiveTurn.followUp : null);
 
+    // A follow-up stays on the current slide. Never let a copied upcoming
+    // question describe a picture that has not been displayed yet.
+    if (
+      adaptiveFollowUpQuestion &&
+      (normalizeAnswer(adaptiveFollowUpQuestion) === normalizeAnswer(plannedNextLine) ||
+        hasSubstantialSpeechOverlap(adaptiveFollowUpQuestion, plannedNextLine))
+    ) {
+      adaptiveFollowUpQuestion = null;
+    }
+
+    if (newsElaborationRequested && !emotionalSupportTurn) {
+      const asksForOverview = /^(?:can you |could you |please )?(?:tell me more|say more|more details|go on)[?.! ]*$/i.test(userContent);
+      adaptiveText = asksForOverview ? buildNewsElaboration(currentAffairs) : await answerNewsQuestion({
+        currentAffairs, question: userContent, recentMessages, provider: llmProvider,
+        model: useFastScriptedTurn ? process.env.OPENAI_FAST_TEXT_MODEL : undefined,
+      });
+      adaptiveFollowUpQuestion = null;
+    }
     if (orientationTurn?.answered) {
       scriptContext.orientationOutcome = orientationTurn.outcome;
       scriptContext.orientationAnswer = orientationTurn.suppliedAnswer;
@@ -2791,7 +2828,7 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
           question: activeAdaptiveFollowUp.question,
           content: userContent,
         })
-      : [...storedAnswers, toSessionAnswer({ step, content: userContent })];
+      : [...storedAnswers, toSessionAnswer({ step, content: matchingAnswer?.transcript || userContent })];
 
     if (step.id === 'theme_song_choice' && !activeAdaptiveFollowUp) {
       const themeSongSearchAnswer = resolveThemeSongSelectionAnswer(userContent, themeSong);
@@ -2949,7 +2986,7 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
     ? adaptiveFollowUpQuestion
     : shouldElaborateNews
     ? currentAffairs?.status === 'available'
-      ? 'What part of that story stands out to you?'
+      ? ''
       : PLEASANT_NEWS_PROMPT
     : hasUserContent && hasDeliveredQuestion
     ? sessionCompleteAfterResponse && completionReply
@@ -2992,8 +3029,11 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
     adaptiveText = await generateResponse(llmMessages, {
       provider: llmProvider,
       temperature: 0.4,
-      maxTokens: 60,
+      maxTokens: 256,
       model: useFastScriptedTurn ? process.env.OPENAI_FAST_TEXT_MODEL : undefined,
+    }).catch((error) => {
+      console.warn('[session] Using acknowledgement fallback:', error.message);
+      return 'Thank you for sharing your thoughts.';
     });
   }
 
@@ -3011,9 +3051,9 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
   const shouldDeferSlideTransition = Boolean(
     shouldAdvance && adaptiveText && scriptedNextLine && !hasSubstantialSpeechOverlap(adaptiveText, scriptedNextLine)
   );
-  const speechSegments = shouldDeferSlideTransition
+  const speechSegments = adaptiveText && scriptedNextLine && !hasSubstantialSpeechOverlap(adaptiveText, scriptedNextLine)
     ? [
-        { text: adaptiveText, role: 'acknowledgement', advanceSlideAfter: true },
+        { text: adaptiveText, role: 'acknowledgement', advanceSlideAfter: shouldDeferSlideTransition },
         { text: scriptedNextLine, role: 'script' },
       ]
     : [{ text: assistantText, role: 'script' }];

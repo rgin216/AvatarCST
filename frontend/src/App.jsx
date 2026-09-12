@@ -90,8 +90,15 @@ const TEST_SESSIONS = [
     theme: "Current Affairs",
     icon: "📰",
   },
-  ...Array.from({ length: 9 }, (_, i) => {
-    const n = i + 7;
+  {
+    id: "cst_faces_scenes",
+    label: "Session 7",
+    title: "Faces and Scenes",
+    theme: "Faces and Scenes",
+    icon: "🖼️",
+  },
+  ...Array.from({ length: 8 }, (_, i) => {
+    const n = i + 8;
     return {
       id: `placeholder_session_${n}`,
       label: `Session ${n}`,

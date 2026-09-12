@@ -1,3 +1,4 @@
+import { capNewsExcerpt, cleanNewsExcerpt } from './newsConversationService.js';
 const NEWS_API_URL = process.env.NEWS_API_URL || 'https://newsapi.org/v2/top-headlines';
 const NEWS_API_EVERYTHING_URL =
   process.env.NEWS_API_EVERYTHING_URL || 'https://newsapi.org/v2/everything';
@@ -145,11 +146,7 @@ const cleanText = (value = '', maxLength = 240) =>
     .trim()
     .slice(0, maxLength);
 
-const cleanArticleContent = (value = '') => {
-  const content = String(value);
-  if (/(?:\u2026|\.\.\.)?\s*\[\+\d+\s+chars\]\s*$/i.test(content)) return '';
-  return cleanText(content, 600);
-};
+const cleanArticleContent = (value = '') => cleanNewsExcerpt(value);
 
 const cleanArticleContentForScoring = (value = '') =>
   cleanText(
@@ -194,7 +191,7 @@ export const isSuitablePositiveArticle = (article = {}) =>
 
 const normalizeArticle = (article) => ({
   title: cleanText(article.title, 180),
-  description: cleanText(article.description, 260),
+  description: capNewsExcerpt(article.description),
   content: cleanArticleContent(article.content),
   url: safeHttpUrl(article.url),
   imageUrl: safeHttpUrl(article.urlToImage),
