@@ -60,6 +60,7 @@ async function fetchOpenAISpeech(text, options = {}) {
     throw new Error('OPENAI_API_KEY is not set - cannot stream OpenAI speech');
   }
 
+  const model = process.env.OPENAI_TTS_MODEL || 'gpt-4o-mini-tts';
   const response = await fetch(OPENAI_SPEECH_URL, {
     method: 'POST',
     headers: {
@@ -67,11 +68,11 @@ async function fetchOpenAISpeech(text, options = {}) {
       Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
     },
     body: JSON.stringify({
-      model: process.env.OPENAI_TTS_MODEL || 'gpt-4o-mini-tts',
+      model,
       voice: options.voice || OPENAI_FEMALE_VOICE,
       input: text,
       response_format: options.responseFormat || 'mp3',
-      instructions: getVoiceDeliveryOptions(options).instructions,
+      ...(model === 'gpt-4o-mini-tts' ? { instructions: getVoiceDeliveryOptions(options).instructions } : {}),
       speed: 1.0,
     }),
     signal: AbortSignal.timeout(30_000),

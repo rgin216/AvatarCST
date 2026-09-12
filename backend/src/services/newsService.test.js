@@ -237,3 +237,10 @@ test('still checks truncated article content for blocked topics', () => {
     false
   );
 });
+
+
+test('normalization bounds a long description without cutting a sentence', () => {
+  const selected = selectPositiveArticle([article({ description: 'Volunteers welcomed birds back. '.repeat(1000) })]);
+  assert.ok(selected.description.length <= 600);
+  assert.ok(selected.description.endsWith('.'));
+});

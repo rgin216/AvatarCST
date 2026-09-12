@@ -1,10 +1,10 @@
 export function classifyPictureAnswer(content = '') {
   const answer = content.toLowerCase().replace(/[’']/g, '');
   if (/\b(not sure|unsure|dont know|do not know|cant tell|cannot tell|no idea)\b/.test(answer)) return 'unsure';
+  if (/\bnot (?:a )?real\b/.test(answer)) return 'ai';
+  if (/\bnot (?:(?:an? )?(?:ai|fake)|generated|artificial)\b/.test(answer)) return 'real';
   const ai = /\b(ai|a\.i\.?|artificial|generated|fake)\b/.test(answer);
   const real = /\b(real|genuine|actual|human)\b/.test(answer);
-  if (/\bnot (?:a )?real\b/.test(answer)) return 'ai';
-  if (/\bnot (?:ai|fake|generated|artificial)\b/.test(answer)) return 'real';
   return ai === real ? 'unsure' : ai ? 'ai' : 'real';
 }
 

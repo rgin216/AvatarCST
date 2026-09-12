@@ -58,3 +58,26 @@ test('invalid or excessive Edge pitch settings are bounded independently per mod
   assert.equal(getVoiceDeliveryOptions({ avatarMode: 'male' }).edgeProsody.pitch, '+0Hz');
   assert.equal(getVoiceDeliveryOptions({ avatarMode: 'female' }).edgeProsody.pitch, '-20Hz');
 });
+
+
+test('legacy OpenAI TTS models omit instructions while mini TTS retains delivery guidance', async (t) => {
+  const priorKey = process.env.OPENAI_API_KEY;
+  const priorModel = process.env.OPENAI_TTS_MODEL;
+  process.env.OPENAI_API_KEY = 'test-key';
+  t.after(() => {
+    if (priorKey === undefined) delete process.env.OPENAI_API_KEY; else process.env.OPENAI_API_KEY = priorKey;
+    if (priorModel === undefined) delete process.env.OPENAI_TTS_MODEL; else process.env.OPENAI_TTS_MODEL = priorModel;
+  });
+  let body;
+  t.mock.method(globalThis, 'fetch', async (url, request) => {
+    body = JSON.parse(request.body);
+    return new Response(new Uint8Array([1, 2, 3]));
+  });
+  for (const model of ['tts-1', 'tts-1-hd', 'gpt-4o-mini-tts']) {
+    process.env.OPENAI_TTS_MODEL = model;
+    await pipeSpeechStream('Hello.', sink(), { provider: 'openai', voice: 'alloy' });
+    assert.equal(body.model, model);
+    assert.equal(Object.hasOwn(body, 'instructions'), model === 'gpt-4o-mini-tts');
+    assert.equal(body.speed, 1);
+  }
+});

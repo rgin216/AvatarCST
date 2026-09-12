@@ -92,3 +92,39 @@ for (const echoNextQuestion of [true, false]) {
   }
  });
 }
+
+
+test('negated AI and fake phrases classify as real', () => {
+  assert.equal(classifyPictureAnswer('not an AI'), 'real');
+  assert.equal(classifyPictureAnswer('not a fake'), 'real');
+});
+
+function mockFeedbackSession(t, selectedStep, interactionState = {}) {
+  const session = { _id: 'review-regression', userId: 'test-user', status: 'active', pipelineMode: 'openai-fast-scripted', scriptId: 'cst_faces_scenes', scriptStepIndex: steps.indexOf(selectedStep), scriptStepTurnIndex: 1, scriptStepRetryCount: 0, activityRevision: 1, interactionState, save: async () => session };
+  t.mock.method(Session, 'findOneAndUpdate', async () => session);
+  t.mock.method(User, 'findById', () => ({ lean: async () => ({ _id: 'test-user', name: 'Test' }) }));
+  t.mock.method(Memory, 'findOne', () => ({ lean: async () => null }));
+  t.mock.method(Message, 'find', () => ({ sort() { return this; }, limit() { return this; }, lean: async () => [{ role: 'assistant', content: selectedStep.reply() }] }));
+  t.mock.method(Message, 'create', async message => ({ _id: 'message', ...message }));
+  t.mock.method(globalThis, 'fetch', async () => { throw new Error('provider unavailable'); });
+  return session;
+}
+
+test('active safety support takes precedence over malformed matching events', async (t) => {
+  const session = mockFeedbackSession(t, step, { safetySupport: { status: 'awaiting_immediate_danger' } });
+  const result = await respondToSessionTurn({ sessionId: session._id, content: '[[matching:bad]]' });
+  assert.equal(result.scriptStep.progressionSource, 'safety-support');
+  assert.equal(result.scriptStep.nextIndex, steps.indexOf(step));
+  assert.equal(result.messages.user, null);
+});
+
+test('failed adaptive generation retries before forcing progress on the third attempt', async (t) => {
+  const selectedStep = steps.find(s => s.id === 'faces_scenes_people_different');
+  const session = mockFeedbackSession(t, selectedStep, { sessionAnswers: [] });
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    const result = await respondToSessionTurn({ sessionId: session._id, content: 'One has a black jacket and another has a blue shirt.' });
+    assert.equal(result.scriptStep.answeredCurrentQuestion, false);
+    assert.equal(result.scriptStep.forcedProgress, attempt === 3);
+    assert.equal(result.scriptStep.nextIndex, steps.indexOf(selectedStep) + (attempt === 3 ? 1 : 0));
+  }
+});

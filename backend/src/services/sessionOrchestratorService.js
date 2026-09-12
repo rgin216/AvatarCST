@@ -2444,29 +2444,10 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
     throw err;
   }
 
-  const matchingAnswer = parseMatchingAnswer(step, userContent || '');
-  let userMessage = null;
-  const hasAutomatedProtocol = /^\[\[[^\]]+\]\]$/.test(userContent || '');
-  if (
-    userContent &&
-    !hasAutoAdvanceProtocol &&
-    !(safetySupportTurn && hasAutomatedProtocol)
-  ) {
-    const messageContent = matchingAnswer ? matchingAnswer.transcript : wheelEvent
-      ? `Question wheel landed on ${wheelEvent.label}.`
-      : activityRevealEvent
-      ? `Revealed ${activityRevealEvent.option.label}.`
-      : hasActivityCompletionProtocol
-      ? `Finished reenacting ${currentActivityOption.label}.`
-      : hasMusicCompletionProtocol
-      ? 'Music playback completed.'
-      : hasVideoCompletionProtocol
-      ? 'Exercise video completed.'
-      : userContent;
-    userMessage = await Message.create({ sessionId, role: 'user', content: messageContent });
-  }
-
   if (safetySupportTurn) {
+    const userMessage = userContent && !hasAutoAdvanceProtocol && !/^\[\[[^\]]+\]\]$/.test(userContent)
+      ? await Message.create({ sessionId, role: 'user', content: userContent })
+      : null;
     const assistantText = safetySupportTurn.response;
     const assistantMessage = await Message.create({
       sessionId,
@@ -2517,6 +2498,28 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
       suggestedMemoryUpdates: [],
       safetySupport: session.interactionState.safetySupport,
     };
+  }
+
+  const matchingAnswer = parseMatchingAnswer(step, userContent || '');
+  let userMessage = null;
+  const hasAutomatedProtocol = /^\[\[[^\]]+\]\]$/.test(userContent || '');
+  if (
+    userContent &&
+    !hasAutoAdvanceProtocol &&
+    !(safetySupportTurn && hasAutomatedProtocol)
+  ) {
+    const messageContent = matchingAnswer ? matchingAnswer.transcript : wheelEvent
+      ? `Question wheel landed on ${wheelEvent.label}.`
+      : activityRevealEvent
+      ? `Revealed ${activityRevealEvent.option.label}.`
+      : hasActivityCompletionProtocol
+      ? `Finished reenacting ${currentActivityOption.label}.`
+      : hasMusicCompletionProtocol
+      ? 'Music playback completed.'
+      : hasVideoCompletionProtocol
+      ? 'Exercise video completed.'
+      : userContent;
+    userMessage = await Message.create({ sessionId, role: 'user', content: messageContent });
   }
 
   if (step.id === 'facilitator_role' && userContent) {
@@ -2712,7 +2715,7 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
         }
       ).catch((error) => {
         console.warn('[session] Using complete scripted fallback:', error.message);
-        return JSON.stringify({ answered: true, response: 'Thank you for sharing your thoughts.', followUp: null });
+        return JSON.stringify({ answered: false, response: 'Thank you for sharing your thoughts.', followUp: null });
       }));
     }
     answeredCurrentQuestion = adaptiveTurn.answered;

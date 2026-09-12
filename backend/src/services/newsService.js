@@ -1,4 +1,4 @@
-import { cleanNewsExcerpt } from './newsConversationService.js';
+import { capNewsExcerpt, cleanNewsExcerpt } from './newsConversationService.js';
 const NEWS_API_URL = process.env.NEWS_API_URL || 'https://newsapi.org/v2/top-headlines';
 const NEWS_API_EVERYTHING_URL =
   process.env.NEWS_API_EVERYTHING_URL || 'https://newsapi.org/v2/everything';
@@ -191,7 +191,7 @@ export const isSuitablePositiveArticle = (article = {}) =>
 
 const normalizeArticle = (article) => ({
   title: cleanText(article.title, 180),
-  description: cleanNewsExcerpt(article.description),
+  description: capNewsExcerpt(article.description),
   content: cleanArticleContent(article.content),
   url: safeHttpUrl(article.url),
   imageUrl: safeHttpUrl(article.urlToImage),
