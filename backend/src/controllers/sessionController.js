@@ -147,6 +147,7 @@ function getSpeechOptions(pipelineMode, avatarMode) {
   const provider = getSpeechProviderForPipeline(pipelineMode);
   return {
     provider,
+    avatarMode,
     voice: provider === 'openai' ? voices.openAiVoice : voices.edgeVoice,
   };
 }

@@ -83,14 +83,14 @@ test('keeps suitable stories in ranked order for sequential use', () => {
   assert.equal(selected[1].url, 'https://example.test/second-story');
 });
 
-test('discards article detail when NewsAPI reports that it was truncated', () => {
+test('retains complete sentences from truncated NewsAPI content', () => {
   const selected = selectPositiveArticle([
     article({
       content: 'The sanctuary recorded its highest number of returning birds this year. [+124 chars]',
     }),
   ]);
 
-  assert.equal(selected.content, '');
+  assert.equal(selected.content, 'The sanctuary recorded its highest number of returning birds this year.');
 });
 
 const mockNewsResponse = (articles) => ({
@@ -236,4 +236,11 @@ test('still checks truncated article content for blocked topics', () => {
     })),
     false
   );
+});
+
+
+test('normalization bounds a long description without cutting a sentence', () => {
+  const selected = selectPositiveArticle([article({ description: 'Volunteers welcomed birds back. '.repeat(1000) })]);
+  assert.ok(selected.description.length <= 600);
+  assert.ok(selected.description.endsWith('.'));
 });

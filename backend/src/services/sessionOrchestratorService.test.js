@@ -873,7 +873,7 @@ test('distinguishes a tentative orientation question from a second incorrect ans
 
   assert.equal(tentative.answered, false);
   assert.equal(tentative.outcome, 'retry');
-  assert.match(tentative.response, /understandable question.*another look/i);
+  assert.match(tentative.response, /understandable question.*take your time/i);
   assert.equal(incorrect.answered, true);
   assert.equal(incorrect.outcome, 'incorrect');
   assert.equal(incorrect.suppliedAnswer, "It's winter.");
@@ -966,7 +966,7 @@ test('recognises requests for more news and elaborates only from vetted details'
         content: 'The sanctuary recorded its highest number of returning birds this year.',
       },
     }),
-    'The report adds: The sanctuary recorded its highest number of returning birds this year.'
+    'Volunteers welcomed native birds back. The sanctuary recorded its highest number of returning birds this year.'
   );
   assert.match(buildNewsElaboration({ status: 'unavailable' }), /do not have a vetted story/i);
   assert.equal(
@@ -978,7 +978,7 @@ test('recognises requests for more news and elaborates only from vetted details'
         content: 'The sanctuary recorded more returning birds\u2026 [+124 chars]',
       },
     }),
-    'The report adds: Volunteers welcomed native birds back.'
+    'Volunteers welcomed native birds back.'
   );
 });
 
@@ -1733,8 +1733,8 @@ test('returns vetted news elaboration without advancing the backend-controlled s
     content: 'Please tell me more.',
   });
 
-  assert.match(turn.assistantText, /report adds.*accessible garden beds/i);
-  assert.match(turn.assistantText, /what part of that story stands out/i);
+  assert.match(turn.assistantText, /accessible garden beds/i);
+  assert.doesNotMatch(turn.assistantText, /report adds|what part of that story stands out/i);
   assert.equal(turn.scriptStep.id, 'current_affairs_positive_news');
   assert.equal(turn.scriptStep.nextIndex, 20);
   assert.equal(turn.slide.id, 'current_affairs_positive_news');

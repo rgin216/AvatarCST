@@ -76,14 +76,14 @@ export const SEASON_INFO = {
  * @param {number} [config.deckSlideStart=1] - first deckSlide number for this block
  * @param {{title: string, sessionNumber: number, sessionTitle: string, reply: Function}} config.welcome
  * @param {{title: string, subtitle: string, bullets: string[], reply: Function, interaction?: object}} config.themeSong
- * @param {{adaptiveFollowUp?: object}} [config.checkIn]
+ * @param {{adaptiveFollowUp?: object, shareThemeSongSlide?: boolean}} [config.checkIn]
  * @param {boolean} [config.includeYearReveal=false] - Session 6 shows the year again as its own reveal slide
  * @param {{detail?: string}} [config.yearReveal]
  * @param {'static'|'dynamic'} [config.seasonReplyStyle='static'] - 'dynamic' acknowledges whether the patient's answer was right (used by Session 6)
  * @param {{adaptiveFollowUp?: object}} [config.weather]
- * @param {{subtitle: string, reply: Function}|null} [config.currentAffairsSlide] - omit (null) for the Current Affairs session itself
+ * @param {{id?: string, subtitle: string, reply: Function, adaptiveFollowUp?: object}|null} [config.currentAffairsSlide] - omit (null) for the Current Affairs session itself
  * @param {{reply: Function, interaction?: object}} config.exercise
- * @param {{sessionTitle: string, bullets: string[]}} config.themeIntro
+ * @param {{sessionTitle: string, bullets: string[], reply?: Function}} config.themeIntro
  * @returns {object[]} ordered step objects, ready to spread into a script array
  */
 export const buildStandardSessionOpening = ({
@@ -139,7 +139,7 @@ export const buildStandardSessionOpening = ({
   steps.push({
     id: `${prefix}_check_in`,
     turns: 1,
-    deckSlide: nextDeckSlide(),
+    deckSlide: checkIn.shareThemeSongSlide ? deckSlide - 1 : nextDeckSlide(),
     title: 'Check-in',
     subtitle: 'How are you doing today?',
     prompt: 'How are you doing today?',
@@ -195,7 +195,7 @@ export const buildStandardSessionOpening = ({
   });
 
   if (includeYearReveal) {
-    const detail = yearReveal.detail || 'We can keep that date in view as we continue.';
+    const detail = yearReveal.detail ?? 'We can keep that date in view as we continue.';
     steps.push({
       id: `${prefix}_orientation_year_reveal`,
       turns: 1,
@@ -274,7 +274,7 @@ export const buildStandardSessionOpening = ({
 
   if (currentAffairsSlide) {
     steps.push({
-      id: `${prefix}_current_affairs`,
+      id: currentAffairsSlide.id || `${prefix}_current_affairs`,
       turns: 1,
       deckSlide: nextDeckSlide(),
       title: 'Current Affairs',
@@ -285,6 +285,7 @@ export const buildStandardSessionOpening = ({
       accent: ACCENTS.currentAffairsSlide,
       interaction: { type: 'positiveNews' },
       acceptAnyAnswer: true,
+      ...(currentAffairsSlide.adaptiveFollowUp ? { adaptiveFollowUp: currentAffairsSlide.adaptiveFollowUp } : {}),
       reply: currentAffairsSlide.reply,
     });
   }
@@ -316,7 +317,7 @@ export const buildStandardSessionOpening = ({
     accent: ACCENTS.themeIntro,
     interaction: { type: 'autoAdvance' },
     recordAnswer: false,
-    reply: () => `Now it is time to move to our theme for today: ${themeIntro.sessionTitle}.`,
+    reply: themeIntro.reply || (() => `Now it is time to move to our theme for today: ${themeIntro.sessionTitle}.`),
   });
 
   return steps;
