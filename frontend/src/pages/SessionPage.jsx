@@ -1,3 +1,4 @@
+import ObjectSelectionActivity from "../components/ObjectSelectionActivity.jsx";
 import MatchingActivity from "../components/MatchingActivity.jsx";
 import { useEffect, useRef, useState } from "react";
 import AvatarViewer from "../components/avatar/AvatarViewer";
@@ -313,6 +314,7 @@ export default function SessionPage({
     INACTIVITY_TIMEOUT_MS,
     Number(slide.inactivityTimeoutMs) || 0
   );
+  const objectInteraction = slide.interaction?.type === "objectSelection";
   const matchingInteraction = slide.interaction?.type === "matching" ? slide.interaction : null;
   const realOrAiInteraction = slide.interaction?.type === "realOrAi";
   const hasSlideInteraction =
@@ -320,7 +322,7 @@ export default function SessionPage({
     Boolean(exerciseVideo) ||
     hasPositiveNewsInteraction ||
     Boolean(musicInteraction) ||
-    hasActivityRevealInteraction || Boolean(matchingInteraction) || isSingleAudioClip;
+    hasActivityRevealInteraction || Boolean(matchingInteraction) || objectInteraction || isSingleAudioClip;
   const landedWheelResult = questionWheel?.status === "landed" ? questionWheel : null;
   const sessionInputDisabled =
     typing ||
@@ -1244,6 +1246,7 @@ export default function SessionPage({
         lipSyncMode,
       });
       applyTurn(data);
+      return true;
     } catch (err) {
       console.error("Failed to get assistant response", err);
       setMessages((items) => [
@@ -1253,6 +1256,7 @@ export default function SessionPage({
           text: "I am having trouble connecting right now. Let us take a breath and try again in a moment.",
         },
       ]);
+      return false;
     } finally {
       setTyping(false);
     }
@@ -1536,7 +1540,7 @@ export default function SessionPage({
 
       <main className="session-slide-shell">
         <section
-          className={`ppt-slide${slide.imageUrl && !hasSlideInteraction ? " has-slide-image" : ""}${hasSlideInteraction ? " has-slide-interaction" : ""}${exerciseVideo ? " has-video-interaction" : ""}${hasPositiveNewsInteraction ? " has-news-interaction" : ""}${musicInteraction ? " has-music-interaction" : ""}${hasActivityRevealInteraction ? " has-activity-reveal-interaction" : ""}${matchingInteraction ? " has-matching-interaction" : ""}${isSingleAudioClip ? " has-audioclips-interaction" : ""}`}
+          className={`ppt-slide${slide.imageUrl && !hasSlideInteraction ? " has-slide-image" : ""}${hasSlideInteraction ? " has-slide-interaction" : ""}${exerciseVideo ? " has-video-interaction" : ""}${hasPositiveNewsInteraction ? " has-news-interaction" : ""}${musicInteraction ? " has-music-interaction" : ""}${hasActivityRevealInteraction ? " has-activity-reveal-interaction" : ""}${objectInteraction ? " has-object-interaction" : ""}${matchingInteraction ? " has-matching-interaction" : ""}${isSingleAudioClip ? " has-audioclips-interaction" : ""}`}
           style={{
             "--slide-accent": slide.accent || theme.blush,
             backgroundImage: slide.imageUrl && !hasSlideInteraction ? `url(${slide.imageUrl})` : undefined,
@@ -1610,6 +1614,7 @@ export default function SessionPage({
               </footer>
             </div>
           )}
+          {objectInteraction && <ObjectSelectionActivity key={slide.id} slide={slide} disabled={sessionInputDisabled || isRecording} onActivity={registerUserActivity} onSubmit={sendMessage} />}
           {matchingInteraction && <MatchingActivity key={slide.id || slide.index} interaction={matchingInteraction} title={slide.title} disabled={typing || wheelResultPending} submitDisabled={sessionInputDisabled} onActivity={registerUserActivity} onComplete={(content) => sendMessage(content, "My matches are ready.")} />}
           {realOrAiInteraction && <div className="real-ai-choices" aria-label="Choose your guess">
             {['Real person', 'AI generated', 'Not sure'].map((answer) => <button type="button" key={answer} disabled={sessionInputDisabled} onClick={() => sendMessage(answer)}>{answer}</button>)}

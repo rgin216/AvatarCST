@@ -1,3 +1,4 @@
+import { createCategorizingObjectsScript } from './categorizingObjectsScript.js';
 import { createFacesScenesScript } from './facesScenesScript.js';
 ﻿import {
   adaptiveConversation,
@@ -14,6 +15,7 @@ const scriptSlideFolders = {
   cst_sounds: 'session4',
   cst_current_affairs: 'session6',
   cst_faces_scenes: 'session7',
+  cst_categorizing_objects: 'session10',
 };
 
 const physicalGamesWheelOptions = [
@@ -1657,6 +1659,7 @@ const scripts = {
 };
 
 scripts.cst_faces_scenes = createFacesScenesScript(scripts.cst_current_affairs);
+scripts.cst_categorizing_objects = createCategorizingObjectsScript(scripts.cst_current_affairs);
 
 export const getScript = (scriptId = 'cst_intro_reminiscence') =>
   scripts[scriptId] || scripts.cst_intro_reminiscence;

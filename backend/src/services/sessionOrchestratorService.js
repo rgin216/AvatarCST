@@ -1,3 +1,4 @@
+import { evaluateCategorizingTurn } from './categorizingObjectsService.js';
 import { answerNewsQuestion, newsContext } from './newsConversationService.js';
 import { parseMatchingAnswer } from './matchingService.js';
 import Message from '../models/Message.js';
@@ -1429,6 +1430,11 @@ export const buildTopicSessionSummary = (answers = [], { themeSong = null } = {}
   };
 
   for (const [pattern, topic] of [
+    [/^categorizing_objects_senses_/, 'exploring everyday things through the senses'],
+    [/^categorizing_objects_odd_one_out$/, 'sorting food and non-food items'],
+    [/^categorizing_objects_pairs$/, 'finding connections between everyday objects'],
+    [/^categorizing_objects_(category|letter|words)$/, 'exploring categories and words'],
+    [/^categorizing_objects_holiday$/, 'remembering childhood holiday belongings'],
     [/^faces_scenes_match_/, 'matching descriptions to famous people'],
     [/^faces_scenes_(celebrities|people)_/, 'comparing similarities and differences between people'],
     [/^faces_scenes_(scene_preference|landmarks|queen_street)$/, 'exploring scenes and how Queen Street has changed'],
@@ -1474,7 +1480,7 @@ export const buildTopicSessionSummary = (answers = [], { themeSong = null } = {}
   }
 
   for (const item of meaningful) {
-    if (item.stepId?.startsWith('faces_scenes_')) continue;
+    if (/^(faces_scenes|categorizing_objects)_/.test(item.stepId || '')) continue;
     if ([
       'introduce_yourself',
       'what_is_cst',
@@ -1551,7 +1557,7 @@ export const buildTopicSessionSummary = (answers = [], { themeSong = null } = {}
   ].includes(item.stepId))) {
     addTopic('exploring the Auckland Harbour Bridge and its future');
   }
-  const wheelAnswer = meaningful.find((item) => ['current_affairs_spin_question', 'faces_scenes_spin_question'].includes(item.stepId));
+  const wheelAnswer = meaningful.find((item) => ['current_affairs_spin_question', 'faces_scenes_spin_question', 'categorizing_objects_spin_question'].includes(item.stepId));
   let wheelTopic = '';
   if (wheelAnswer) {
     const wheelText = `${wheelAnswer.answer || ''} ${wheelAnswer.adaptiveFollowUp?.answer || ''}`;
@@ -2109,6 +2115,7 @@ export const getSessionTurnContext = async (sessionId, existingSession = null) =
     session.scriptStepIndex || 0
   );
   const slide = toSlide({ step, index: boundedIndex, total: totalSteps });
+  if (slide.interaction?.type === 'objectSelection') slide.interaction = { ...slide.interaction, state: session.interactionState?.categorizing || {} };
   const nextStepIndex = isFinalStep
     ? boundedIndex
     : getRoutedNextStepIndex({
@@ -2231,6 +2238,7 @@ const getSessionInactivityReminderWrite = async (sessionId, expectedActivityRevi
     const activeSafetySupport = session.interactionState?.safetySupport || null;
     const currentAffairs = session.interactionState?.currentAffairs || null;
     const scriptContext = {
+      categorizing: session.interactionState?.categorizing || {},
       name: getDisplayName(user),
       wheelQuestion: session.interactionState?.questionWheel?.question,
       currentAffairs,
@@ -2500,6 +2508,8 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
     };
   }
 
+  const categorizingTurn = userContent && effectiveTurnIndex > 0
+    ? evaluateCategorizingTurn({ step, content: userContent, stored: session.interactionState?.categorizing }) : null;
   const matchingAnswer = parseMatchingAnswer(step, userContent || '');
   let userMessage = null;
   const hasAutomatedProtocol = /^\[\[[^\]]+\]\]$/.test(userContent || '');
@@ -2508,7 +2518,7 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
     !hasAutoAdvanceProtocol &&
     !(safetySupportTurn && hasAutomatedProtocol)
   ) {
-    const messageContent = matchingAnswer ? matchingAnswer.transcript : wheelEvent
+    const messageContent = categorizingTurn ? categorizingTurn.transcript : matchingAnswer ? matchingAnswer.transcript : wheelEvent
       ? `Question wheel landed on ${wheelEvent.label}.`
       : activityRevealEvent
       ? `Revealed ${activityRevealEvent.option.label}.`
@@ -2553,6 +2563,7 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
     : null;
   let themeSong = getThemeSongForSession(session, user);
   const scriptContext = {
+    categorizing: categorizingTurn?.state || session.interactionState?.categorizing || {},
     previousAnswer: userContent,
     recentMessages,
     name: getDisplayName(user),
@@ -2652,7 +2663,7 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
           answered: newlyFilledNamingSlots.length > 0 || namingSlotsComplete,
           response: '',
         }
-      : null) || emotionalSupportTurn || orientationTurn || (matchingAnswer ? { answered: true, response: matchingAnswer.response } : null) || evaluateTriviaAnswer({
+      : null) || emotionalSupportTurn || categorizingTurn || orientationTurn || (matchingAnswer ? { answered: true, response: matchingAnswer.response } : null) || evaluateTriviaAnswer({
       step,
       content: userContent,
     }) || evaluateMusicCompletionAnswer({
@@ -2828,7 +2839,7 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
           question: activeAdaptiveFollowUp.question,
           content: userContent,
         })
-      : [...storedAnswers, toSessionAnswer({ step, content: matchingAnswer?.transcript || userContent })];
+      : [...storedAnswers, toSessionAnswer({ step, content: categorizingTurn?.transcript || matchingAnswer?.transcript || userContent })];
 
     if (step.id === 'theme_song_choice' && !activeAdaptiveFollowUp) {
       const themeSongSearchAnswer = resolveThemeSongSelectionAnswer(userContent, themeSong);
@@ -2913,7 +2924,9 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
     answeredCurrentQuestion &&
     newsElaborationRequested
   );
-  const shouldAdvance = isActivityInteractionEvent
+  const shouldAdvance = categorizingTurn && !emotionalSupportTurn
+    ? categorizingTurn.complete && !isFinalStep
+    : isActivityInteractionEvent
     ? completedAllActivities && !isFinalStep
     : namingSlotStep
     ? hasUserContent &&
@@ -2963,7 +2976,9 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
     !shouldForceProgress
       ? buildNamingSlotPrompt(namingMissingLabels, step.namingSlots.noun || 'sound')
       : '';
-  const scriptedNextLine = namingSlotPromptLine || activityInteractionReply || (themeSongFeedback
+  const scriptedNextLine = categorizingTurn && !categorizingTurn.complete && !emotionalSupportTurn
+    ? categorizingTurn.prompt
+    : namingSlotPromptLine || activityInteractionReply || (themeSongFeedback
     ? themeSongRequiresRetry
       ? themeSongFeedback
       : joinSpeechParts(
@@ -3077,6 +3092,9 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
     : 0;
   session.scriptStepIndex = nextStepIndex;
   const displaySlide = shouldAdvance ? nextSlide : slide;
+  if (displaySlide.interaction?.type === 'objectSelection') {
+    displaySlide.interaction = { ...displaySlide.interaction, state: categorizingTurn?.state || session.interactionState?.categorizing || {} };
+  }
   session.presentationState = {
     slideIndex: displaySlide.index,
     deckSlide: displaySlide.deckSlide,
@@ -3093,6 +3111,7 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
   const nextInteractionState = {
     ...(session.interactionState || {}),
     sessionAnswers,
+    ...(categorizingTurn && !emotionalSupportTurn ? { categorizing: categorizingTurn.state } : {}),
   };
   if (themeSong) {
     nextInteractionState.themeSong = themeSong;
