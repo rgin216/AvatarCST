@@ -7,8 +7,21 @@ const OPENAI_TEXT_MODEL = process.env.OPENAI_TEXT_MODEL || 'gpt-5.4-mini';
 const GROQ_TIMEOUT_MS = 10_000;
 const OPENAI_TIMEOUT_MS = 15_000;
 
+// The system prompt itself uses **bold** to emphasize instructions to the
+// model, which the model can imitate in its own spoken output - strip markdown
+// emphasis/code markers so TTS never reads "asterisk" aloud.
+const stripMarkdownEmphasis = (text = '') =>
+  text
+    .replace(/\*\*(.*?)\*\*/g, '$1')
+    .replace(/__(.*?)__/g, '$1')
+    .replace(/\*(.*?)\*/g, '$1')
+    .replace(/_(.*?)_/g, '$1')
+    .replace(/`([^`]*)`/g, '$1');
+
 const stripAssistantPrefix = (raw = '') =>
-  raw.trim().replace(/^(here['']?s my response[^:]*:|response:|aria says:?|as aria,?)\s*/i, '');
+  stripMarkdownEmphasis(
+    raw.trim().replace(/^(here['']?s my response[^:]*:|response:|aria says:?|as aria,?)\s*/i, '')
+  );
 
 const getGroqGenerationOptions = (model) =>
   /^openai\/gpt-oss-(?:20b|120b)$/.test(model)
