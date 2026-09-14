@@ -14,6 +14,7 @@ import {
 import {
   buildCstAdaptiveResponseInstructions,
   buildCstAdaptiveTurnInstructions,
+  buildCstFoodPhraseGuessInstructions,
   buildCstInstrumentGuessInstructions,
   buildCstNameThatTuneInstructions,
 } from './promptService.js';
@@ -732,6 +733,35 @@ const isActivityRevealProtocol = (content = '') =>
 const isActivityCompletionProtocol = (content = '') =>
   /^\[\[activity-complete\]\]$/i.test(content.trim());
 
+const isMealBuilderProtocol = (content = '') =>
+  /^\[\[meal-builder:/i.test(content.trim());
+
+// The meal builder is a single client-side drag/tap activity (unlike activityReveal's
+// server-confirmed card-by-card sequence) - the participant assembles their whole
+// plate locally, then submits one event once, so there is no in-progress state to
+// persist or restore across a refresh.
+export const parseMealBuilderEvent = (content = '', step = null) => {
+  const match = content.trim().match(/^\[\[meal-builder:(.+)\]\]$/s);
+  if (!match || step?.interaction?.type !== 'mealBuilder') return null;
+
+  try {
+    const parsed = JSON.parse(match[1]);
+    const requestedIds = Array.isArray(parsed?.cardIds)
+      ? [...new Set(parsed.cardIds.map((id) => String(id || '').trim()).filter(Boolean))]
+      : [];
+    const cards = step.interaction.cards || [];
+    const chosen = requestedIds
+      .map((id) => cards.find((card) => String(card.id) === id))
+      .filter(Boolean);
+    if (chosen.length === 0) return null;
+    const maxItems = step.interaction.maxItems;
+    if (typeof maxItems === 'number' && chosen.length > maxItems) return null;
+    return { cards: chosen, labels: chosen.map((card) => card.label) };
+  } catch {
+    return null;
+  }
+};
+
 const isNaturalMediaCompletionAnswer = (content = '') => {
   const normalized = normalizeAnswer(content);
   if (!normalized) return false;
@@ -1108,7 +1138,7 @@ export const createNamingSlotState = (step, persisted = null) => {
   };
 };
 
-export const parseNamingSlotAnswer = (content = '', { count = 3, filled = [] } = {}) => {
+export const parseNamingSlotAnswer = (content = '', { count = 3, filled = [], contentRules = null } = {}) => {
   const normalized = normalizeAnswer(content);
   if (!normalized) return null;
 
@@ -1124,6 +1154,17 @@ export const parseNamingSlotAnswer = (content = '', { count = 3, filled = [] } =
 
   if (/\b(?:all (?:three|3|of them|of these)|every one|they (?:re|are) all|each (?:one|of them))\b/.test(normalized)) {
     return { slots: emptySlots };
+  }
+
+  // When each slot's content is independently identifiable (e.g. finishing a
+  // specific saying, unlike anonymous sound clips), match by content before
+  // falling back to ordinal/positional guessing, so answering out of order and
+  // without saying "first"/"second" still lands on the right slot.
+  if (contentRules) {
+    const contentHits = emptySlots.filter((index) =>
+      (contentRules[index]?.identify || contentRules[index]?.match)?.test(normalized)
+    );
+    if (contentHits.length > 0) return { slots: contentHits };
   }
 
   const hits = new Set();
@@ -1151,10 +1192,14 @@ export const parseNamingSlotAnswer = (content = '', { count = 3, filled = [] } =
   return { slots: emptySlots.slice(0, fillCount) };
 };
 
-export const buildNamingSlotPrompt = (missingLabels = [], noun = 'sound') => {
+export const buildNamingSlotPrompt = (
+  missingLabels = [],
+  noun = 'sound',
+  singlePrompt = (label) => `And what does the ${label} ${noun} sound like?`
+) => {
   const labels = missingLabels.filter(Boolean);
   if (labels.length === 0) return '';
-  if (labels.length === 1) return `And what does the ${labels[0]} ${noun} sound like?`;
+  if (labels.length === 1) return singlePrompt(labels[0]);
   const joined =
     labels.length === 2
       ? `${labels[0]} and ${labels[1]}`
@@ -1169,6 +1214,18 @@ const SCRIPTED_INSTRUMENT_RULES = {
     { label: 'a trumpet', match: /\b(trumpet|cornet|bugle|flugel|horn|brass|trombone|tuba)\b/ },
     { label: 'a bass guitar', match: /\b(bass|double bass|upright bass|guitar|cello)\b/ },
     { label: 'an organ', match: /\b(organ|harmonium|accordion|keyboard|synth|synthesiser|synthesizer|harpsichord|piano)\b/ },
+  ],
+  // Same naming-slots mechanic as sounds_naming_instruments, but for finishing
+  // three well-known food sayings instead of naming a sound - a genuine attempt at
+  // the blanked word for that saying counts. `identify` is broader than `match`
+  // because it also covers the words already printed on the card (e.g. "apple",
+  // "doctor", "milk"), which helps route an out-of-order answer to the right
+  // saying, but only `match` decides whether the guess is actually correct -
+  // otherwise reading back a visible word would count as filling in the blank.
+  food_famous_phrases: [
+    { label: 'away', identify: /\b(apple|doctor|away)\b/, match: /\baway\b/ },
+    { label: 'spilled', identify: /\b(spill(?:ed|ing)?|milk)\b/, match: /\bspill(?:ed|ing)?\b/ },
+    { label: 'peas and pod', identify: /\b(peas?|pod)\b/, match: /\b(peas?|pod)\b/ },
   ],
 };
 
@@ -1226,6 +1283,7 @@ export const isRecordableSessionAnswer = ({ step, content, wheelEvent }) =>
     !isAutoAdvanceProtocol(content) &&
     !isActivityRevealProtocol(content) &&
     !isActivityCompletionProtocol(content) &&
+    !isMealBuilderProtocol(content) &&
     step?.id &&
     step.recordAnswer !== false
   );
@@ -1550,6 +1608,27 @@ export const buildTopicSessionSummary = (answers = [], { themeSong = null } = {}
     'current_affairs_bridge_future',
   ].includes(item.stepId))) {
     addTopic('exploring the Auckland Harbour Bridge and its future');
+  }
+  if (meaningful.some((item) => ['food_naming_chef', 'food_naming_chef_answer'].includes(item.stepId))) {
+    addTopic('trying to name a well-known New Zealand cook');
+  }
+  if (meaningful.some((item) => item.stepId === 'food_fast_food_opinion')) {
+    addTopic('sharing an opinion on fast food');
+  }
+  if (meaningful.some((item) => item.stepId === 'food_famous_phrases')) {
+    addTopic('finishing well-known food sayings');
+  }
+  if (meaningful.some((item) => item.stepId === 'food_sensory_game')) {
+    addTopic('imagining a grocery store through the senses');
+  }
+  if (meaningful.some((item) => item.stepId === 'food_meal_plan')) {
+    addTopic('planning a meal together');
+  }
+  if (meaningful.some((item) => item.stepId === 'food_tag')) {
+    addTopic('playing a food word-chain game');
+  }
+  if (meaningful.some((item) => item.stepId === 'food_spin_question')) {
+    addTopic('reflecting on a food-related question from the wheel');
   }
   const wheelAnswer = meaningful.find((item) => ['current_affairs_spin_question', 'faces_scenes_spin_question'].includes(item.stepId));
   let wheelTopic = '';
@@ -2233,6 +2312,7 @@ const getSessionInactivityReminderWrite = async (sessionId, expectedActivityRevi
     const scriptContext = {
       name: getDisplayName(user),
       wheelQuestion: session.interactionState?.questionWheel?.question,
+      mealChoice: session.interactionState?.mealBuilder?.labels?.join(', '),
       currentAffairs,
       themeSong: getThemeSongForSession(session, user),
     };
@@ -2302,8 +2382,10 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
   const hasWheelProtocol = isQuestionWheelProtocol(userContent || '');
   const hasActivityRevealProtocol = isActivityRevealProtocol(userContent || '');
   const hasActivityCompletionProtocol = isActivityCompletionProtocol(userContent || '');
+  const hasMealBuilderProtocol = isMealBuilderProtocol(userContent || '');
   const wheelEvent = parseQuestionWheelEvent(userContent || '', step);
   const activityRevealEvent = parseActivityRevealEvent(userContent || '', step);
+  const mealBuilderEvent = parseMealBuilderEvent(userContent || '', step);
   if (!safetySupportTurn && hasWheelProtocol && !wheelEvent) {
     const err = new Error('Invalid question wheel option');
     err.status = 400;
@@ -2311,6 +2393,11 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
   }
   if (!safetySupportTurn && hasActivityRevealProtocol && !activityRevealEvent) {
     const err = new Error('Invalid activity reveal option');
+    err.status = 400;
+    throw err;
+  }
+  if (!safetySupportTurn && hasMealBuilderProtocol && !mealBuilderEvent) {
+    const err = new Error('Invalid meal builder selection');
     err.status = 400;
     throw err;
   }
@@ -2334,6 +2421,18 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
     (step.interaction?.type !== 'activityReveal' || effectiveTurnIndex !== 1)
   ) {
     const err = new Error('Activity interaction is not expected at this point');
+    err.status = 409;
+    throw err;
+  }
+  // Once the plate has been submitted (turn 1), the app is waiting on the spoken
+  // follow-up answer - a second meal-builder event at that point (e.g. a duplicate
+  // "That's my plate" press) must not be treated as a fresh choice.
+  if (
+    !safetySupportTurn &&
+    mealBuilderEvent &&
+    (step.interaction?.type !== 'mealBuilder' || effectiveTurnIndex !== 1)
+  ) {
+    const err = new Error('Meal builder selection is not expected at this point');
     err.status = 409;
     throw err;
   }
@@ -2512,6 +2611,8 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
       ? `Question wheel landed on ${wheelEvent.label}.`
       : activityRevealEvent
       ? `Revealed ${activityRevealEvent.option.label}.`
+      : mealBuilderEvent
+      ? `Chose ${mealBuilderEvent.labels.join(', ')} for the meal.`
       : hasActivityCompletionProtocol
       ? `Finished reenacting ${currentActivityOption.label}.`
       : hasMusicCompletionProtocol
@@ -2557,6 +2658,7 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
     recentMessages,
     name: getDisplayName(user),
     wheelQuestion: wheelEvent?.question || session.interactionState?.questionWheel?.question,
+    mealChoice: mealBuilderEvent?.labels?.join(', ') || session.interactionState?.mealBuilder?.labels?.join(', '),
     currentAffairs,
     themeSong,
   };
@@ -2604,6 +2706,7 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
       ? parseNamingSlotAnswer(userContent, {
           count: currentNamingSlotState.count,
           filled: currentNamingSlotState.filled,
+          contentRules: step.namingSlots.matchByContent ? SCRIPTED_INSTRUMENT_RULES[step.id] : null,
         })
       : null;
   const newlyFilledNamingSlots = namingSlotParse?.slots || [];
@@ -2637,7 +2740,7 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
   let adaptiveFollowUpQuestion = null;
   let emotionalSupportTurn = null;
   let orientationTurn = null;
-  if (!isQuestionWheelEvent && !isActivityInteractionEvent && userContent && hasDeliveredQuestion) {
+  if (!isQuestionWheelEvent && !isActivityInteractionEvent && !mealBuilderEvent && userContent && hasDeliveredQuestion) {
     emotionalSupportTurn = evaluateEmotionalSupportAnswer({
       content: userContent,
       hasActiveSupport: activeAdaptiveFollowUp?.kind === 'emotional_support',
@@ -2787,17 +2890,21 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
     newlyFilledNamingSlots.length > 0
   ) {
     const rules = SCRIPTED_INSTRUMENT_RULES[step.id];
-    const namedSounds = newlyFilledNamingSlots
+    const isFoodPhraseStep = step.id === 'food_famous_phrases';
+    const namedItems = newlyFilledNamingSlots
       .filter((slotIndex) => rules[slotIndex])
-      .map(
-        (slotIndex) =>
-          `the ${step.namingSlots.labels?.[slotIndex] || `${slotIndex + 1}`} sound is ${rules[slotIndex].label}`
+      .map((slotIndex) =>
+        isFoodPhraseStep
+          ? `the "${step.namingSlots.labels?.[slotIndex] || `${slotIndex + 1}`}" saying is missing ${rules[slotIndex].label}`
+          : `the ${step.namingSlots.labels?.[slotIndex] || `${slotIndex + 1}`} sound is ${rules[slotIndex].label}`
       );
     adaptiveText = await generateResponse(
       [
         {
           role: 'system',
-          content: buildCstInstrumentGuessInstructions({ recentMessages, namedSounds }),
+          content: isFoodPhraseStep
+            ? buildCstFoodPhraseGuessInstructions({ recentMessages, namedPhrases: namedItems })
+            : buildCstInstrumentGuessInstructions({ recentMessages, namedSounds: namedItems }),
         },
         { role: 'user', content: userContent },
       ],
@@ -2961,7 +3068,11 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
     hasDeliveredQuestion &&
     !namingSlotsComplete &&
     !shouldForceProgress
-      ? buildNamingSlotPrompt(namingMissingLabels, step.namingSlots.noun || 'sound')
+      ? buildNamingSlotPrompt(
+          namingMissingLabels,
+          step.namingSlots.noun || 'sound',
+          step.namingSlots.singlePrompt
+        )
       : '';
   const scriptedNextLine = namingSlotPromptLine || activityInteractionReply || (themeSongFeedback
     ? themeSongRequiresRetry
@@ -3118,6 +3229,11 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
   } else {
     delete nextInteractionState.questionWheel;
   }
+  if (mealBuilderEvent && step.interaction?.type === 'mealBuilder') {
+    nextInteractionState.mealBuilder = mealBuilderEvent;
+  } else if (displaySlide.interaction?.type !== 'mealBuilder') {
+    delete nextInteractionState.mealBuilder;
+  }
   if (displaySlide.interaction?.type === 'activityReveal') {
     nextInteractionState.activityReveal = step.interaction?.type === 'activityReveal'
       ? createActivityRevealState(displaySlide, nextActivityRevealState)
@@ -3178,6 +3294,7 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
       sessionId: session._id,
       suggestions:
         wheelEvent ||
+        mealBuilderEvent ||
         isActivityInteractionEvent ||
         isNameThatTuneStep(step) ||
         hasMusicCompletionProtocol ||
@@ -3227,6 +3344,7 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
         : null,
     questionWheel: session.interactionState?.questionWheel || null,
     activityReveal: session.interactionState?.activityReveal || null,
+    mealBuilder: session.interactionState?.mealBuilder || null,
     assistantText,
     speechSegments,
     sessionCompleteAfterResponse,

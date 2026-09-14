@@ -73,16 +73,13 @@ const TEST_SESSIONS = [
     title: "Sounds",
     theme: "Sounds",
   },
-  ...Array.from({ length: 1 }, (_, i) => {
-    const n = i + 5;
-    return {
-      id: `placeholder_session_${n}`,
-      label: `Session ${n}`,
-      title: "Coming soon",
-      theme: "",
-      disabled: true,
-    };
-  }),
+  {
+    id: "cst_food",
+    label: "Session 5",
+    title: "Food",
+    theme: "Food",
+    icon: "🍽️",
+  },
   {
     id: "cst_current_affairs",
     label: "Session 6",

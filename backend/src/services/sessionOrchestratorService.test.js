@@ -36,6 +36,7 @@ import {
   isVideoCompletionAnswer,
   parseAdaptiveTurn,
   parseActivityRevealEvent,
+  parseMealBuilderEvent,
   resolveThemeSongSelectionAnswer,
   respondToSessionTurn,
   selectRelevantMemoryEntries,
@@ -45,9 +46,10 @@ import {
 import {
   buildCstAdaptiveResponseInstructions,
   buildCstAdaptiveTurnInstructions,
+  buildCstFoodPhraseGuessInstructions,
   buildCstInstrumentGuessInstructions,
 } from './promptService.js';
-import { getScript, getScriptStep, renderScriptFollowUp, renderScriptReply } from './cstScriptService.js';
+import { getScript, getScriptStep, getScriptStepIndex, renderScriptFollowUp, renderScriptReply } from './cstScriptService.js';
 import Message from '../models/Message.js';
 import Session from '../models/Session.js';
 import User from '../models/User.js';
@@ -1739,4 +1741,226 @@ test('returns vetted news elaboration without advancing the backend-controlled s
   assert.equal(turn.scriptStep.nextIndex, 20);
   assert.equal(turn.slide.id, 'current_affairs_positive_news');
   assert.equal(session.scriptStepIndex, 20);
+});
+
+test('gives Session 5 a 26-step script aligned one-to-one with its markdown sections', () => {
+  const script = getScript('cst_food');
+  assert.equal(script.length, 26);
+
+  const md = readFileSync(
+    new URL('../../context/vCST_Session5_AI_Script.md', import.meta.url),
+    'utf8'
+  );
+  const sections = md.split(/\r?\n---\r?\n/).map((s) => s.trim()).filter(Boolean);
+  // One preamble section plus one section per executable step, in order.
+  assert.equal(sections.length, script.length + 1);
+
+  // Every step maps to exactly one deck slide, 1..26 with no gaps.
+  assert.deepEqual(
+    script.map((step) => step.deckSlide),
+    Array.from({ length: 26 }, (_, i) => i + 1)
+  );
+});
+
+test('summarises Session 5 food activities', () => {
+  const summary = buildTopicSessionSummary([
+    { stepId: 'food_naming_chef', answer: 'I think that might be a well-known cook.' },
+    { stepId: 'food_famous_phrases', answer: 'An apple a day keeps the doctor away.' },
+    { stepId: 'food_meal_plan', answer: 'Chose Roast Chicken, Salad for the meal.' },
+    { stepId: 'food_tag', answer: 'Apple, Egg, Grape.' },
+  ]);
+
+  assert.match(summary, /New Zealand cook/i);
+  assert.match(summary, /food sayings/i);
+  assert.match(summary, /planning a meal/i);
+});
+
+test('matches food sayings by content, not turn order, unlike anonymous sound clips', () => {
+  const step = getScriptStep('cst_food', 18).step;
+  assert.equal(step.id, 'food_famous_phrases');
+  assert.equal(step.namingSlots.matchByContent, true);
+  // Labels stay purely positional so a re-prompt never gives away a blanked word.
+  assert.deepEqual(step.namingSlots.labels, ['first', 'second', 'third']);
+
+  const contentRules = [
+    { match: /\b(apple|doctor|away)\b/ },
+    { match: /\b(spill(?:ed|ing)?|milk)\b/ },
+    { match: /\b(peas?|pod)\b/ },
+  ];
+  const fresh = createNamingSlotState(step);
+
+  // Answering the second saying first (out of order, no ordinal word) still
+  // lands on slot 1, not the next empty slot (0).
+  assert.deepEqual(
+    parseNamingSlotAnswer('spill milk', { ...fresh, contentRules }).slots,
+    [1]
+  );
+  assert.deepEqual(
+    parseNamingSlotAnswer('two peas in a pod', { ...fresh, contentRules }).slots,
+    [2]
+  );
+
+  // With no content match, it still falls back to ordinal/positional guessing.
+  const partial = createNamingSlotState(step, { filled: [false, true, false] });
+  assert.deepEqual(
+    parseNamingSlotAnswer('toast', { ...partial, contentRules }).slots,
+    [0]
+  );
+});
+
+test('re-prompts for missing food sayings without revealing their blanked words', () => {
+  const step = getScriptStep('cst_food', 18).step;
+  const line = buildNamingSlotPrompt(['second'], step.namingSlots.noun, step.namingSlots.singlePrompt);
+  assert.match(line, /how does the second saying go/i);
+  assert.doesNotMatch(line, /spill|milk|peas|pod/i);
+
+  const multiLine = buildNamingSlotPrompt(['second', 'third'], step.namingSlots.noun);
+  assert.match(multiLine, /second and third sayings/i);
+});
+
+test('acknowledges food-saying attempts leniently, by which words are present', () => {
+  const step = getScriptStep('cst_food', 18).step;
+
+  assert.equal(
+    evaluateNamedInstrumentSlots({ step, content: 'away', slotIndices: [0] }).outcomes[0].outcome,
+    'correct'
+  );
+  assert.equal(
+    evaluateNamedInstrumentSlots({ step, content: 'spill milk', slotIndices: [1] }).outcomes[0].outcome,
+    'correct'
+  );
+  assert.equal(
+    evaluateNamedInstrumentSlots({ step, content: 'peas and pod', slotIndices: [2] }).outcomes[0].outcome,
+    'correct'
+  );
+
+  const wrong = evaluateNamedInstrumentSlots({ step, content: 'banana', slotIndices: [0] });
+  assert.equal(wrong.outcomes[0].outcome, 'incorrect');
+
+  // Words already printed on the card (not blanked) should not count as
+  // correctly filling in the blank, even though they help identify which
+  // saying is being attempted.
+  assert.equal(
+    evaluateNamedInstrumentSlots({ step, content: 'apple', slotIndices: [0] }).outcomes[0].outcome,
+    'incorrect'
+  );
+  assert.equal(
+    evaluateNamedInstrumentSlots({ step, content: 'milk', slotIndices: [1] }).outcomes[0].outcome,
+    'incorrect'
+  );
+});
+
+test('builds the food-phrase acknowledgement prompt without asking a follow-up question', () => {
+  const prompt = buildCstFoodPhraseGuessInstructions({
+    recentMessages: [{ role: 'user', content: 'spill milk' }],
+    namedPhrases: ['the "second" saying is missing spilled and milk'],
+  });
+  assert.match(prompt, /spilled and milk/);
+  assert.match(prompt, /Do not ask a follow-up question/i);
+});
+
+test('accepts only configured meal-builder cards and requires at least one', () => {
+  const step = getScriptStep('cst_food', getScriptStepIndex('cst_food', 'food_meal_plan')).step;
+  assert.equal(step.interaction.type, 'mealBuilder');
+
+  const chosen = parseMealBuilderEvent(
+    '[[meal-builder:{"cardIds":["salad","salmon","not-a-card"]}]]',
+    step
+  );
+  assert.deepEqual(chosen.labels, ['Salad', 'Salmon']);
+
+  assert.equal(
+    parseMealBuilderEvent('[[meal-builder:{"cardIds":["not-a-card"]}]]', step),
+    null
+  );
+  assert.equal(
+    parseMealBuilderEvent('[[meal-builder:{"cardIds":[]}]]', step),
+    null
+  );
+});
+
+test('rejects meal-builder selections above the configured maxItems', () => {
+  const step = getScriptStep('cst_food', getScriptStepIndex('cst_food', 'food_meal_plan')).step;
+  assert.equal(step.interaction.maxItems, 3);
+
+  assert.equal(
+    parseMealBuilderEvent(
+      '[[meal-builder:{"cardIds":["salad","salmon","soup","bread-rolls"]}]]',
+      step
+    ),
+    null
+  );
+
+  const chosen = parseMealBuilderEvent(
+    '[[meal-builder:{"cardIds":["salad","salmon","soup"]}]]',
+    step
+  );
+  assert.deepEqual(chosen.labels, ['Salad', 'Salmon', 'Soup']);
+});
+
+test('does not record meal-builder controls as conversational answers', () => {
+  const step = getScriptStep('cst_food', getScriptStepIndex('cst_food', 'food_meal_plan')).step;
+  assert.equal(isRecordableSessionAnswer({
+    step,
+    content: '[[meal-builder:{"cardIds":["salad"]}]]',
+    wheelEvent: null,
+  }), false);
+});
+
+test('rejects a duplicate meal-builder submission once the plate has already been sent', async (t) => {
+  const originals = {
+    sessionFindOneAndUpdate: Session.findOneAndUpdate,
+    userFindById: User.findById,
+    memoryFindOne: Memory.findOne,
+    messageFind: Message.find,
+    messageCreate: Message.create,
+  };
+  t.after(() => {
+    Session.findOneAndUpdate = originals.sessionFindOneAndUpdate;
+    User.findById = originals.userFindById;
+    Memory.findOne = originals.memoryFindOne;
+    Message.find = originals.messageFind;
+    Message.create = originals.messageCreate;
+  });
+
+  const mealPlanIndex = getScriptStepIndex('cst_food', 'food_meal_plan');
+  const session = {
+    _id: 'session-food-meal-plan',
+    userId: 'user-food-meal-plan',
+    status: 'active',
+    pipelineMode: 'free',
+    scriptId: 'cst_food',
+    scriptStepIndex: mealPlanIndex,
+    // Turn 1 (the plate submission) already happened; the app is now waiting on
+    // the spoken answer to the "did you used to cook this" follow-up.
+    scriptStepTurnIndex: 2,
+    scriptStepRetryCount: 0,
+    activityRevision: 1,
+    interactionState: {
+      sessionAnswers: [],
+      mealBuilder: { cards: [{ id: 'salad', label: 'Salad' }], labels: ['Salad'] },
+    },
+    save: async () => session,
+  };
+
+  Session.findOneAndUpdate = async () => session;
+  User.findById = () => ({ lean: async () => ({ _id: session.userId, name: 'Test User' }) });
+  Memory.findOne = () => ({ lean: async () => null });
+  Message.find = () => ({
+    sort() { return this; },
+    limit() { return this; },
+    lean: async () => [{
+      role: 'assistant',
+      content: 'Salad — that sounds lovely. Is that something you used to cook yourself, or something someone used to make for you?',
+    }],
+  });
+  Message.create = async (message) => ({ _id: `${message.role}-message`, ...message });
+
+  await assert.rejects(
+    respondToSessionTurn({
+      sessionId: session._id,
+      content: '[[meal-builder:{"cardIds":["salad"]}]]',
+    }),
+    (error) => error.status === 409
+  );
 });

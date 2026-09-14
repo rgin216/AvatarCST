@@ -1,4 +1,6 @@
 import MatchingActivity from "../components/MatchingActivity.jsx";
+import MealBuilderActivity from "../components/MealBuilderActivity.jsx";
+import PhraseCardsActivity from "../components/PhraseCardsActivity.jsx";
 import { useEffect, useRef, useState } from "react";
 import AvatarViewer from "../components/avatar/AvatarViewer";
 import api from "../services/api.js";
@@ -314,13 +316,15 @@ export default function SessionPage({
     Number(slide.inactivityTimeoutMs) || 0
   );
   const matchingInteraction = slide.interaction?.type === "matching" ? slide.interaction : null;
+  const mealBuilderInteraction = slide.interaction?.type === "mealBuilder" ? slide.interaction : null;
+  const phraseCardsInteraction = slide.interaction?.type === "phraseCards" ? slide.interaction : null;
   const realOrAiInteraction = slide.interaction?.type === "realOrAi";
   const hasSlideInteraction =
     hasWheelInteraction ||
     Boolean(exerciseVideo) ||
     hasPositiveNewsInteraction ||
     Boolean(musicInteraction) ||
-    hasActivityRevealInteraction || Boolean(matchingInteraction) || isSingleAudioClip;
+    hasActivityRevealInteraction || Boolean(matchingInteraction) || Boolean(mealBuilderInteraction) || Boolean(phraseCardsInteraction) || isSingleAudioClip;
   const landedWheelResult = questionWheel?.status === "landed" ? questionWheel : null;
   const sessionInputDisabled =
     typing ||
@@ -1230,7 +1234,7 @@ export default function SessionPage({
 
   async function sendMessage(text, displayText = text) {
     const content = text.trim();
-    if (!content || typing || wheelResultPendingRef.current) return;
+    if (!content || typing || wheelResultPendingRef.current) return false;
     registerUserActivity();
 
     setMessages((items) => [...items, { from: "user", text: displayText.trim() }]);
@@ -1244,6 +1248,7 @@ export default function SessionPage({
         lipSyncMode,
       });
       applyTurn(data);
+      return true;
     } catch (err) {
       console.error("Failed to get assistant response", err);
       setMessages((items) => [
@@ -1253,6 +1258,7 @@ export default function SessionPage({
           text: "I am having trouble connecting right now. Let us take a breath and try again in a moment.",
         },
       ]);
+      return false;
     } finally {
       setTyping(false);
     }
@@ -1536,7 +1542,7 @@ export default function SessionPage({
 
       <main className="session-slide-shell">
         <section
-          className={`ppt-slide${slide.imageUrl && !hasSlideInteraction ? " has-slide-image" : ""}${hasSlideInteraction ? " has-slide-interaction" : ""}${exerciseVideo ? " has-video-interaction" : ""}${hasPositiveNewsInteraction ? " has-news-interaction" : ""}${musicInteraction ? " has-music-interaction" : ""}${hasActivityRevealInteraction ? " has-activity-reveal-interaction" : ""}${matchingInteraction ? " has-matching-interaction" : ""}${isSingleAudioClip ? " has-audioclips-interaction" : ""}`}
+          className={`ppt-slide${slide.imageUrl && !hasSlideInteraction ? " has-slide-image" : ""}${hasSlideInteraction ? " has-slide-interaction" : ""}${exerciseVideo ? " has-video-interaction" : ""}${hasPositiveNewsInteraction ? " has-news-interaction" : ""}${musicInteraction ? " has-music-interaction" : ""}${hasActivityRevealInteraction ? " has-activity-reveal-interaction" : ""}${matchingInteraction ? " has-matching-interaction" : ""}${mealBuilderInteraction ? " has-meal-builder-interaction" : ""}${phraseCardsInteraction ? " has-phrase-cards-interaction" : ""}${isSingleAudioClip ? " has-audioclips-interaction" : ""}`}
           style={{
             "--slide-accent": slide.accent || theme.blush,
             backgroundImage: slide.imageUrl && !hasSlideInteraction ? `url(${slide.imageUrl})` : undefined,
@@ -1611,6 +1617,8 @@ export default function SessionPage({
             </div>
           )}
           {matchingInteraction && <MatchingActivity key={slide.id || slide.index} interaction={matchingInteraction} title={slide.title} disabled={typing || wheelResultPending} submitDisabled={sessionInputDisabled} onActivity={registerUserActivity} onComplete={(content) => sendMessage(content, "My matches are ready.")} />}
+          {mealBuilderInteraction && <MealBuilderActivity key={slide.id || slide.index} interaction={mealBuilderInteraction} title={slide.title} disabled={typing || wheelResultPending || isRecording} submitDisabled={sessionInputDisabled || isRecording} onActivity={registerUserActivity} onComplete={(content) => sendMessage(content, "My plate is ready.")} />}
+          {phraseCardsInteraction && <PhraseCardsActivity key={slide.id || slide.index} interaction={phraseCardsInteraction} title={slide.title} />}
           {realOrAiInteraction && <div className="real-ai-choices" aria-label="Choose your guess">
             {['Real person', 'AI generated', 'Not sure'].map((answer) => <button type="button" key={answer} disabled={sessionInputDisabled} onClick={() => sendMessage(answer)}>{answer}</button>)}
           </div>}

@@ -12,6 +12,7 @@ const scriptSlideFolders = {
   cst_childhood: 'session2',
   cst_physical_games: 'session3',
   cst_sounds: 'session4',
+  cst_food: 'session5',
   cst_current_affairs: 'session6',
   cst_faces_scenes: 'session7',
 };
@@ -83,6 +84,29 @@ const currentAffairsWheelOptions = [
   { label: 'Favourite Music', question: 'What kind of music do you most enjoy?' },
   { label: 'Favourite TV Show', question: 'Do you have a favourite television show?' },
   { label: 'Favourite Season', question: 'Which season do you enjoy most, and why?' },
+];
+
+const foodWheelOptions = [
+  { label: 'Favourite Meal', question: 'What is one of your favourite meals?' },
+  { label: 'Family Recipe', question: 'Is there a family recipe that has been passed down?' },
+  { label: 'Baking', question: 'Did you ever enjoy baking? What did you like to make?' },
+  { label: 'Sunday Dinner', question: 'What did a special family meal look like when you were growing up?' },
+  { label: 'A Restaurant', question: 'Is there a restaurant or cafe you remember fondly?' },
+  { label: 'Growing Food', question: 'Did your family ever grow your own fruit or vegetables?' },
+  { label: 'A Treat', question: 'What was a special treat you looked forward to as a child?' },
+  { label: 'Cooking for Others', question: 'Did you enjoy cooking for family or friends?' },
+  { label: 'Kitchen Memories', question: 'What do you remember about the kitchen where you grew up?' },
+  { label: 'A Celebration Meal', question: 'What food reminds you of a celebration or holiday?' },
+  { label: 'Market Day', question: 'Did you ever visit a local market for fresh food?' },
+  { label: 'Comfort Food', question: 'What is a food that always makes you feel better?' },
+  { label: 'Learning to Cook', question: 'Who taught you how to cook, if anyone?' },
+  { label: 'A Smell', question: 'Is there a smell from cooking that brings back a memory?' },
+  { label: 'Eating Out', question: 'Did your family go out for meals often, or mostly eat at home?' },
+  { label: 'A Picnic', question: 'Do you remember a picnic or an outdoor meal you enjoyed?' },
+  { label: 'Sweet Tooth', question: 'Do you have a sweet tooth? What is your favourite dessert?' },
+  { label: 'Then and Now', question: 'How has the food you eat changed over the years?' },
+  { label: 'A Kitchen Gadget', question: 'Is there a kitchen tool or gadget you have always liked using?' },
+  { label: 'Sharing a Meal', question: 'Who do you most enjoy sharing a meal with?' },
 ];
 
 const scripts = {
@@ -1652,6 +1676,251 @@ const scripts = {
       recordAnswer: false,
       reply: ({ name }) =>
         `That brings us to the end of today's session, ${name}. Our next session will explore Food. Take good care, and I will look forward to seeing you next time.`,
+    },
+  ],
+  cst_food: [
+    ...buildStandardSessionOpening({
+      prefix: 'food',
+      deckLabel: 'NZ05. Food',
+      welcome: {
+        title: 'AI-supported Individual Cognitive Stimulation Therapy',
+        sessionNumber: 5,
+        sessionTitle: 'Food',
+        reply: ({ name }) =>
+          `Welcome back, ${name}. It is lovely to see you again. Today is our fifth session, and our theme will be Food. When you are ready, say "I'm ready" to begin.`,
+      },
+      themeSong: {
+        title: 'Theme Song',
+        subtitle: 'Our song from an earlier session',
+        bullets: ['Theme song', 'Listen together'],
+        reply: ({ themeSong }) =>
+          themeSong?.status === 'available'
+            ? `Let us begin with the theme song you chose earlier, ${themeSong.track.name} by ${themeSong.track.artistLabel}. It can play for up to one minute. When you have finished listening, press Done, or say or type done.`
+            : 'I could not find a saved theme song from an earlier session. Press Done, or say or type done, when you are ready to continue.',
+      },
+      currentAffairsSlide: {
+        subtitle: 'A positive story',
+        reply: ({ currentAffairs }) =>
+          currentAffairs?.status === 'available'
+            ? `Here is a positive story from New Zealand: ${currentAffairs.article.title}. You can ask me to tell you more, or tell me what you think about it.`
+            : 'I could not find a new positive New Zealand story just now. Have you heard anything pleasant or interesting lately?',
+      },
+      exercise: {
+        reply: () =>
+          'Next is a short seated exercise to get the blood flowing. Please sit comfortably and safely on a sturdy chair. The video will start after I finish speaking. Only do what feels comfortable. When you are finished, press Done, or say or type done.',
+      },
+      themeIntro: {
+        sessionTitle: 'Food',
+        bullets: ['Cooking', 'Meals', 'Food memories'],
+      },
+    }),
+    {
+      id: 'food_naming_chef',
+      turns: 1,
+      acceptAnyAnswer: true,
+      deckSlide: 16,
+      title: 'Who Is This?',
+      subtitle: 'A well-known New Zealand face',
+      prompt: 'Who is the lady on the slide?',
+      bullets: ['A well-known New Zealand cook', 'It is fine to guess'],
+      visualHint: 'Source deck: NZ05. Food, slide 16',
+      accent: '#00AEEF',
+      reply: () =>
+        'On this slide is a well-known face from New Zealand kitchens. Do you recognise who this lady is? It is completely fine to guess.',
+    },
+    {
+      id: 'food_naming_chef_answer',
+      turns: 1,
+      acceptAnyAnswer: true,
+      deckSlide: 17,
+      title: 'Alison Holst',
+      subtitle: 'A well-known New Zealand cook',
+      prompt: 'What was home cooking like for you?',
+      bullets: ['A well-known cookbook author', 'A recollection prompt'],
+      visualHint: 'Source deck: NZ05. Food, slide 17',
+      accent: '#A8C5A0',
+      reply: () =>
+        'That was Alison Holst, a well-known New Zealand cookbook author and home economist whose recipes were kitchen staples in many Kiwi households for decades. What was home cooking like in your house growing up?',
+    },
+    {
+      id: 'food_fast_food_opinion',
+      turns: 1,
+      acceptAnyAnswer: true,
+      deckSlide: 18,
+      title: 'Fast Food',
+      subtitle: 'What do you think?',
+      prompt: 'What is your opinion of fast food?',
+      bullets: ['A discussion prompt', 'There is no right answer'],
+      visualHint: 'Source deck: NZ05. Food, slide 18',
+      accent: '#F47C20',
+      reply: () => 'These days there is fast food nearly everywhere you look. What is your opinion of fast food?',
+    },
+    {
+      id: 'food_famous_phrases',
+      turns: 1,
+      deckSlide: 19,
+      title: 'Famous Food Phrases',
+      subtitle: 'Finish the saying',
+      prompt: 'Can you finish these old sayings?',
+      bullets: ['An apple a day keeps the doctor away', 'No point crying over spilled milk', 'Two peas in a pod'],
+      visualHint: 'Source deck: NZ05. Food, slide 19',
+      accent: '#F4C8B0',
+      // Advances only once all three sayings have an attempt; re-prompts for the missing ones.
+      // Labels are purely positional (not "apple"/"milk"/"peas") so a re-prompt for
+      // an unattempted saying never gives away its blanked word.
+      namingSlots: {
+        count: 3,
+        labels: ['first', 'second', 'third'],
+        noun: 'saying',
+        singlePrompt: (label) => `And how does the ${label} saying go?`,
+        // Each saying is content-identifiable (unlike anonymous sound clips), so
+        // match which one they just attempted by content, not by turn order.
+        matchByContent: true,
+      },
+      interaction: {
+        type: 'phraseCards',
+        cards: [
+          { id: 'apple', text: 'An apple a day keeps the doctor ___.' },
+          { id: 'spilled-milk', text: 'There is no point crying over ___ milk.' },
+          { id: 'peas-in-a-pod', text: 'Two ___ in a ___.' },
+        ],
+      },
+      reply: () =>
+        'On the slide are three well-known food sayings, each missing a word or two. Have a look at each one and see if you can finish it. It is completely fine to guess.',
+    },
+    {
+      id: 'food_sensory_game',
+      turns: 1,
+      deckSlide: 20,
+      title: 'Grocery Store Sensory Game',
+      subtitle: 'Close your eyes and imagine',
+      prompt: 'What comes to mind first?',
+      bullets: ['Something you could feel', 'Something sour', 'Something you could smell', 'Something loud to eat'],
+      visualHint: 'Source deck: NZ05. Food, slide 20',
+      accent: '#7A9DAD',
+      reply: () =>
+        'Close your eyes for a moment and imagine walking through a grocery store. On the slide are a few prompts — something you could recognise by feel, something sour, something by smell, or something loud to eat. Whichever one comes to mind first, tell me about it.',
+    },
+    {
+      id: 'food_brain_health',
+      turns: 1,
+      deckSlide: 21,
+      title: "What's Good for Your Heart is Good for Your Brain",
+      subtitle: 'A quick note',
+      prompt: 'Foods that are good for the brain',
+      bullets: ['Berries', 'Fish', 'Nuts'],
+      visualHint: 'Source deck: NZ05. Food, slide 21',
+      accent: '#4472C4',
+      interaction: { type: 'autoAdvance' },
+      recordAnswer: false,
+      reply: () =>
+        "Here's something interesting — a lot of what is good for your brain is things you probably already enjoy, like berries, nuts, and fish.",
+    },
+    {
+      id: 'food_meal_plan',
+      turns: 2,
+      deckSlide: 22,
+      title: 'Plan a Meal Together',
+      subtitle: 'Build a dinner plate',
+      prompt: 'Choose a few foods for a dinner',
+      bullets: ['Drag or tap a few favourites', 'No wrong combination'],
+      visualHint: 'Source deck: NZ05. Food, slide 22',
+      accent: '#A8C5A0',
+      interaction: {
+        type: 'mealBuilder',
+        maxItems: 3,
+        cards: [
+          { id: 'roast-chicken', label: 'Roast Chicken', emoji: '🍗' },
+          { id: 'mashed-potatoes', label: 'Mashed Potatoes', emoji: '🥔' },
+          { id: 'salad', label: 'Salad', emoji: '🥗' },
+          { id: 'salmon', label: 'Salmon', emoji: '🐟' },
+          { id: 'soup', label: 'Soup', emoji: '🍲' },
+          { id: 'bread-rolls', label: 'Bread Rolls', emoji: '🥖' },
+        ],
+      },
+      adaptiveFollowUp: adaptiveReminiscence(
+        'Ask whether that combination is something they used to cook themselves, or something someone used to make for them.'
+      ),
+      reply: () =>
+        "Let's plan a meal together. Choose a few foods from the cards to build a dinner plate — drag one onto the plate, or just tap it.",
+      followUps: [
+        ({ mealChoice }) =>
+          mealChoice
+            ? `${mealChoice} — that sounds like a lovely dinner. Is that something you used to cook yourself, or something someone used to make for you?`
+            : 'That sounds like a lovely dinner. Is that something you used to cook yourself, or something someone used to make for you?',
+      ],
+    },
+    {
+      id: 'food_tag',
+      turns: 1,
+      deckSlide: 23,
+      title: 'Food Tag',
+      subtitle: 'A food word chain',
+      prompt: 'Keep the chain going',
+      bullets: ['Apple, Egg, Grape...', 'Keep the chain going as far as you can'],
+      visualHint: 'Source deck: NZ05. Food, slide 23',
+      accent: '#F47C20',
+      inactivityTimeoutMs: 4 * 60 * 1000,
+      reply: () =>
+        'Let\'s try a little word game called Food Tag. I will start: Apple. The next food has to start with the last letter, so, Egg. Now it is your turn — keep the chain going as far as you can.',
+    },
+    {
+      id: 'food_spin_question',
+      turns: 2,
+      deckSlide: 24,
+      title: 'Question Wheel',
+      subtitle: 'Spin',
+      prompt: 'Spin the wheel',
+      bullets: ['Meals', 'Memories', 'Family', 'Everyday life'],
+      visualHint: 'Source deck: NZ05. Food, slide 24',
+      accent: '#A8C5A0',
+      interaction: {
+        type: 'questionWheel',
+        options: foodWheelOptions,
+      },
+      adaptiveFollowUp: adaptiveReminiscence(
+        'Deepen the landed topic with one question about a memory, preference, reason, person, place, or then-versus-now comparison.'
+      ),
+      reply: () => 'Now we have the question wheel. Press spin the wheel, and I will ask the question it lands on.',
+      followUps: [
+        ({ wheelQuestion }) => wheelQuestion || 'What question did the wheel land on?',
+      ],
+    },
+    {
+      id: 'food_summary_song',
+      turns: 2,
+      deckSlide: 25,
+      title: 'Finally',
+      subtitle: 'Looking back over today',
+      prompt: 'What have we done today?',
+      bullets: ['Theme song', 'Summarise today'],
+      visualHint: 'Source deck: NZ05. Food, slide 25',
+      accent: '#F4C8B0',
+      interaction: spotifySongInteraction({ summarizeOnComplete: true }),
+      recordAnswer: false,
+      reply: ({ themeSong }) =>
+        themeSong?.status === 'available'
+          ? `Before we look back over today, your theme song, ${themeSong.track.name} by ${themeSong.track.artistLabel}, is ready to play again. When you have finished listening, press Done, or say or type done.`
+          : 'Before we look back over today, I was not able to prepare the theme song this time. Press Done, or say or type done, when you are ready to continue.',
+      followUps: [
+        ({ sessionSummary }) =>
+          `Now let us look back over what we have done today. ${sessionSummary || 'Today, you explored food, cooking, and shared meals together.'} What is one part of today that you would like to remember?`,
+      ],
+    },
+    {
+      id: 'food_closing',
+      turns: 1,
+      autoCompleteAfterNarration: true,
+      deckSlide: 26,
+      title: 'The Theme of the Next Session',
+      subtitle: 'Session 6: Current Affairs',
+      prompt: 'See you next time',
+      bullets: ['Thank you', 'Next session', 'Current Affairs'],
+      visualHint: 'Source deck: NZ05. Food, slide 26',
+      accent: '#4472C4',
+      recordAnswer: false,
+      reply: ({ name }) =>
+        `That brings us to the end of today's session, ${name}. Our next session will explore Current Affairs. Take good care, and I will look forward to seeing you next time.`,
     },
   ],
 };
