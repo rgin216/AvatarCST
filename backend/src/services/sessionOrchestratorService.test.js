@@ -37,6 +37,7 @@ import {
   parseAdaptiveTurn,
   parseActivityRevealEvent,
   parseMealBuilderEvent,
+  resolveNamingSlotReveal,
   resolveThemeSongSelectionAnswer,
   respondToSessionTurn,
   selectRelevantMemoryEntries,
@@ -1848,6 +1849,119 @@ test('acknowledges food-saying attempts leniently, by which words are present', 
     evaluateNamedInstrumentSlots({ step, content: 'milk', slotIndices: [1] }).outcomes[0].outcome,
     'incorrect'
   );
+});
+
+test('gives Session 8 a 25-step script aligned one-to-one with its markdown sections', () => {
+  const script = getScript('cst_word_associations');
+  assert.equal(script.length, 25);
+
+  const md = readFileSync(
+    new URL('../../context/vCST_Session8_AI_Script.md', import.meta.url),
+    'utf8'
+  );
+  const sections = md.split(/\r?\n---\r?\n/).map((s) => s.trim()).filter(Boolean);
+  // One preamble section plus one section per executable step, in order.
+  assert.equal(sections.length, script.length + 1);
+
+  // Every step maps to a deck slide, 1..24 with no gaps - the fill-blanks
+  // step and its category follow-up intentionally share slide 20.
+  const deckSlides = script.map((step) => step.deckSlide);
+  assert.equal(deckSlides[0], 1);
+  assert.equal(Math.max(...deckSlides), 24);
+  const distinctInOrder = [...new Set(deckSlides)];
+  assert.deepEqual(distinctInOrder, Array.from({ length: 24 }, (_, i) => i + 1));
+});
+
+test('summarises Session 8 word-association activities', () => {
+  const summary = buildTopicSessionSummary([
+    { stepId: 'word_associations_missing_word', answer: 'A cup of tea, a pair of shoes, a pint of milk.' },
+    { stepId: 'word_associations_pairs', answer: 'Salt and pepper.' },
+    { stepId: 'word_associations_famous_phrases', answer: 'Practice makes perfect.' },
+    { stepId: 'word_associations_match_phrase', answer: 'Matched the sayings.' },
+  ]);
+
+  assert.match(summary, /missing words/i);
+  assert.match(summary, /word pairs/i);
+  assert.match(summary, /well-known sayings/i);
+  assert.match(summary, /matching sayings/i);
+});
+
+test('summarises Session 8 category and word-chain activities', () => {
+  const summary = buildTopicSessionSummary([
+    { stepId: 'word_associations_category', answer: 'They are all sayings about money.' },
+    { stepId: 'word_associations_connect_a_word', answer: 'Ant, picnic, basket.' },
+  ]);
+
+  assert.match(summary, /link between a set of sayings/i);
+  assert.match(summary, /word-association chain game/i);
+});
+
+test('reveals the scripted answer for a Session 8 phrase slot regardless of correctness', () => {
+  const step = getScriptStep('cst_word_associations', getScriptStepIndex('cst_word_associations', 'word_associations_famous_phrases')).step;
+
+  assert.deepEqual(
+    resolveNamingSlotReveal({ step, content: 'perfect', slotIndices: [0] }),
+    [{ index: 0, text: 'perfect' }]
+  );
+  // Revealed regardless of whether the guess was actually right.
+  assert.deepEqual(
+    resolveNamingSlotReveal({ step, content: 'banana', slotIndices: [0] }),
+    [{ index: 0, text: 'perfect' }]
+  );
+});
+
+test('echoes back the participant\'s own word for an open-ended Session 8 blank', () => {
+  const step = getScriptStep('cst_word_associations', getScriptStepIndex('cst_word_associations', 'word_associations_missing_word')).step;
+
+  assert.deepEqual(
+    resolveNamingSlotReveal({ step, content: 'tea', slotIndices: [0] }),
+    [{ index: 0, text: 'tea' }]
+  );
+});
+
+test('routes an open-ended blank by its container word, not turn order', () => {
+  const step = getScriptStep('cst_word_associations', getScriptStepIndex('cst_word_associations', 'word_associations_missing_word')).step;
+  assert.equal(step.namingSlots.matchByContent, true);
+  const fresh = createNamingSlotState(step);
+
+  // Answering "pair" first (out of order, no ordinal word) must land on slot
+  // 1, not slot 0 just because it was the first thing said.
+  const contentRules = [
+    { identify: /\bcups?\b/ },
+    { identify: /\bpairs?\b/ },
+    { identify: /\bpints?\b/ },
+  ];
+  assert.deepEqual(
+    parseNamingSlotAnswer('a pair of bunce', { ...fresh, contentRules }).slots,
+    [1]
+  );
+});
+
+test('caps an open-ended reveal to one word even for a rambling answer', () => {
+  const step = getScriptStep('cst_word_associations', getScriptStepIndex('cst_word_associations', 'word_associations_missing_word')).step;
+
+  assert.deepEqual(
+    resolveNamingSlotReveal({
+      step,
+      content: 'a cup of reminds me of a cup of water',
+      slotIndices: [0],
+    }),
+    [{ index: 0, text: 'water' }]
+  );
+});
+
+test('identifies all three slots from one rambling answer joined by "and then"', () => {
+  const step = getScriptStep('cst_word_associations', getScriptStepIndex('cst_word_associations', 'word_associations_missing_word')).step;
+  const fresh = createNamingSlotState(step);
+
+  // Previously "socks, and then a pint" only produced 2 fragments (the shared
+  // whitespace between "and" and "then" was eaten by the first match), so the
+  // third answer never got a slot and the app kept asking to repeat it.
+  const result = parseNamingSlotAnswer(
+    'a cup of water, a pair of socks, and then a pint of lager',
+    fresh
+  );
+  assert.deepEqual(result.slots, [0, 1, 2]);
 });
 
 test('builds the food-phrase acknowledgement prompt without asking a follow-up question', () => {
