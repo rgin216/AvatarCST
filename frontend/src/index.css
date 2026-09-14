@@ -1289,7 +1289,7 @@ body {
     repeating-conic-gradient(
       from 0deg,
       rgba(255, 255, 255, 0.9) 0deg 0.7deg,
-      transparent 0.7deg 18deg
+      transparent 0.7deg var(--wheel-slice-degrees, 18deg)
     );
   pointer-events: none;
 }
@@ -1309,13 +1309,13 @@ body {
   position: absolute;
   left: 50%;
   top: 0;
-  width: 26cqi;
+  width: var(--wheel-label-max-width, 26cqi);
   color: #111827;
   font: 900 clamp(8px, calc(3.38cqi - 1px), 28px) Nunito, sans-serif;
   line-height: 1.04;
   text-align: center;
   text-wrap: balance;
-  transform: translate(-50%, -50%) rotate(270deg);
+  transform: translate(-50%, -50%) rotate(calc(270deg + var(--label-flip, 0deg)));
   transform-origin: center;
   overflow-wrap: normal;
 }
