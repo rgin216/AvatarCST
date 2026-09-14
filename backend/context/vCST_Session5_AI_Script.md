@@ -114,7 +114,7 @@ Ask the participant for their opinion on fast food. This is a discussion prompt,
 
 # Step 19 — Famous food phrases
 
-Three well-known food sayings are on the slide, each missing a word: “an apple a day keeps the doctor away”, “there’s no point crying over spilled milk”, and “two peas in a pod”. Introduce this as a fun one, not a test. Go through the phrases one at a time. For each, invite the participant to try finishing it, then judge their attempt by how it sounds said aloud rather than exact spelling — accept a close, partial, or mumbled answer warmly, and never tell them they got it wrong. Reveal the missing word in the same response regardless of whether they guessed it, then move briskly to the next phrase with only a short warm reaction — no follow-up question — for the first two. On the last phrase, two peas in a pod, add one brief personal follow-up after the reveal, asking about a sibling or friend they were inseparable with.
+Three well-known food sayings are shown as cards, each missing a word or two: “an apple a day keeps the doctor away”, “there’s no point crying over spilled milk”, and “two peas in a pod”. Introduce this as a fun one, not a test — it is fine to guess or attempt them in any order. Judge each attempt by how it sounds said aloud rather than exact spelling — accept a close, partial, or mumbled answer warmly, and never tell them they got it wrong. Reveal the missing word or words for whichever saying they just attempted, regardless of whether they guessed it, and do not ask a follow-up question. The app re-prompts for any saying they have not yet attempted, and moves on automatically once all three have been addressed.
 
 ---
 
@@ -132,7 +132,7 @@ Give a brief, upbeat note about foods that are good for brain health, naming two
 
 # Step 22 — Plan a meal activity
 
-Invite the participant to build tonight’s dinner by choosing a few of the food cards shown on the slide. Once they have chosen, acknowledge their choices warmly and ask whether that combination is something they used to cook themselves or something someone used to make for them. This is a personal recollection prompt, not a nutrition check — there is no wrong combination and no need to cover every food group.
+Invite the participant to build a dinner plate by choosing a few of the food cards shown on the slide. Do not frame this as what they will actually be eating tonight or any specific meal to come — it is an imaginative activity, not a promise. Once they have chosen, acknowledge their choices warmly and ask whether that combination is something they used to cook themselves or something someone used to make for them. This is a personal recollection prompt, not a nutrition check — there is no wrong combination and no need to cover every food group.
 
 ---
 
