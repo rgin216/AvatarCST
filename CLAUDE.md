@@ -18,15 +18,19 @@ The project has moved beyond the old "basic backend foundation" phase. The main 
 
 - React/Vite frontend and Express/Mongo backend.
 - Login flow that creates or loads a patient user by name.
-- Landing flow with four test sessions:
+- Landing flow with seven test sessions:
   - `cst_intro_reminiscence` - Session 1: Introduction and Welcome.
   - `cst_childhood` - Session 2: Getting to Know You: Childhood.
   - `cst_physical_games` - Session 3: Physical Games.
   - `cst_sounds` - Session 4: Sounds.
+  - `cst_food` - Session 5: Food.
+  - `cst_current_affairs` - Session 6: Current Affairs.
+  - `cst_faces_scenes` - Session 7: Faces and Scenes.
 - Scripted session orchestration through `POST /api/sessions/:id/respond`.
 - Microphone input path through `POST /api/sessions/:id/respond-audio`.
-- Slide-backed session UI using exported slide images under `frontend/public/slides/session1/` through `session4/`.
+- Slide-backed session UI using exported slide images under `frontend/public/slides/session1/` through `session7/`.
 - Session 4 adds an `audioClips` slide interaction: local `.mp3` clips in `frontend/public/audio/session4/` for the instrument-sounds slide and the Name That Tune slides, with a per-slot naming tracker and lenient right/wrong acknowledgement.
+- Session 5 adds a `mealBuilder` slide interaction (drag-or-tap food cards onto a plate, mobile/desktop via Pointer Events) and a `phraseCards` slide interaction (blanked food sayings, judged the same way as Session 4's instrument naming but by content rather than turn order, so an out-of-order answer still lands on the right saying).
 - Local avatar rendering with:
   - male avatar path based on `frontend/public/models/harry.glb`,
   - experimental female/avatar mode path,
@@ -41,7 +45,7 @@ The project has moved beyond the old "basic backend foundation" phase. The main 
 - Memory is stored, reviewed, and injected, but retrieval is currently broad and simple: the orchestrator loads approved memory entries and passes a small slice back as `memoryUsed`. There is no semantic search or scoring yet.
 - `suggestedMemoryUpdates` is heuristic only, based on simple regexes in `sessionOrchestratorService.js`, and is saved as pending caregiver-review memory.
 - The current voice paths still wait for a recorded browser audio blob before transcription starts; they are lower-latency response paths, not live full-duplex voice.
-- The two sessions are useful test scripts, not polished clinical content.
+- The seven sessions are useful test scripts, not polished clinical content.
 - Docs other than this file may still be stale; prefer source files over README text when they disagree.
 
 ## Current Audio / LLM Pipeline
@@ -124,12 +128,12 @@ The session state fields that matter most are:
 Script data is currently split across two layers:
 
 - `backend/src/services/cstScriptService.js` contains executable session steps used by the app.
-- `backend/context/vCST_Session1_AI_Script.md` through `vCST_Session4_AI_Script.md` hold fuller source script text and adaptation guidance. Each markdown file has one `---`-separated section per executable step, in order, after a preamble section.
+- `backend/context/vCST_Session1_AI_Script.md` through `vCST_Session7_AI_Script.md` hold fuller source script text and adaptation guidance. Each markdown file has one `---`-separated section per executable step, in order, after a preamble section.
 - `backend/context/vCST_Initial_Prompt.md` defines Aria's tone and CST facilitation principles.
 
 Slide images live in:
 
-- `frontend/public/slides/session1/` through `frontend/public/slides/session4/`
+- `frontend/public/slides/session1/` through `frontend/public/slides/session7/`
 
 When adding a session:
 
@@ -319,7 +323,7 @@ The proposed order sounds right:
    - Keep the free Groq/Edge path and OpenAI fast path behaviorally aligned.
 
 3. Session polish.
-   - Improve the two test sessions' scripts.
+   - Improve the test sessions' scripts.
    - Add caregiver-visible session summaries.
    - Reduce visible dev/debug chrome before demos.
 
