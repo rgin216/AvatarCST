@@ -5,16 +5,20 @@ import './MealBuilderActivity.css';
 // mobile and desktop without separate touch handlers (same technique as
 // MatchingActivity). Tapping a card is a full alternative to dragging it,
 // since precise dragging can be hard - drag and tap both add the same way.
+const DRAG_THRESHOLD_PX = 6;
+
 export default function MealBuilderActivity({ interaction, title, disabled, submitDisabled, onActivity, onComplete }) {
   const [plate, setPlate] = useState([]);
   const [dragId, setDragId] = useState(null);
   const [pointer, setPointer] = useState(null);
   const [overPlate, setOverPlate] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const board = useRef(null);
   const suppressClick = useRef(false);
+  const dragStart = useRef(null);
   const { cards = [], maxItems = 3 } = interaction;
-  const locked = disabled || submitted;
+  const locked = disabled || submitted || submitting;
 
   const position = (event) => {
     const rect = board.current.getBoundingClientRect();
@@ -22,6 +26,13 @@ export default function MealBuilderActivity({ interaction, title, disabled, subm
   };
   const isOverPlate = (event) =>
     Boolean(document.elementFromPoint(event.clientX, event.clientY)?.closest('[data-plate-drop]'));
+  const passedDragThreshold = (event) => {
+    if (!dragStart.current) return false;
+    const pos = position(event);
+    const dx = pos.x - dragStart.current.x;
+    const dy = pos.y - dragStart.current.y;
+    return Math.hypot(dx, dy) > DRAG_THRESHOLD_PX;
+  };
 
   const addCard = (id) => {
     if (locked || plate.includes(id) || plate.length >= maxItems) return;
@@ -84,6 +95,7 @@ export default function MealBuilderActivity({ interaction, title, disabled, subm
               onPointerDown={(event) => {
                 if (locked || event.button !== 0) return;
                 suppressClick.current = false;
+                dragStart.current = position(event);
                 setDragId(card.id);
                 setPointer(position(event));
                 event.currentTarget.setPointerCapture(event.pointerId);
@@ -92,18 +104,20 @@ export default function MealBuilderActivity({ interaction, title, disabled, subm
                 if (dragId !== card.id) return;
                 setPointer(position(event));
                 setOverPlate(isOverPlate(event));
+                if (passedDragThreshold(event)) suppressClick.current = true;
               }}
               onPointerUp={(event) => {
                 if (dragId !== card.id) return;
                 if (event.currentTarget.hasPointerCapture(event.pointerId)) {
                   event.currentTarget.releasePointerCapture(event.pointerId);
                 }
+                if (passedDragThreshold(event)) suppressClick.current = true;
                 const dropped = isOverPlate(event);
                 setDragId(null);
                 setPointer(null);
                 setOverPlate(false);
+                dragStart.current = null;
                 if (dropped) {
-                  suppressClick.current = true;
                   addCard(card.id);
                   event.preventDefault();
                 }
@@ -112,6 +126,7 @@ export default function MealBuilderActivity({ interaction, title, disabled, subm
                 setDragId(null);
                 setPointer(null);
                 setOverPlate(false);
+                dragStart.current = null;
               }}
             >
               <span className="meal-builder-emoji">{card.emoji}</span>
@@ -132,12 +147,16 @@ export default function MealBuilderActivity({ interaction, title, disabled, subm
         <button
           type="button"
           disabled={locked || submitDisabled || plateCards.length === 0}
-          onClick={() => {
-            setSubmitted(true);
-            onComplete(`[[meal-builder:${JSON.stringify({ cardIds: plate })}]]`);
+          onClick={async () => {
+            setSubmitting(true);
+            const success = await onComplete(`[[meal-builder:${JSON.stringify({ cardIds: plate })}]]`);
+            if (success) {
+              setSubmitted(true);
+            }
+            setSubmitting(false);
           }}
         >
-          {submitted ? "Plate submitted" : "That's my plate"}
+          {submitted ? "Plate submitted" : submitting ? "Submitting…" : "That's my plate"}
         </button>
       </footer>
     </div>

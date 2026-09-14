@@ -1814,7 +1814,7 @@ const scripts = {
       interaction: { type: 'autoAdvance' },
       recordAnswer: false,
       reply: () =>
-        "Here's something interesting — there is actually a diet built for brain health, and a lot of it is things you probably already enjoy: leafy greens, berries, nuts, and fish.",
+        "Here's something interesting — a lot of what is good for your brain is things you probably already enjoy, like berries, nuts, and fish.",
     },
     {
       id: 'food_meal_plan',

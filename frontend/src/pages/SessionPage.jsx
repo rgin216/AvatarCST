@@ -1234,7 +1234,7 @@ export default function SessionPage({
 
   async function sendMessage(text, displayText = text) {
     const content = text.trim();
-    if (!content || typing || wheelResultPendingRef.current) return;
+    if (!content || typing || wheelResultPendingRef.current) return false;
     registerUserActivity();
 
     setMessages((items) => [...items, { from: "user", text: displayText.trim() }]);
@@ -1248,6 +1248,7 @@ export default function SessionPage({
         lipSyncMode,
       });
       applyTurn(data);
+      return true;
     } catch (err) {
       console.error("Failed to get assistant response", err);
       setMessages((items) => [
@@ -1257,6 +1258,7 @@ export default function SessionPage({
           text: "I am having trouble connecting right now. Let us take a breath and try again in a moment.",
         },
       ]);
+      return false;
     } finally {
       setTyping(false);
     }
@@ -1615,7 +1617,7 @@ export default function SessionPage({
             </div>
           )}
           {matchingInteraction && <MatchingActivity key={slide.id || slide.index} interaction={matchingInteraction} title={slide.title} disabled={typing || wheelResultPending} submitDisabled={sessionInputDisabled} onActivity={registerUserActivity} onComplete={(content) => sendMessage(content, "My matches are ready.")} />}
-          {mealBuilderInteraction && <MealBuilderActivity key={slide.id || slide.index} interaction={mealBuilderInteraction} title={slide.title} disabled={typing || wheelResultPending} submitDisabled={sessionInputDisabled} onActivity={registerUserActivity} onComplete={(content) => sendMessage(content, "My plate is ready.")} />}
+          {mealBuilderInteraction && <MealBuilderActivity key={slide.id || slide.index} interaction={mealBuilderInteraction} title={slide.title} disabled={typing || wheelResultPending || isRecording} submitDisabled={sessionInputDisabled || isRecording} onActivity={registerUserActivity} onComplete={(content) => sendMessage(content, "My plate is ready.")} />}
           {phraseCardsInteraction && <PhraseCardsActivity key={slide.id || slide.index} interaction={phraseCardsInteraction} title={slide.title} />}
           {realOrAiInteraction && <div className="real-ai-choices" aria-label="Choose your guess">
             {['Real person', 'AI generated', 'Not sure'].map((answer) => <button type="button" key={answer} disabled={sessionInputDisabled} onClick={() => sendMessage(answer)}>{answer}</button>)}

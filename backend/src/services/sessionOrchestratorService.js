@@ -754,6 +754,8 @@ export const parseMealBuilderEvent = (content = '', step = null) => {
       .map((id) => cards.find((card) => String(card.id) === id))
       .filter(Boolean);
     if (chosen.length === 0) return null;
+    const maxItems = step.interaction.maxItems;
+    if (typeof maxItems === 'number' && chosen.length > maxItems) return null;
     return { cards: chosen, labels: chosen.map((card) => card.label) };
   } catch {
     return null;
@@ -1159,7 +1161,9 @@ export const parseNamingSlotAnswer = (content = '', { count = 3, filled = [], co
   // falling back to ordinal/positional guessing, so answering out of order and
   // without saying "first"/"second" still lands on the right slot.
   if (contentRules) {
-    const contentHits = emptySlots.filter((index) => contentRules[index]?.match?.test(normalized));
+    const contentHits = emptySlots.filter((index) =>
+      (contentRules[index]?.identify || contentRules[index]?.match)?.test(normalized)
+    );
     if (contentHits.length > 0) return { slots: contentHits };
   }
 
@@ -1213,11 +1217,15 @@ const SCRIPTED_INSTRUMENT_RULES = {
   ],
   // Same naming-slots mechanic as sounds_naming_instruments, but for finishing
   // three well-known food sayings instead of naming a sound - a genuine attempt at
-  // any of the missing words for that saying counts.
+  // the blanked word for that saying counts. `identify` is broader than `match`
+  // because it also covers the words already printed on the card (e.g. "apple",
+  // "doctor", "milk"), which helps route an out-of-order answer to the right
+  // saying, but only `match` decides whether the guess is actually correct -
+  // otherwise reading back a visible word would count as filling in the blank.
   food_famous_phrases: [
-    { label: 'apple, doctor, and away', match: /\b(apple|doctor|away)\b/ },
-    { label: 'spilled and milk', match: /\b(spill(?:ed|ing)?|milk)\b/ },
-    { label: 'peas and pod', match: /\b(peas?|pod)\b/ },
+    { label: 'away', identify: /\b(apple|doctor|away)\b/, match: /\baway\b/ },
+    { label: 'spilled', identify: /\b(spill(?:ed|ing)?|milk)\b/, match: /\bspill(?:ed|ing)?\b/ },
+    { label: 'peas and pod', identify: /\b(peas?|pod)\b/, match: /\b(peas?|pod)\b/ },
   ],
 };
 

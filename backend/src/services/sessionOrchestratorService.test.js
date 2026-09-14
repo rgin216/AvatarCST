@@ -1822,7 +1822,7 @@ test('acknowledges food-saying attempts leniently, by which words are present', 
   const step = getScriptStep('cst_food', 18).step;
 
   assert.equal(
-    evaluateNamedInstrumentSlots({ step, content: 'apple', slotIndices: [0] }).outcomes[0].outcome,
+    evaluateNamedInstrumentSlots({ step, content: 'away', slotIndices: [0] }).outcomes[0].outcome,
     'correct'
   );
   assert.equal(
@@ -1836,6 +1836,18 @@ test('acknowledges food-saying attempts leniently, by which words are present', 
 
   const wrong = evaluateNamedInstrumentSlots({ step, content: 'banana', slotIndices: [0] });
   assert.equal(wrong.outcomes[0].outcome, 'incorrect');
+
+  // Words already printed on the card (not blanked) should not count as
+  // correctly filling in the blank, even though they help identify which
+  // saying is being attempted.
+  assert.equal(
+    evaluateNamedInstrumentSlots({ step, content: 'apple', slotIndices: [0] }).outcomes[0].outcome,
+    'incorrect'
+  );
+  assert.equal(
+    evaluateNamedInstrumentSlots({ step, content: 'milk', slotIndices: [1] }).outcomes[0].outcome,
+    'incorrect'
+  );
 });
 
 test('builds the food-phrase acknowledgement prompt without asking a follow-up question', () => {
@@ -1865,6 +1877,25 @@ test('accepts only configured meal-builder cards and requires at least one', () 
     parseMealBuilderEvent('[[meal-builder:{"cardIds":[]}]]', step),
     null
   );
+});
+
+test('rejects meal-builder selections above the configured maxItems', () => {
+  const step = getScriptStep('cst_food', getScriptStepIndex('cst_food', 'food_meal_plan')).step;
+  assert.equal(step.interaction.maxItems, 3);
+
+  assert.equal(
+    parseMealBuilderEvent(
+      '[[meal-builder:{"cardIds":["salad","salmon","soup","bread-rolls"]}]]',
+      step
+    ),
+    null
+  );
+
+  const chosen = parseMealBuilderEvent(
+    '[[meal-builder:{"cardIds":["salad","salmon","soup"]}]]',
+    step
+  );
+  assert.deepEqual(chosen.labels, ['Salad', 'Salmon', 'Soup']);
 });
 
 test('does not record meal-builder controls as conversational answers', () => {
