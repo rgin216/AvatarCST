@@ -1601,6 +1601,27 @@ export const buildTopicSessionSummary = (answers = [], { themeSong = null } = {}
   ].includes(item.stepId))) {
     addTopic('exploring the Auckland Harbour Bridge and its future');
   }
+  if (meaningful.some((item) => ['food_naming_chef', 'food_naming_chef_answer'].includes(item.stepId))) {
+    addTopic('trying to name a well-known New Zealand cook');
+  }
+  if (meaningful.some((item) => item.stepId === 'food_fast_food_opinion')) {
+    addTopic('sharing an opinion on fast food');
+  }
+  if (meaningful.some((item) => item.stepId === 'food_famous_phrases')) {
+    addTopic('finishing well-known food sayings');
+  }
+  if (meaningful.some((item) => item.stepId === 'food_sensory_game')) {
+    addTopic('imagining a grocery store through the senses');
+  }
+  if (meaningful.some((item) => item.stepId === 'food_meal_plan')) {
+    addTopic('planning a meal together');
+  }
+  if (meaningful.some((item) => item.stepId === 'food_tag')) {
+    addTopic('playing a food word-chain game');
+  }
+  if (meaningful.some((item) => item.stepId === 'food_spin_question')) {
+    addTopic('reflecting on a food-related question from the wheel');
+  }
   const wheelAnswer = meaningful.find((item) => ['current_affairs_spin_question', 'faces_scenes_spin_question'].includes(item.stepId));
   let wheelTopic = '';
   if (wheelAnswer) {

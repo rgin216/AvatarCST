@@ -1762,6 +1762,19 @@ test('gives Session 5 a 26-step script aligned one-to-one with its markdown sect
   );
 });
 
+test('summarises Session 5 food activities', () => {
+  const summary = buildTopicSessionSummary([
+    { stepId: 'food_naming_chef', answer: 'I think that might be a well-known cook.' },
+    { stepId: 'food_famous_phrases', answer: 'An apple a day keeps the doctor away.' },
+    { stepId: 'food_meal_plan', answer: 'Chose Roast Chicken, Salad for the meal.' },
+    { stepId: 'food_tag', answer: 'Apple, Egg, Grape.' },
+  ]);
+
+  assert.match(summary, /New Zealand cook/i);
+  assert.match(summary, /food sayings/i);
+  assert.match(summary, /planning a meal/i);
+});
+
 test('matches food sayings by content, not turn order, unlike anonymous sound clips', () => {
   const step = getScriptStep('cst_food', 18).step;
   assert.equal(step.id, 'food_famous_phrases');
