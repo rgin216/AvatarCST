@@ -1362,12 +1362,25 @@ export const resolveNamingSlotReveal = ({ step, content = '', slotIndices = [] }
           ? fragments.slice(position).join(' ')
           : fragments[position]
     : () => normalized;
+  // When slots are routed by content (matchByContent), a fragment's position in
+  // the sentence need not match its slot's position in slotIndices - answering
+  // out of order would otherwise pair the wrong fragment with the wrong slot.
+  // Re-run the same identify/match rule used to route the answer to find the
+  // fragment that actually names this slot before falling back to position.
+  const contentRules = step?.namingSlots?.matchByContent
+    ? SCRIPTED_INSTRUMENT_RULES[step?.id] || OPEN_NAMING_SLOT_IDENTIFY_RULES[step?.id]
+    : null;
+  const textForSlot = (index, position) => {
+    const matcher = contentRules?.[index]?.identify || contentRules?.[index]?.match;
+    const matchedFragment = matcher && fragments.find((fragment) => matcher.test(fragment));
+    return matchedFragment || perSlotText(position);
+  };
   return slotIndices.map((index, position) => ({
     index,
     // A scripted answer is already a short canonical label; an open blank's
     // echo is capped to one word so it fits the card instead of dumping the
     // whole (possibly rambling) message onto it.
-    text: rules?.[index]?.label || lastMeaningfulWord(perSlotText(position)),
+    text: rules?.[index]?.label || lastMeaningfulWord(textForSlot(index, position)),
   }));
 };
 
@@ -3044,7 +3057,10 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
         maxTokens: 80,
         model: useFastScriptedTurn ? process.env.OPENAI_FAST_TEXT_MODEL : undefined,
       }
-    );
+    ).catch((error) => {
+      console.warn('[session] Naming-slot acknowledgement fallback:', error.message);
+      return '';
+    });
     if (!collapseRepeatedAdjacentSpeech(adaptiveText || '').trim()) {
       adaptiveText = namingSlotAcknowledgement?.response || '';
     }
@@ -3076,7 +3092,10 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
         maxTokens: 60,
         model: useFastScriptedTurn ? process.env.OPENAI_FAST_TEXT_MODEL : undefined,
       }
-    );
+    ).catch((error) => {
+      console.warn('[session] Open-blank acknowledgement fallback:', error.message);
+      return '';
+    });
     if (!collapseRepeatedAdjacentSpeech(adaptiveText || '').trim()) {
       adaptiveText = 'Lovely, thank you.';
     }
