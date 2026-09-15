@@ -94,8 +94,15 @@ const TEST_SESSIONS = [
     theme: "Faces and Scenes",
     icon: "🖼️",
   },
-  ...Array.from({ length: 8 }, (_, i) => {
-    const n = i + 8;
+  {
+    id: "cst_word_associations",
+    label: "Session 8",
+    title: "Word Associations",
+    theme: "Word Associations",
+    icon: "🔤",
+  },
+  ...Array.from({ length: 7 }, (_, i) => {
+    const n = i + 9;
     return {
       id: `placeholder_session_${n}`,
       label: `Session ${n}`,

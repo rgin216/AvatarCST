@@ -17,6 +17,7 @@ import {
   buildCstFoodPhraseGuessInstructions,
   buildCstInstrumentGuessInstructions,
   buildCstNameThatTuneInstructions,
+  buildCstOpenBlankAcknowledgementInstructions,
 } from './promptService.js';
 import { generateResponse } from './llmService.js';
 import { getPositiveNzNews } from './newsService.js';
@@ -1124,17 +1125,31 @@ const NAMING_SLOT_ORDINALS = [
 
 // Split a normalized answer into the separate things the person listed, so a
 // multi-slot reply ("first a trumpet, second a drum") can be judged per slot.
-const splitNamingFragments = (normalized = '') =>
-  normalized
-    .split(/\s+(?:and|then)\s+|\s*,\s*|\s*;\s*/)
+// Takes the RAW content, not the shared normalizeAnswer() output - that strips
+// commas/semicolons entirely (replacing them with a space), which silently
+// destroyed the strongest signal for "here are three separate answers" before
+// this function ever saw the text. This does its own lowercasing, keeping just
+// comma/semicolon as punctuation to split on, plus word-boundary "and"/"then"
+// splits (not \s+...\s+) so adjacent connectors like "socks, and then a pint"
+// don't have their shared whitespace eaten by the first match, which
+// previously collapsed "and then" into one delimiter and merged two answers.
+const splitNamingFragments = (content = '') =>
+  String(content)
+    .toLowerCase()
+    .replace(/[^a-z0-9,;\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .split(/\s*,\s*|\s*;\s*|\band\b|\bthen\b/)
     .filter((fragment) => /[a-z]{3}/.test(fragment));
 
 export const createNamingSlotState = (step, persisted = null) => {
   const count = Math.max(0, Math.trunc(Number(step?.namingSlots?.count) || 0));
   const source = Array.isArray(persisted?.filled) ? persisted.filled : [];
+  const revealedSource = Array.isArray(persisted?.revealed) ? persisted.revealed : [];
   return {
     count,
     filled: Array.from({ length: count }, (_, index) => Boolean(source[index])),
+    revealed: Array.from({ length: count }, (_, index) => revealedSource[index] || null),
   };
 };
 
@@ -1187,7 +1202,7 @@ export const parseNamingSlotAnswer = (content = '', { count = 3, filled = [], co
   }
 
   // Otherwise treat it as naming the next empty slot(s), one per listed fragment.
-  const fragments = splitNamingFragments(normalized);
+  const fragments = splitNamingFragments(content);
   const fillCount = Math.min(Math.max(fragments.length, 1), emptySlots.length);
   return { slots: emptySlots.slice(0, fillCount) };
 };
@@ -1227,6 +1242,37 @@ const SCRIPTED_INSTRUMENT_RULES = {
     { label: 'spilled', identify: /\b(spill(?:ed|ing)?|milk)\b/, match: /\bspill(?:ed|ing)?\b/ },
     { label: 'peas and pod', identify: /\b(peas?|pod)\b/, match: /\b(peas?|pod)\b/ },
   ],
+  // Session 8 (Word Associations) word-pair and saying blanks - same mechanic,
+  // reveal-on-attempt via the shared namingSlots + phraseCards pipeline.
+  word_associations_pairs: [
+    { label: 'pepper', identify: /\b(salt|pepper)\b/, match: /\bpepper\b/ },
+    { label: 'jelly', identify: /\b(peanut ?butter|jelly|jam)\b/, match: /\b(jelly|jam)\b/ },
+    { label: 'key or load', identify: /\b(lock|key|load)\b/, match: /\b(key|load)\b/ },
+  ],
+  word_associations_famous_phrases: [
+    { label: 'perfect', identify: /\b(practice|perfect)\b/, match: /\bperfect\b/ },
+    { label: 'sorry', identify: /\b(safe|sorry)\b/, match: /\bsorry\b/ },
+    { label: 'thin', identify: /\b(thick|thin)\b/, match: /\bthin\b/ },
+  ],
+  word_associations_sayings: [
+    { label: 'free', identify: /\b(best|things|life|free)\b/, match: /\bfree\b/ },
+    { label: 'happiness', identify: /\b(money|buy|happ\w*)\b/, match: /\bhapp(?:y|iness)\b/ },
+    { label: 'beggars', identify: /\b(beggars?|choosers?)\b/, match: /\bbeggars?\b/ },
+  ],
+};
+
+// For an open-ended naming-slots step (no scripted correct answer, so no
+// entry in SCRIPTED_INSTRUMENT_RULES), the container noun itself ("a pair
+// of...") is still a safe, unambiguous routing signal - it's never the blank,
+// just the label already printed on the card. Kept separate from
+// SCRIPTED_INSTRUMENT_RULES so it only affects content-routing, not which
+// reveal/acknowledgement path a step takes.
+const OPEN_NAMING_SLOT_IDENTIFY_RULES = {
+  word_associations_missing_word: [
+    { identify: /\bcups?\b/ },
+    { identify: /\bpairs?\b/ },
+    { identify: /\bpints?\b/ },
+  ],
 };
 
 export const evaluateNamedInstrumentSlots = ({ step, content, slotIndices = [] }) => {
@@ -1240,10 +1286,16 @@ export const evaluateNamedInstrumentSlots = ({ step, content, slotIndices = [] }
 
   // When the person listed one fragment per slot, judge each slot against its
   // own fragment so a keyword elsewhere in the message cannot mark it correct.
-  const fragments = splitNamingFragments(normalized);
+  // A trailing descriptive clause ("...a bass, lower than a horn") can produce
+  // one extra fragment past the last slot - fold it into that last slot's text
+  // rather than losing per-slot isolation entirely.
+  const fragments = splitNamingFragments(content);
   const perSlotText =
-    fragments.length === consideredSlots.length
-      ? (position) => fragments[position]
+    fragments.length >= consideredSlots.length
+      ? (position) =>
+          position === consideredSlots.length - 1
+            ? fragments.slice(position).join(' ')
+            : fragments[position]
       : () => normalized;
 
   const outcomes = consideredSlots.map((index, position) => ({
@@ -1274,6 +1326,62 @@ export const evaluateNamedInstrumentSlots = ({ step, content, slotIndices = [] }
   }
 
   return { outcomes, response };
+};
+
+// The text shown on a phraseCards card once a slot has been attempted. For a
+// slot with a scripted answer (SCRIPTED_INSTRUMENT_RULES) this is always the
+// canonical answer, regardless of whether the guess was correct - matches the
+// "reveal on attempt" framing used throughout. For a slot with no scripted
+// answer (e.g. an open "what comes to mind" blank), it echoes back whatever
+// the person actually said for that slot instead.
+// The single most word-like token in a fragment - last word wins, since
+// blanks are almost always phrased "...of X" / "...is X". Strips connective
+// filler ("a", "the", "of") from the very end first so e.g. "a pint of lager"
+// reveals "lager", not "of".
+const NAMING_SLOT_FILLER_WORDS = new Set(['a', 'an', 'the', 'of', 'is', 'was', 'to', 'it', 's']);
+const lastMeaningfulWord = (text = '') => {
+  const words = text
+    .toLowerCase()
+    .replace(/[^a-z'\s]/g, ' ')
+    .split(/\s+/)
+    .filter(Boolean);
+  for (let i = words.length - 1; i >= 0; i -= 1) {
+    if (!NAMING_SLOT_FILLER_WORDS.has(words[i])) return words[i];
+  }
+  return words[words.length - 1] || '';
+};
+
+export const resolveNamingSlotReveal = ({ step, content = '', slotIndices = [] }) => {
+  if (!content || slotIndices.length === 0) return [];
+  const rules = SCRIPTED_INSTRUMENT_RULES[step?.id];
+  const normalized = normalizeAnswer(content);
+  const fragments = splitNamingFragments(content);
+  const perSlotText = fragments.length >= slotIndices.length
+    ? (position) =>
+        position === slotIndices.length - 1
+          ? fragments.slice(position).join(' ')
+          : fragments[position]
+    : () => normalized;
+  // When slots are routed by content (matchByContent), a fragment's position in
+  // the sentence need not match its slot's position in slotIndices - answering
+  // out of order would otherwise pair the wrong fragment with the wrong slot.
+  // Re-run the same identify/match rule used to route the answer to find the
+  // fragment that actually names this slot before falling back to position.
+  const contentRules = step?.namingSlots?.matchByContent
+    ? SCRIPTED_INSTRUMENT_RULES[step?.id] || OPEN_NAMING_SLOT_IDENTIFY_RULES[step?.id]
+    : null;
+  const textForSlot = (index, position) => {
+    const matcher = contentRules?.[index]?.identify || contentRules?.[index]?.match;
+    const matchedFragment = matcher && fragments.find((fragment) => matcher.test(fragment));
+    return matchedFragment || perSlotText(position);
+  };
+  return slotIndices.map((index, position) => ({
+    index,
+    // A scripted answer is already a short canonical label; an open blank's
+    // echo is capped to one word so it fits the card instead of dumping the
+    // whole (possibly rambling) message onto it.
+    text: rules?.[index]?.label || lastMeaningfulWord(textForSlot(index, position)),
+  }));
 };
 
 export const isRecordableSessionAnswer = ({ step, content, wheelEvent }) =>
@@ -1629,6 +1737,27 @@ export const buildTopicSessionSummary = (answers = [], { themeSong = null } = {}
   }
   if (meaningful.some((item) => item.stepId === 'food_spin_question')) {
     addTopic('reflecting on a food-related question from the wheel');
+  }
+  if (meaningful.some((item) => item.stepId === 'word_associations_missing_word')) {
+    addTopic('filling in missing words for everyday phrases');
+  }
+  if (meaningful.some((item) => item.stepId === 'word_associations_pairs')) {
+    addTopic('completing familiar word pairs');
+  }
+  if (meaningful.some((item) => item.stepId === 'word_associations_famous_phrases')) {
+    addTopic('finishing well-known sayings');
+  }
+  if (meaningful.some((item) => item.stepId === 'word_associations_match_phrase')) {
+    addTopic('matching sayings to their endings');
+  }
+  if (meaningful.some((item) => ['word_associations_sayings', 'word_associations_category'].includes(item.stepId))) {
+    addTopic('finding the link between a set of sayings');
+  }
+  if (meaningful.some((item) => item.stepId === 'word_associations_connect_a_word')) {
+    addTopic('playing a word-association chain game');
+  }
+  if (meaningful.some((item) => item.stepId === 'word_associations_spin_question')) {
+    addTopic('reflecting on a question from the wheel');
   }
   const wheelAnswer = meaningful.find((item) => ['current_affairs_spin_question', 'faces_scenes_spin_question'].includes(item.stepId));
   let wheelTopic = '';
@@ -2706,7 +2835,9 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
       ? parseNamingSlotAnswer(userContent, {
           count: currentNamingSlotState.count,
           filled: currentNamingSlotState.filled,
-          contentRules: step.namingSlots.matchByContent ? SCRIPTED_INSTRUMENT_RULES[step.id] : null,
+          contentRules: step.namingSlots.matchByContent
+            ? SCRIPTED_INSTRUMENT_RULES[step.id] || OPEN_NAMING_SLOT_IDENTIFY_RULES[step.id]
+            : null,
         })
       : null;
   const newlyFilledNamingSlots = namingSlotParse?.slots || [];
@@ -2734,6 +2865,15 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
           slotIndices: newlyFilledNamingSlots,
         })
       : null;
+  const namingSlotRevealUpdates =
+    namingSlotStep && newlyFilledNamingSlots.length > 0
+      ? resolveNamingSlotReveal({ step, content: userContent, slotIndices: newlyFilledNamingSlots })
+      : [];
+  const nextNamingSlotRevealed = namingSlotStep
+    ? currentNamingSlotState.revealed.map(
+        (existing, index) => namingSlotRevealUpdates.find((update) => update.index === index)?.text || existing
+      )
+    : [];
 
   let answeredCurrentQuestion = true;
   let adaptiveText = '';
@@ -2890,21 +3030,24 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
     newlyFilledNamingSlots.length > 0
   ) {
     const rules = SCRIPTED_INSTRUMENT_RULES[step.id];
-    const isFoodPhraseStep = step.id === 'food_famous_phrases';
+    // Every naming-slots step with scripted rules is a "finish the phrase" step
+    // except the original sound-naming one - that is the only case that needs
+    // the instrument-guessing framing instead.
+    const isSoundNamingStep = step.id === 'sounds_naming_instruments';
     const namedItems = newlyFilledNamingSlots
       .filter((slotIndex) => rules[slotIndex])
       .map((slotIndex) =>
-        isFoodPhraseStep
-          ? `the "${step.namingSlots.labels?.[slotIndex] || `${slotIndex + 1}`}" saying is missing ${rules[slotIndex].label}`
-          : `the ${step.namingSlots.labels?.[slotIndex] || `${slotIndex + 1}`} sound is ${rules[slotIndex].label}`
+        isSoundNamingStep
+          ? `the ${step.namingSlots.labels?.[slotIndex] || `${slotIndex + 1}`} sound is ${rules[slotIndex].label}`
+          : `the "${step.namingSlots.labels?.[slotIndex] || `${slotIndex + 1}`}" saying is missing ${rules[slotIndex].label}`
       );
     adaptiveText = await generateResponse(
       [
         {
           role: 'system',
-          content: isFoodPhraseStep
-            ? buildCstFoodPhraseGuessInstructions({ recentMessages, namedPhrases: namedItems })
-            : buildCstInstrumentGuessInstructions({ recentMessages, namedSounds: namedItems }),
+          content: isSoundNamingStep
+            ? buildCstInstrumentGuessInstructions({ recentMessages, namedSounds: namedItems })
+            : buildCstFoodPhraseGuessInstructions({ recentMessages, namedPhrases: namedItems }),
         },
         { role: 'user', content: userContent },
       ],
@@ -2914,9 +3057,47 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
         maxTokens: 80,
         model: useFastScriptedTurn ? process.env.OPENAI_FAST_TEXT_MODEL : undefined,
       }
-    );
+    ).catch((error) => {
+      console.warn('[session] Naming-slot acknowledgement fallback:', error.message);
+      return '';
+    });
     if (!collapseRepeatedAdjacentSpeech(adaptiveText || '').trim()) {
       adaptiveText = namingSlotAcknowledgement?.response || '';
+    }
+  } else if (
+    namingSlotStep &&
+    !SCRIPTED_INSTRUMENT_RULES[step.id] &&
+    userContent &&
+    hasDeliveredQuestion &&
+    newlyFilledNamingSlots.length > 0
+  ) {
+    // No scripted answer for this slide (e.g. an open "whatever comes to
+    // mind" blank) - the reveal itself is their own word echoed back on the
+    // card, but the spoken acknowledgement should still vary and react to
+    // what they actually said, not a single fixed fallback line.
+    const namedItems = namingSlotRevealUpdates.map(
+      ({ index, text }) => `the ${step.namingSlots.labels?.[index] || `${index + 1}`} blank got the word "${text}"`
+    );
+    adaptiveText = await generateResponse(
+      [
+        {
+          role: 'system',
+          content: buildCstOpenBlankAcknowledgementInstructions({ recentMessages, namedItems }),
+        },
+        { role: 'user', content: userContent },
+      ],
+      {
+        provider: llmProvider,
+        temperature: 0.5,
+        maxTokens: 60,
+        model: useFastScriptedTurn ? process.env.OPENAI_FAST_TEXT_MODEL : undefined,
+      }
+    ).catch((error) => {
+      console.warn('[session] Open-blank acknowledgement fallback:', error.message);
+      return '';
+    });
+    if (!collapseRepeatedAdjacentSpeech(adaptiveText || '').trim()) {
+      adaptiveText = 'Lovely, thank you.';
     }
   }
 
@@ -3241,8 +3422,12 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
   } else {
     delete nextInteractionState.activityReveal;
   }
-  if (namingSlotStep && displaySlide.id === step.id) {
-    nextInteractionState.namingSlots = { stepId: step.id, filled: nextNamingSlotFilled };
+  if (namingSlotStep) {
+    // Keyed by the step just answered, not displaySlide - on the completing
+    // turn displaySlide has already moved on to the next step, but the
+    // reveal still needs to reach the frontend so it can show on the old
+    // slide during the deferred transition before it flips over.
+    nextInteractionState.namingSlots = { stepId: step.id, filled: nextNamingSlotFilled, revealed: nextNamingSlotRevealed };
   } else if (nextInteractionState.namingSlots?.stepId !== displaySlide.id) {
     delete nextInteractionState.namingSlots;
   }
@@ -3345,6 +3530,7 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
     questionWheel: session.interactionState?.questionWheel || null,
     activityReveal: session.interactionState?.activityReveal || null,
     mealBuilder: session.interactionState?.mealBuilder || null,
+    namingSlots: session.interactionState?.namingSlots || null,
     assistantText,
     speechSegments,
     sessionCompleteAfterResponse,
