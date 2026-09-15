@@ -143,3 +143,22 @@ test('orchestrator asks category, then letter, then words using saved choices',a
   const finished=await respondToSessionTurn({sessionId:session._id,content:'done'});
   assert.equal(finished.slide.deckSlide,20);
 });
+
+test('pair completion transitions after acknowledgement and before the next script',async t=>{
+ const session=mockSession(t,'pairs');
+ session.interactionState.categorizing={pairs:[{ids:['ring','dress'],reason:'getting dressed'}]};
+ const result=await respondToSessionTurn({sessionId:session._id,content:'done'});
+ assert.equal(result.speechSegments.length,2);
+ assert.equal(result.speechSegments[0].role,'acknowledgement');
+ assert.equal(result.speechSegments[0].advanceSlideAfter,true);
+ assert.equal(result.speechSegments[1].role,'script');
+ assert.equal(result.slideTransition.deferUntilAcknowledgementEnds,true);
+});
+test('category request and letter progress with only the extracted topic',async t=>{
+ const session=mockSession(t,'category');
+ const category=await respondToSessionTurn({sessionId:session._id,content:"I think I'll choose beach as my category."});
+ assert.match(category.assistantText,/category is beach/);
+ assert.doesNotMatch(category.assistantText,/I think|I'll choose|as my category/);
+ const letter=await respondToSessionTurn({sessionId:session._id,content:"Let's go with S."});
+ assert.match(letter.assistantText,/beach beginning with S/);
+});

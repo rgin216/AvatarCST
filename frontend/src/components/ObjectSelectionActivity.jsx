@@ -1,4 +1,5 @@
-import { useRef, useState } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
+import { fitObjectBoard } from '../utils/objectBoardLayout.js';
 import './ObjectSelectionActivity.css';
 
 const colour = index => `hsl(${(index * 137.508 + 210) % 360} 78% 37%)`;
@@ -10,6 +11,16 @@ export default function ObjectSelectionActivity({ slide, disabled, onActivity, o
   const [reason, setReason] = useState('');
   const [zoom, setZoom] = useState(false);
   const sending = useRef(false);
+  const viewport = useRef(null);
+  const [boardSize, setBoardSize] = useState(null);
+  useLayoutEffect(() => {
+    const observer = new ResizeObserver(([entry]) => {
+      const { width, height } = entry.contentRect;
+      setBoardSize(fitObjectBoard(width, height));
+    });
+    observer.observe(viewport.current);
+    return () => observer.disconnect();
+  }, []);
   const checked = odd && state.odd?.checked;
   const pairs = state.pairs || [];
   const names = ids => ids.map(id => interaction.items.find(item => item.id === id)?.label).filter(Boolean).join(' and ');
@@ -33,8 +44,8 @@ export default function ObjectSelectionActivity({ slide, disabled, onActivity, o
       <p>{odd ? (checked ? 'Selections checked — review the feedback below.' : 'Circle the items that do not belong, then check.') : 'Choose two pictures. Many connections are possible; you can reuse an object.'}</p>
       <button type="button" onClick={() => { setZoom(!zoom); onActivity(); }}>{zoom ? 'Fit picture' : 'Enlarge picture'}</button>
     </div>
-    <div className={`object-scroll${zoom ? ' zoomed' : ''}`}>
-      <div className={`object-board${zoom ? ' enlarged' : ''}`}>
+    <div ref={viewport} className={`object-scroll${zoom ? ' zoomed' : ''}`}>
+      <div className={`object-board${zoom ? ' enlarged' : ''}`} style={!zoom && boardSize ? boardSize : undefined}>
         <img src={slide.imageUrl} alt={slide.title} draggable="false" />
         <svg viewBox="0 0 1280 720" aria-hidden="true" className="object-circles">
           {pairs.flatMap((pair, index) => pair.ids.map(id => {

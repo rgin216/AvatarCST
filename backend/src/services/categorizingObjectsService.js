@@ -4,7 +4,18 @@ const unsure = text => /\b(?:not sure|don'?t know|cannot think|can'?t think|no i
 const finished = text => /^(?:(?:i am|i'm|im)\s+)?(?:done|finished|skip|next|move on|that'?s all(?: i can think of)?|that is all|no more)[.!\s]*$/i.test(text);
 const fail = () => { const error = new Error('Invalid object activity selection'); error.status = 400; throw error; };
 const list = values => values.join(', ');
-const normalizeChoice = text => text.trim().replace(/[’]/g, "'").replace(/^(?:(?:let'?s|let us|i(?:'d like to| would like to)?)\s+(?:go with|choose|chose|pick|picked|do|try|have)|how about|(?:the|my) category is)\s+/i, '').replace(/[.!?]+$/, '').trim();
+const normalizeChoice = text => {
+  let choice = text.trim().replace(/[’]/g, "'");
+  // Speech often nests a hedge and a choice: "Well, I think I'll choose...".
+  // Remove only leading conversational framing, preserving the topic itself.
+  const framing = /^(?:(?:well|okay|ok|maybe|perhaps|i think|i suppose|i guess)[,\s]+|(?:(?:let'?s|let us|i(?:'?ll| will|'d like to| would like to| want to)?)\s+(?:go with|choose|chose|pick|picked|do|try|have)|how about|(?:the|my) category is)\s+)/i;
+  for (let previous; previous !== choice;) {
+    previous = choice;
+    choice = choice.replace(framing, '').trim();
+  }
+  return choice.replace(/[.!?]+$/, '').trim();
+};
+const normalizeCategory = text => normalizeChoice(text).replace(/\s+(?:as|for)\s+(?:a|the|my|our)\s+category$/i, '').replace(/^(?:the|a|an)\s+/i, '').trim();
 const finishSuffix = /(?:^|[,;.!]\s*|\s+)(?:(?:and\s+)?that'?s all(?: i can (?:name|think of))?|that is all(?: i can (?:name|think of))?|i(?: am|'m) done|no more)[.!\s]*$/i;
 
 // Activity state is owned by the server; clients send only selections or a reason.
@@ -15,6 +26,7 @@ export function evaluateCategorizingTurn({ step, content = '', stored = {} }) {
   }
   if (!content.trim()) return null;
   const state = structuredClone(stored);
+  if (typeof state.category === 'string') state.category = normalizeCategory(state.category);
   const result = (response, complete = false, transcript = content, prompt = '') => ({
     answered: true, response, complete, transcript, state, prompt,
   });
@@ -80,7 +92,8 @@ export function evaluateCategorizingTurn({ step, content = '', stored = {} }) {
     return event ? reply : { ...reply, acknowledgement: { kind: 'pair', objects: labels, answer: reason } };
   }
   if (step.activityKind === 'category') {
-    state.category = done || unsure(content) ? 'animals' : normalizeChoice(content).slice(0, 100);
+    state.category = done || unsure(content) ? 'animals' : normalizeCategory(content).slice(0, 100);
+    if (!state.category || /^category$/i.test(state.category)) return result('What category would you like? For example, animals, foods, places, or names.');
     state.words = [];
     return result(done || unsure(content) ? 'That is all right.' : '', true);
   }

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { personalizeCategorizingReply } from './categorizingAcknowledgementService.js';
-import { continuousSpeechSegments } from './continuousSpeechService.js';
+
 import { evaluateCategorizingTurn } from './categorizingObjectsService.js';
 import { getScript } from './cstScriptService.js';
 const step = kind => getScript('cst_categorizing_objects').find(s=>s.activityKind===kind);
@@ -37,10 +37,16 @@ test('a personal pair explanation is affirmed specifically',async()=>{
  const enhanced=await personalizeCategorizingReply(turn,{generate:async()=> 'Yes, both bring back memories of your grandmother.'});
  assert.match(enhanced.response,/Yes, both bring back memories/);assert.equal(enhanced.state.pairs.length,1);
 });
-test('acknowledgement and script share one synthesis with punctuation and slide completion',()=>{
- for(const avatarMode of ['male','female']){
-  const parts=continuousSpeechSegments({avatarMode,speechSegments:[{text:'A soft pillow',role:'acknowledgement',advanceSlideAfter:true},{text:'What feels cold?',role:'script'}]});
-  assert.equal(parts.length,1);assert.equal(parts[0].text,'A soft pillow.\n\nWhat feels cold?');assert.equal(parts[0].advanceSlideAfter,true);
+test('category requests strip first-person wording and category suffixes',()=>{
+ for(const text of ["I'll choose the peach as a category.","I will choose peach for my category.","I’ll choose the peach as the category."]){assert.equal(run('category',text).state.category,'peach');}
+ assert.equal(run('letter',"Let's go with S.").state.letter,'S');
+ assert.equal(run('category','I choose the category').complete,false);
+});
+
+test('nested spoken framing leaves only the category and preserves multiword topics',()=>{
+ for(const text of ["I think I'll choose beach as my category.","Well, I think I’ll choose beach as my category.","I guess I'll go with beach.","Maybe lets choose beach.","I think ill choose beach"]){
+  assert.equal(run('category',text).state.category,'beach',text);
  }
- assert.equal(continuousSpeechSegments({assistantText:'Welcome.'})[0].text,'Welcome.');
+ assert.equal(run('category',"I think I'll choose New Zealand beaches as my category.").state.category,'New Zealand beaches');
+ assert.equal(run('letter',"Let's go with S.",{category:"I think I'll choose beach"}).state.category,'beach');
 });
