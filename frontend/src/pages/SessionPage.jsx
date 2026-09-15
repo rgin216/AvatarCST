@@ -1,3 +1,4 @@
+import ObjectSelectionActivity from "../components/ObjectSelectionActivity.jsx";
 import MatchingActivity from "../components/MatchingActivity.jsx";
 import MealBuilderActivity from "../components/MealBuilderActivity.jsx";
 import PhraseCardsActivity from "../components/PhraseCardsActivity.jsx";
@@ -316,6 +317,7 @@ export default function SessionPage({
     INACTIVITY_TIMEOUT_MS,
     Number(slide.inactivityTimeoutMs) || 0
   );
+  const objectInteraction = slide.interaction?.type === "objectSelection";
   const matchingInteraction = slide.interaction?.type === "matching" ? slide.interaction : null;
   const mealBuilderInteraction = slide.interaction?.type === "mealBuilder" ? slide.interaction : null;
   const phraseCardsInteraction = slide.interaction?.type === "phraseCards" ? slide.interaction : null;
@@ -329,7 +331,7 @@ export default function SessionPage({
     Boolean(exerciseVideo) ||
     hasPositiveNewsInteraction ||
     Boolean(musicInteraction) ||
-    hasActivityRevealInteraction || Boolean(matchingInteraction) || Boolean(mealBuilderInteraction) || Boolean(phraseCardsInteraction) || isSingleAudioClip;
+    hasActivityRevealInteraction || Boolean(matchingInteraction) || objectInteraction || Boolean(mealBuilderInteraction) || Boolean(phraseCardsInteraction) || isSingleAudioClip;
   const landedWheelResult = questionWheel?.status === "landed" ? questionWheel : null;
   const sessionInputDisabled =
     typing ||
@@ -1553,7 +1555,7 @@ export default function SessionPage({
 
       <main className="session-slide-shell">
         <section
-          className={`ppt-slide${slide.imageUrl && !hasSlideInteraction ? " has-slide-image" : ""}${hasSlideInteraction ? " has-slide-interaction" : ""}${exerciseVideo ? " has-video-interaction" : ""}${hasPositiveNewsInteraction ? " has-news-interaction" : ""}${musicInteraction ? " has-music-interaction" : ""}${hasActivityRevealInteraction ? " has-activity-reveal-interaction" : ""}${matchingInteraction ? " has-matching-interaction" : ""}${mealBuilderInteraction ? " has-meal-builder-interaction" : ""}${phraseCardsInteraction ? " has-phrase-cards-interaction" : ""}${isSingleAudioClip ? " has-audioclips-interaction" : ""}`}
+          className={`ppt-slide${slide.imageUrl && !hasSlideInteraction ? " has-slide-image" : ""}${hasSlideInteraction ? " has-slide-interaction" : ""}${exerciseVideo ? " has-video-interaction" : ""}${hasPositiveNewsInteraction ? " has-news-interaction" : ""}${musicInteraction ? " has-music-interaction" : ""}${hasActivityRevealInteraction ? " has-activity-reveal-interaction" : ""}${objectInteraction ? " has-object-interaction" : ""}${matchingInteraction ? " has-matching-interaction" : ""}${mealBuilderInteraction ? " has-meal-builder-interaction" : ""}${phraseCardsInteraction ? " has-phrase-cards-interaction" : ""}${isSingleAudioClip ? " has-audioclips-interaction" : ""}`}
           style={{
             "--slide-accent": slide.accent || theme.blush,
             backgroundImage: slide.imageUrl && !hasSlideInteraction ? `url(${slide.imageUrl})` : undefined,
@@ -1627,6 +1629,7 @@ export default function SessionPage({
               </footer>
             </div>
           )}
+          {objectInteraction && <ObjectSelectionActivity key={slide.id} slide={slide} disabled={sessionInputDisabled || isRecording} onActivity={registerUserActivity} onSubmit={sendMessage} />}
           {matchingInteraction && <MatchingActivity key={slide.id || slide.index} interaction={matchingInteraction} title={slide.title} disabled={typing || wheelResultPending} submitDisabled={sessionInputDisabled} onActivity={registerUserActivity} onComplete={(content) => sendMessage(content, "My matches are ready.")} />}
           {mealBuilderInteraction && <MealBuilderActivity key={slide.id || slide.index} interaction={mealBuilderInteraction} title={slide.title} disabled={typing || wheelResultPending || isRecording} submitDisabled={sessionInputDisabled || isRecording} onActivity={registerUserActivity} onComplete={(content) => sendMessage(content, "My plate is ready.")} />}
           {phraseCardsInteraction && <PhraseCardsActivity key={slide.id || slide.index} interaction={phraseCardsInteraction} title={slide.title} namingSlots={namingSlotsForSlide} />}
