@@ -63,6 +63,7 @@ export const pairItems = [
 ];
 
 export function pairConnection(a, b) {
+  if ([a.id, b.id].includes('fireplace') && [a.id, b.id].includes('extinguisher')) return 'one holds a fire for warmth and the other puts a fire out';
   const group = a.groups.find(value => b.groups.includes(value));
   if (!group) return null;
   const reasons = {

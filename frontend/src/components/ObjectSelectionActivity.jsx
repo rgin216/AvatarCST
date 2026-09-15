@@ -33,7 +33,7 @@ export default function ObjectSelectionActivity({ slide, disabled, onActivity, o
       <p>{odd ? (checked ? 'Selections checked — review the feedback below.' : 'Circle the items that do not belong, then check.') : 'Choose two pictures. Many connections are possible; you can reuse an object.'}</p>
       <button type="button" onClick={() => { setZoom(!zoom); onActivity(); }}>{zoom ? 'Fit picture' : 'Enlarge picture'}</button>
     </div>
-    <div className="object-scroll">
+    <div className={`object-scroll${zoom ? ' zoomed' : ''}`}>
       <div className={`object-board${zoom ? ' enlarged' : ''}`}>
         <img src={slide.imageUrl} alt={slide.title} draggable="false" />
         <svg viewBox="0 0 1280 720" aria-hidden="true" className="object-circles">
@@ -57,10 +57,10 @@ export default function ObjectSelectionActivity({ slide, disabled, onActivity, o
       </div>
     </div>
     <div className="object-controls">
-      <span role="status">{selected.length ? `Selected: ${names(selected)}` : checked ? 'Green: correct. Orange: food. Dashed blue: other non-food items.' : odd ? 'No items selected yet.' : `${pairs.length} pairs explored`}</span>
-      {odd && !checked && <button type="button" disabled={disabled} onClick={() => submit('check', selected)}>Check selections</button>}
-      {!odd && selected.length === 2 && <button type="button" disabled={disabled} onClick={() => submit('pair', selected)}>Check pair</button>}
-      <button type="button" disabled={disabled} onClick={() => submit('done')}>{odd && checked ? 'Continue' : 'Done'}</button>
+      <span role="status">{selected.length ? `Selected: ${names(selected)}` : checked ? 'Green: correct. Orange: food. Dashed blue: other non-food items.' : odd ? 'No items selected yet.' : `${pairs.length} ${pairs.length === 1 ? 'pair' : 'pairs'} explored`}</span>
+      <button type="button" disabled={disabled} onClick={() => odd && !checked ? submit('check', selected) : !odd && selected.length === 2 ? submit('pair', selected) : submit('done')}>
+        {odd ? checked ? 'Continue' : 'Check selections' : selected.length === 2 ? 'Check pair' : 'Done'}
+      </button>
     </div>
     {checked && <div className="object-feedback" aria-live="polite">
       <p>Correctly circled: {names(state.odd.correct) || 'none this time'}.</p>
@@ -77,6 +77,7 @@ export default function ObjectSelectionActivity({ slide, disabled, onActivity, o
       <input id="pair-reason" maxLength={500} value={reason} disabled={disabled} onChange={e => {setReason(e.target.value); onActivity();}} />
       <button disabled={disabled || !reason.trim()}>Share connection</button>
     </form>}
-    {!odd && pairs.length > 0 && <ol className="object-pair-list" aria-label="Your pairs">{pairs.map((pair,index) => <li key={index} style={{borderColor:colour(index)}}>{index+1}. {names(pair.ids)} — {pair.reason}</li>)}</ol>}
+    {!odd && pairs.length > 0 && <details className="object-pair-history"><summary>Your pairs ({pairs.length})</summary><ol className="object-pair-list" aria-label="Your pairs">{pairs.map((pair,index) => <li key={index} style={{borderColor:colour(index)}}>{index+1}. {names(pair.ids)} — {pair.reason}</li>)}</ol></details>}
   </div>;
 }
+

@@ -474,7 +474,7 @@ export default function SessionPage({
       activityRevisionRef.current = turn.activityRevision;
     }
     const slideData = turn.slide || defaultSlide;
-    const deferredTransition = turn.slideTransition?.deferUntilAcknowledgementEnds
+    const deferredTransition = turn.slideTransition?.deferUntilAcknowledgementEnds || turn.slideTransition?.deferUntilNarrationEnds
       ? turn.slideTransition
       : null;
     pendingSlideTransitionRef.current = deferredTransition

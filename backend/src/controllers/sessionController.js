@@ -26,6 +26,7 @@ import {
 } from '../config/pipeline.js';
 import { generateSummary } from '../services/summaryService.js';
 import Summary from '../models/Summary.js';
+import { continuousSpeechSegments } from '../services/continuousSpeechService.js';
 
 const nowMs = () => Number(process.hrtime.bigint() / 1_000_000n);
 const AVATAR_MODES = new Set(['male', 'female', 'visualizer']);
@@ -220,9 +221,7 @@ async function createAudioForTurn(assistantText, pipelineMode, avatarMode, lipSy
 }
 
 async function attachAudioToTurn(turn, pipelineMode, avatarMode, lipSyncMode, timings) {
-  const segmentDefinitions = Array.isArray(turn.speechSegments) && turn.speechSegments.length > 0
-    ? turn.speechSegments
-    : [{ text: turn.assistantText, role: 'script' }];
+  const segmentDefinitions = continuousSpeechSegments(turn);
   const audioSegments = [];
   const outputPaths = [];
 
@@ -255,6 +254,9 @@ async function attachAudioToTurn(turn, pipelineMode, avatarMode, lipSyncMode, ti
     lipsyncEngine: firstAudio?.lipsyncEngine,
   });
   turn.avatar.audio.segments = audioSegments;
+  if (turn.slideTransition?.deferUntilAcknowledgementEnds && turn.speechSegments?.length > 1) {
+    turn.slideTransition = { ...turn.slideTransition, deferUntilAcknowledgementEnds: false, deferUntilNarrationEnds: true };
+  }
   if (firstAudio?.streaming) turn.avatar.audio.streaming = true;
 }
 

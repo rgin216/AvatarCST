@@ -1,4 +1,5 @@
 import { evaluateCategorizingTurn } from './categorizingObjectsService.js';
+import { personalizeCategorizingReply } from './categorizingAcknowledgementService.js';
 import { answerNewsQuestion, newsContext } from './newsConversationService.js';
 import { parseMatchingAnswer } from './matchingService.js';
 import Message from '../models/Message.js';
@@ -2509,7 +2510,7 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
   }
 
   const categorizingTurn = userContent && effectiveTurnIndex > 0
-    ? evaluateCategorizingTurn({ step, content: userContent, stored: session.interactionState?.categorizing }) : null;
+    ? await personalizeCategorizingReply(evaluateCategorizingTurn({ step, content: userContent, stored: session.interactionState?.categorizing }), { provider: llmProvider }) : null;
   const matchingAnswer = parseMatchingAnswer(step, userContent || '');
   let userMessage = null;
   const hasAutomatedProtocol = /^\[\[[^\]]+\]\]$/.test(userContent || '');
@@ -3020,6 +3021,7 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
   if (
     userContent &&
     !adaptiveText &&
+    !categorizingTurn &&
     !themeSongFeedback &&
     !isQuestionWheelEvent &&
     !isActivityInteractionEvent &&
