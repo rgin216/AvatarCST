@@ -649,32 +649,38 @@ export const evaluateOrientationAnswer = ({ step, content, retryCount }) => {
 
 const SCRIPTED_TRIVIA_RULES = {
   physical_games_trivia_next_olympics: {
+    choices: ['2028 New Zealand', '2028 Los Angeles', '2029 London', '2029 Sweden'],
     isCorrect: (answer) =>
       /\b2028\b/.test(answer) && /\b(?:los angeles|l a)\b/.test(answer),
     correctResponse: 'Exactly — you got both the year and host city right.',
     incorrectResponse: 'Good try. One or both parts are not quite right.',
   },
   physical_games_trivia_uniform: {
+    choices: ['Black', 'Blue', 'White', 'Red'],
     isCorrect: (answer) => /\bblack\b/.test(answer),
     correctResponse: 'That is right — you chose the correct colour.',
     incorrectResponse: 'Not quite, but that was a good guess.',
   },
   physical_games_trivia_first_gold: {
+    choices: ['Valerie Adams', 'Lisa Carrington', 'Ted Morgan', 'Hamish Bond'],
     isCorrect: (answer) => /\b(?:ted morgan|morgan)\b/.test(answer),
     correctResponse: 'Spot on — you named the right Olympian.',
     incorrectResponse: 'That is not the Olympian we are looking for, but good try.',
   },
   physical_games_trivia_runner: {
+    choices: ['Peter Snell', 'Lisa Carrington'],
     isCorrect: (answer) => /\b(?:peter snell|snell)\b/.test(answer),
     correctResponse: 'Correct — you identified the runner.',
     incorrectResponse: 'That is not quite right, but it was worth a try.',
   },
   physical_games_trivia_most_gold: {
+    choices: ['Rugby', 'Football', 'Badminton', 'Rowing'],
     isCorrect: (answer) => /\browing\b/.test(answer),
     correctResponse: 'You have got it — that is the right sport.',
     incorrectResponse: 'Close, but that is not the sport in the answer.',
   },
   physical_games_trivia_carrington: {
+    choices: ['Two', 'Three', 'Four'],
     isCorrect: (answer) => /\b(?:3|three)\b/.test(answer),
     correctResponse: 'Well done — that number is correct.',
     incorrectResponse: 'That number is not quite right, but good guess.',
@@ -693,6 +699,18 @@ const SCRIPTED_TRIVIA_RULES = {
 
 const isScriptedTriviaQuestion = (step) => Boolean(SCRIPTED_TRIVIA_RULES[step?.id]);
 
+// Only expand complete letter selections: the article "a" in a sentence must
+// not become option A.
+const expandTriviaChoices = (content, choices) => {
+  if (!choices) return content;
+  const answer = normalizeAnswer(content);
+  const selection = answer.match(/^(?:(?:i think|i choose|i pick|i will go with|i ll go with|it is|it s|the answer is)\s+)?(?:(?:option|letter|answer)\s+)?([abcd]|ay|bee|be|see|sea|dee)(?:\s+please)?$/);
+  if (!selection) return content;
+  const letters = { ay: 'a', bee: 'b', be: 'b', see: 'c', sea: 'c', dee: 'd' };
+  const letter = letters[selection[1]] || selection[1];
+  return choices[letter.charCodeAt(0) - 97] || content;
+};
+
 export const evaluateTriviaAnswer = ({ step, content }) => {
   const rule = SCRIPTED_TRIVIA_RULES[step?.id];
   if (!rule || !content) return null;
@@ -705,7 +723,7 @@ export const evaluateTriviaAnswer = ({ step, content }) => {
     };
   }
 
-  const correct = rule.isCorrect(normalizeAnswer(content));
+  const correct = rule.isCorrect(normalizeAnswer(expandTriviaChoices(content, rule.choices)));
   return {
     answered: true,
     response: correct ? rule.correctResponse : rule.incorrectResponse,

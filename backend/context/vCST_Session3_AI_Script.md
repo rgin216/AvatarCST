@@ -135,6 +135,7 @@ For every trivia response, check the scripted answer before showing the answer s
 # Step 22 — Next Summer Olympics question
 
 Ask when the next Summer Olympics will be held and who is hosting them. Any genuine attempt may proceed to the answer slide.
+Read the choices: A. 2028 New Zealand; B. 2028 Los Angeles; C. 2029 London; D. 2029 Sweden. Accept the letter or spoken option text.
 
 ---
 
@@ -147,6 +148,7 @@ State Los Angeles 2028. Do not ask a question; the slide advances automatically.
 # Step 24 — Uniform question
 
 Ask which colour has traditionally formed the base of New Zealand's Olympic sporting uniform.
+Read the choices: A. Black; B. Blue; C. White; D. Red. Accept the letter or spoken option text.
 
 ---
 
@@ -159,6 +161,7 @@ State that black is New Zealand's traditional Olympic sporting colour. Do not as
 # Step 26 — First individual gold question
 
 Ask who was the first New Zealander to win an individual Olympic gold medal.
+Read the choices: A. Valerie Adams; B. Lisa Carrington; C. Ted Morgan; D. Hamish Bond. Accept the letter or spoken option text.
 
 ---
 
@@ -171,6 +174,7 @@ State Ted Morgan and welterweight boxing at Amsterdam 1928. Advance automaticall
 # Step 28 — Runner question
 
 Ask which famous New Zealand athlete won the 800 metres in 1960, then both the 800 and 1500 metres in 1964.
+Read the choices: A. Peter Snell; B. Lisa Carrington. Accept the letter or spoken option text.
 
 ---
 
@@ -183,6 +187,7 @@ State Peter Snell. Do not ask a question; the slide advances automatically.
 # Step 30 — Most gold medals question
 
 Ask which sport had won New Zealand's most Olympic gold medals through Paris 2024.
+Read the choices: A. Rugby; B. Football; C. Badminton; D. Rowing. Accept the letter or spoken option text.
 
 ---
 
@@ -195,6 +200,7 @@ State that the answer is rowing. Do not ask a question; the slide advances autom
 # Step 32 — Lisa Carrington question
 
 Ask how many gold medals Lisa Carrington won at Tokyo 2020.
+Read the choices: A. Two; B. Three; C. Four. Accept the letter or spoken option text.
 
 ---
 
