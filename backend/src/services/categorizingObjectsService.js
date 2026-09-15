@@ -8,7 +8,7 @@ const normalizeChoice = text => {
   let choice = text.trim().replace(/[’]/g, "'");
   // Speech often nests a hedge and a choice: "Well, I think I'll choose...".
   // Remove only leading conversational framing, preserving the topic itself.
-  const framing = /^(?:(?:well|okay|ok|maybe|perhaps|i think|i suppose|i guess)[,\s]+|(?:(?:let'?s|let us|i(?:'?ll| will|'d like to| would like to| want to)?)\s+(?:go with|choose|chose|pick|picked|do|try|have)|how about|(?:the|my) category is)\s+)/i;
+  const framing = /^(?:(?:well|okay|ok|maybe|perhaps|i think|i suppose|i guess)[,\s]+|(?:(?:let'?s|let us|(?:can|could|would)\s+(?:i|we|you)(?:\s+please)?|i(?:'?ll| will|'d like to| would(?: like to)?| can| could| want to)?)\s+(?:go with|choose|chose|pick|picked|do|try|have|use)|how about|(?:the|my) category is)\s+)/i;
   for (let previous; previous !== choice;) {
     previous = choice;
     choice = choice.replace(framing, '').trim();

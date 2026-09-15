@@ -10,7 +10,7 @@ export async function personalizeCategorizingReply(turn, { provider, generate = 
       { role: 'user', content: JSON.stringify({ kind, question, objects, answer }) },
     ], { provider, temperature: 0.3, maxTokens: 160 });
     const clean = response?.trim();
-    if (clean && clean.length <= 450 && !clean.includes('?')) return { ...turn, response: clean + (kind === 'pair' ? ' Choose another pair, or press Done.' : '') };
+    if (clean && clean.length <= 450 && clean.split(/\s+/).length <= 45 && !clean.includes('?')) return { ...turn, response: clean + (kind === 'pair' ? ' Choose another pair, or press Done.' : '') };
   } catch { /* Keep the answer-specific local fallback if generation is unavailable. */ }
   return turn;
 }

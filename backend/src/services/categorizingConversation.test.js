@@ -50,3 +50,29 @@ test('nested spoken framing leaves only the category and preserves multiword top
  assert.equal(run('category',"I think I'll choose New Zealand beaches as my category.").state.category,'New Zealand beaches');
  assert.equal(run('letter',"Let's go with S.",{category:"I think I'll choose beach"}).state.category,'beach');
 });
+
+test('acknowledgements enforce 45 generated words while retaining other validation',async()=>{
+ const turn=run('pairs','both remind me of my grandmother',{pendingPair:['ashtray','dress']});
+ const accepted=Array(45).fill('soft').join(' ');
+ const result=await personalizeCategorizingReply(turn,{generate:async()=>`  ${accepted}  `});
+ assert.equal(result.response,accepted+' Choose another pair, or press Done.');
+ for(const invalid of [Array(46).fill('soft').join('\n'), 'x'.repeat(451), 'A soft pillow?', '   ']) {
+  assert.equal(await personalizeCategorizingReply(turn,{generate:async()=>invalid}),turn);
+ }
+});
+
+test('can, could and would requests extract choices used by later word turns',()=>{
+ for(const request of ['Can I choose', 'Could we go with', 'Would you pick', 'Could I please use', 'I would choose', 'I can choose', 'I could try']) {
+  const category=run('category',`${request} beach as my category?`);
+  assert.equal(category.state.category,'beach',request);
+  const letter=run('letter',`${request} S?`,category.state);
+  assert.equal(letter.state.letter,'S',request);
+  assert.equal(letter.complete,true);
+  assert.match(step('words').reply({categorizing:letter.state}),/beach beginning with S/);
+  const words=run('words','sand, sea',letter.state);
+  assert.equal(words.state.category,'beach');
+  assert.deepEqual(words.state.words,['sand','sea']);
+ }
+ assert.equal(run('category','Canterbury beaches').state.category,'Canterbury beaches');
+ assert.equal(run('letter','Could I choose B or C?').complete,false);
+});
