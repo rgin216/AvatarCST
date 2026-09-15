@@ -16,8 +16,10 @@ import {
 import {
   buildCstAdaptiveResponseInstructions,
   buildCstAdaptiveTurnInstructions,
+  buildCstFoodPhraseGuessInstructions,
   buildCstInstrumentGuessInstructions,
   buildCstNameThatTuneInstructions,
+  buildCstOpenBlankAcknowledgementInstructions,
 } from './promptService.js';
 import { generateResponse } from './llmService.js';
 import { getPositiveNzNews } from './newsService.js';
@@ -734,6 +736,35 @@ const isActivityRevealProtocol = (content = '') =>
 const isActivityCompletionProtocol = (content = '') =>
   /^\[\[activity-complete\]\]$/i.test(content.trim());
 
+const isMealBuilderProtocol = (content = '') =>
+  /^\[\[meal-builder:/i.test(content.trim());
+
+// The meal builder is a single client-side drag/tap activity (unlike activityReveal's
+// server-confirmed card-by-card sequence) - the participant assembles their whole
+// plate locally, then submits one event once, so there is no in-progress state to
+// persist or restore across a refresh.
+export const parseMealBuilderEvent = (content = '', step = null) => {
+  const match = content.trim().match(/^\[\[meal-builder:(.+)\]\]$/s);
+  if (!match || step?.interaction?.type !== 'mealBuilder') return null;
+
+  try {
+    const parsed = JSON.parse(match[1]);
+    const requestedIds = Array.isArray(parsed?.cardIds)
+      ? [...new Set(parsed.cardIds.map((id) => String(id || '').trim()).filter(Boolean))]
+      : [];
+    const cards = step.interaction.cards || [];
+    const chosen = requestedIds
+      .map((id) => cards.find((card) => String(card.id) === id))
+      .filter(Boolean);
+    if (chosen.length === 0) return null;
+    const maxItems = step.interaction.maxItems;
+    if (typeof maxItems === 'number' && chosen.length > maxItems) return null;
+    return { cards: chosen, labels: chosen.map((card) => card.label) };
+  } catch {
+    return null;
+  }
+};
+
 const isNaturalMediaCompletionAnswer = (content = '') => {
   const normalized = normalizeAnswer(content);
   if (!normalized) return false;
@@ -1096,21 +1127,35 @@ const NAMING_SLOT_ORDINALS = [
 
 // Split a normalized answer into the separate things the person listed, so a
 // multi-slot reply ("first a trumpet, second a drum") can be judged per slot.
-const splitNamingFragments = (normalized = '') =>
-  normalized
-    .split(/\s+(?:and|then)\s+|\s*,\s*|\s*;\s*/)
+// Takes the RAW content, not the shared normalizeAnswer() output - that strips
+// commas/semicolons entirely (replacing them with a space), which silently
+// destroyed the strongest signal for "here are three separate answers" before
+// this function ever saw the text. This does its own lowercasing, keeping just
+// comma/semicolon as punctuation to split on, plus word-boundary "and"/"then"
+// splits (not \s+...\s+) so adjacent connectors like "socks, and then a pint"
+// don't have their shared whitespace eaten by the first match, which
+// previously collapsed "and then" into one delimiter and merged two answers.
+const splitNamingFragments = (content = '') =>
+  String(content)
+    .toLowerCase()
+    .replace(/[^a-z0-9,;\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .split(/\s*,\s*|\s*;\s*|\band\b|\bthen\b/)
     .filter((fragment) => /[a-z]{3}/.test(fragment));
 
 export const createNamingSlotState = (step, persisted = null) => {
   const count = Math.max(0, Math.trunc(Number(step?.namingSlots?.count) || 0));
   const source = Array.isArray(persisted?.filled) ? persisted.filled : [];
+  const revealedSource = Array.isArray(persisted?.revealed) ? persisted.revealed : [];
   return {
     count,
     filled: Array.from({ length: count }, (_, index) => Boolean(source[index])),
+    revealed: Array.from({ length: count }, (_, index) => revealedSource[index] || null),
   };
 };
 
-export const parseNamingSlotAnswer = (content = '', { count = 3, filled = [] } = {}) => {
+export const parseNamingSlotAnswer = (content = '', { count = 3, filled = [], contentRules = null } = {}) => {
   const normalized = normalizeAnswer(content);
   if (!normalized) return null;
 
@@ -1126,6 +1171,17 @@ export const parseNamingSlotAnswer = (content = '', { count = 3, filled = [] } =
 
   if (/\b(?:all (?:three|3|of them|of these)|every one|they (?:re|are) all|each (?:one|of them))\b/.test(normalized)) {
     return { slots: emptySlots };
+  }
+
+  // When each slot's content is independently identifiable (e.g. finishing a
+  // specific saying, unlike anonymous sound clips), match by content before
+  // falling back to ordinal/positional guessing, so answering out of order and
+  // without saying "first"/"second" still lands on the right slot.
+  if (contentRules) {
+    const contentHits = emptySlots.filter((index) =>
+      (contentRules[index]?.identify || contentRules[index]?.match)?.test(normalized)
+    );
+    if (contentHits.length > 0) return { slots: contentHits };
   }
 
   const hits = new Set();
@@ -1148,15 +1204,19 @@ export const parseNamingSlotAnswer = (content = '', { count = 3, filled = [] } =
   }
 
   // Otherwise treat it as naming the next empty slot(s), one per listed fragment.
-  const fragments = splitNamingFragments(normalized);
+  const fragments = splitNamingFragments(content);
   const fillCount = Math.min(Math.max(fragments.length, 1), emptySlots.length);
   return { slots: emptySlots.slice(0, fillCount) };
 };
 
-export const buildNamingSlotPrompt = (missingLabels = [], noun = 'sound') => {
+export const buildNamingSlotPrompt = (
+  missingLabels = [],
+  noun = 'sound',
+  singlePrompt = (label) => `And what does the ${label} ${noun} sound like?`
+) => {
   const labels = missingLabels.filter(Boolean);
   if (labels.length === 0) return '';
-  if (labels.length === 1) return `And what does the ${labels[0]} ${noun} sound like?`;
+  if (labels.length === 1) return singlePrompt(labels[0]);
   const joined =
     labels.length === 2
       ? `${labels[0]} and ${labels[1]}`
@@ -1172,6 +1232,49 @@ const SCRIPTED_INSTRUMENT_RULES = {
     { label: 'a bass guitar', match: /\b(bass|double bass|upright bass|guitar|cello)\b/ },
     { label: 'an organ', match: /\b(organ|harmonium|accordion|keyboard|synth|synthesiser|synthesizer|harpsichord|piano)\b/ },
   ],
+  // Same naming-slots mechanic as sounds_naming_instruments, but for finishing
+  // three well-known food sayings instead of naming a sound - a genuine attempt at
+  // the blanked word for that saying counts. `identify` is broader than `match`
+  // because it also covers the words already printed on the card (e.g. "apple",
+  // "doctor", "milk"), which helps route an out-of-order answer to the right
+  // saying, but only `match` decides whether the guess is actually correct -
+  // otherwise reading back a visible word would count as filling in the blank.
+  food_famous_phrases: [
+    { label: 'away', identify: /\b(apple|doctor|away)\b/, match: /\baway\b/ },
+    { label: 'spilled', identify: /\b(spill(?:ed|ing)?|milk)\b/, match: /\bspill(?:ed|ing)?\b/ },
+    { label: 'peas and pod', identify: /\b(peas?|pod)\b/, match: /\b(peas?|pod)\b/ },
+  ],
+  // Session 8 (Word Associations) word-pair and saying blanks - same mechanic,
+  // reveal-on-attempt via the shared namingSlots + phraseCards pipeline.
+  word_associations_pairs: [
+    { label: 'pepper', identify: /\b(salt|pepper)\b/, match: /\bpepper\b/ },
+    { label: 'jelly', identify: /\b(peanut ?butter|jelly|jam)\b/, match: /\b(jelly|jam)\b/ },
+    { label: 'key or load', identify: /\b(lock|key|load)\b/, match: /\b(key|load)\b/ },
+  ],
+  word_associations_famous_phrases: [
+    { label: 'perfect', identify: /\b(practice|perfect)\b/, match: /\bperfect\b/ },
+    { label: 'sorry', identify: /\b(safe|sorry)\b/, match: /\bsorry\b/ },
+    { label: 'thin', identify: /\b(thick|thin)\b/, match: /\bthin\b/ },
+  ],
+  word_associations_sayings: [
+    { label: 'free', identify: /\b(best|things|life|free)\b/, match: /\bfree\b/ },
+    { label: 'happiness', identify: /\b(money|buy|happ\w*)\b/, match: /\bhapp(?:y|iness)\b/ },
+    { label: 'beggars', identify: /\b(beggars?|choosers?)\b/, match: /\bbeggars?\b/ },
+  ],
+};
+
+// For an open-ended naming-slots step (no scripted correct answer, so no
+// entry in SCRIPTED_INSTRUMENT_RULES), the container noun itself ("a pair
+// of...") is still a safe, unambiguous routing signal - it's never the blank,
+// just the label already printed on the card. Kept separate from
+// SCRIPTED_INSTRUMENT_RULES so it only affects content-routing, not which
+// reveal/acknowledgement path a step takes.
+const OPEN_NAMING_SLOT_IDENTIFY_RULES = {
+  word_associations_missing_word: [
+    { identify: /\bcups?\b/ },
+    { identify: /\bpairs?\b/ },
+    { identify: /\bpints?\b/ },
+  ],
 };
 
 export const evaluateNamedInstrumentSlots = ({ step, content, slotIndices = [] }) => {
@@ -1185,10 +1288,16 @@ export const evaluateNamedInstrumentSlots = ({ step, content, slotIndices = [] }
 
   // When the person listed one fragment per slot, judge each slot against its
   // own fragment so a keyword elsewhere in the message cannot mark it correct.
-  const fragments = splitNamingFragments(normalized);
+  // A trailing descriptive clause ("...a bass, lower than a horn") can produce
+  // one extra fragment past the last slot - fold it into that last slot's text
+  // rather than losing per-slot isolation entirely.
+  const fragments = splitNamingFragments(content);
   const perSlotText =
-    fragments.length === consideredSlots.length
-      ? (position) => fragments[position]
+    fragments.length >= consideredSlots.length
+      ? (position) =>
+          position === consideredSlots.length - 1
+            ? fragments.slice(position).join(' ')
+            : fragments[position]
       : () => normalized;
 
   const outcomes = consideredSlots.map((index, position) => ({
@@ -1221,6 +1330,62 @@ export const evaluateNamedInstrumentSlots = ({ step, content, slotIndices = [] }
   return { outcomes, response };
 };
 
+// The text shown on a phraseCards card once a slot has been attempted. For a
+// slot with a scripted answer (SCRIPTED_INSTRUMENT_RULES) this is always the
+// canonical answer, regardless of whether the guess was correct - matches the
+// "reveal on attempt" framing used throughout. For a slot with no scripted
+// answer (e.g. an open "what comes to mind" blank), it echoes back whatever
+// the person actually said for that slot instead.
+// The single most word-like token in a fragment - last word wins, since
+// blanks are almost always phrased "...of X" / "...is X". Strips connective
+// filler ("a", "the", "of") from the very end first so e.g. "a pint of lager"
+// reveals "lager", not "of".
+const NAMING_SLOT_FILLER_WORDS = new Set(['a', 'an', 'the', 'of', 'is', 'was', 'to', 'it', 's']);
+const lastMeaningfulWord = (text = '') => {
+  const words = text
+    .toLowerCase()
+    .replace(/[^a-z'\s]/g, ' ')
+    .split(/\s+/)
+    .filter(Boolean);
+  for (let i = words.length - 1; i >= 0; i -= 1) {
+    if (!NAMING_SLOT_FILLER_WORDS.has(words[i])) return words[i];
+  }
+  return words[words.length - 1] || '';
+};
+
+export const resolveNamingSlotReveal = ({ step, content = '', slotIndices = [] }) => {
+  if (!content || slotIndices.length === 0) return [];
+  const rules = SCRIPTED_INSTRUMENT_RULES[step?.id];
+  const normalized = normalizeAnswer(content);
+  const fragments = splitNamingFragments(content);
+  const perSlotText = fragments.length >= slotIndices.length
+    ? (position) =>
+        position === slotIndices.length - 1
+          ? fragments.slice(position).join(' ')
+          : fragments[position]
+    : () => normalized;
+  // When slots are routed by content (matchByContent), a fragment's position in
+  // the sentence need not match its slot's position in slotIndices - answering
+  // out of order would otherwise pair the wrong fragment with the wrong slot.
+  // Re-run the same identify/match rule used to route the answer to find the
+  // fragment that actually names this slot before falling back to position.
+  const contentRules = step?.namingSlots?.matchByContent
+    ? SCRIPTED_INSTRUMENT_RULES[step?.id] || OPEN_NAMING_SLOT_IDENTIFY_RULES[step?.id]
+    : null;
+  const textForSlot = (index, position) => {
+    const matcher = contentRules?.[index]?.identify || contentRules?.[index]?.match;
+    const matchedFragment = matcher && fragments.find((fragment) => matcher.test(fragment));
+    return matchedFragment || perSlotText(position);
+  };
+  return slotIndices.map((index, position) => ({
+    index,
+    // A scripted answer is already a short canonical label; an open blank's
+    // echo is capped to one word so it fits the card instead of dumping the
+    // whole (possibly rambling) message onto it.
+    text: rules?.[index]?.label || lastMeaningfulWord(textForSlot(index, position)),
+  }));
+};
+
 export const isRecordableSessionAnswer = ({ step, content, wheelEvent }) =>
   Boolean(
     hasMeaningfulUserContent(content) &&
@@ -1228,6 +1393,7 @@ export const isRecordableSessionAnswer = ({ step, content, wheelEvent }) =>
     !isAutoAdvanceProtocol(content) &&
     !isActivityRevealProtocol(content) &&
     !isActivityCompletionProtocol(content) &&
+    !isMealBuilderProtocol(content) &&
     step?.id &&
     step.recordAnswer !== false
   );
@@ -1557,6 +1723,48 @@ export const buildTopicSessionSummary = (answers = [], { themeSong = null } = {}
     'current_affairs_bridge_future',
   ].includes(item.stepId))) {
     addTopic('exploring the Auckland Harbour Bridge and its future');
+  }
+  if (meaningful.some((item) => ['food_naming_chef', 'food_naming_chef_answer'].includes(item.stepId))) {
+    addTopic('trying to name a well-known New Zealand cook');
+  }
+  if (meaningful.some((item) => item.stepId === 'food_fast_food_opinion')) {
+    addTopic('sharing an opinion on fast food');
+  }
+  if (meaningful.some((item) => item.stepId === 'food_famous_phrases')) {
+    addTopic('finishing well-known food sayings');
+  }
+  if (meaningful.some((item) => item.stepId === 'food_sensory_game')) {
+    addTopic('imagining a grocery store through the senses');
+  }
+  if (meaningful.some((item) => item.stepId === 'food_meal_plan')) {
+    addTopic('planning a meal together');
+  }
+  if (meaningful.some((item) => item.stepId === 'food_tag')) {
+    addTopic('playing a food word-chain game');
+  }
+  if (meaningful.some((item) => item.stepId === 'food_spin_question')) {
+    addTopic('reflecting on a food-related question from the wheel');
+  }
+  if (meaningful.some((item) => item.stepId === 'word_associations_missing_word')) {
+    addTopic('filling in missing words for everyday phrases');
+  }
+  if (meaningful.some((item) => item.stepId === 'word_associations_pairs')) {
+    addTopic('completing familiar word pairs');
+  }
+  if (meaningful.some((item) => item.stepId === 'word_associations_famous_phrases')) {
+    addTopic('finishing well-known sayings');
+  }
+  if (meaningful.some((item) => item.stepId === 'word_associations_match_phrase')) {
+    addTopic('matching sayings to their endings');
+  }
+  if (meaningful.some((item) => ['word_associations_sayings', 'word_associations_category'].includes(item.stepId))) {
+    addTopic('finding the link between a set of sayings');
+  }
+  if (meaningful.some((item) => item.stepId === 'word_associations_connect_a_word')) {
+    addTopic('playing a word-association chain game');
+  }
+  if (meaningful.some((item) => item.stepId === 'word_associations_spin_question')) {
+    addTopic('reflecting on a question from the wheel');
   }
   const wheelAnswer = meaningful.find((item) => ['current_affairs_spin_question', 'faces_scenes_spin_question', 'categorizing_objects_spin_question'].includes(item.stepId));
   let wheelTopic = '';
@@ -2242,6 +2450,7 @@ const getSessionInactivityReminderWrite = async (sessionId, expectedActivityRevi
       categorizing: session.interactionState?.categorizing || {},
       name: getDisplayName(user),
       wheelQuestion: session.interactionState?.questionWheel?.question,
+      mealChoice: session.interactionState?.mealBuilder?.labels?.join(', '),
       currentAffairs,
       themeSong: getThemeSongForSession(session, user),
     };
@@ -2311,8 +2520,10 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
   const hasWheelProtocol = isQuestionWheelProtocol(userContent || '');
   const hasActivityRevealProtocol = isActivityRevealProtocol(userContent || '');
   const hasActivityCompletionProtocol = isActivityCompletionProtocol(userContent || '');
+  const hasMealBuilderProtocol = isMealBuilderProtocol(userContent || '');
   const wheelEvent = parseQuestionWheelEvent(userContent || '', step);
   const activityRevealEvent = parseActivityRevealEvent(userContent || '', step);
+  const mealBuilderEvent = parseMealBuilderEvent(userContent || '', step);
   if (!safetySupportTurn && hasWheelProtocol && !wheelEvent) {
     const err = new Error('Invalid question wheel option');
     err.status = 400;
@@ -2320,6 +2531,11 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
   }
   if (!safetySupportTurn && hasActivityRevealProtocol && !activityRevealEvent) {
     const err = new Error('Invalid activity reveal option');
+    err.status = 400;
+    throw err;
+  }
+  if (!safetySupportTurn && hasMealBuilderProtocol && !mealBuilderEvent) {
+    const err = new Error('Invalid meal builder selection');
     err.status = 400;
     throw err;
   }
@@ -2343,6 +2559,18 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
     (step.interaction?.type !== 'activityReveal' || effectiveTurnIndex !== 1)
   ) {
     const err = new Error('Activity interaction is not expected at this point');
+    err.status = 409;
+    throw err;
+  }
+  // Once the plate has been submitted (turn 1), the app is waiting on the spoken
+  // follow-up answer - a second meal-builder event at that point (e.g. a duplicate
+  // "That's my plate" press) must not be treated as a fresh choice.
+  if (
+    !safetySupportTurn &&
+    mealBuilderEvent &&
+    (step.interaction?.type !== 'mealBuilder' || effectiveTurnIndex !== 1)
+  ) {
+    const err = new Error('Meal builder selection is not expected at this point');
     err.status = 409;
     throw err;
   }
@@ -2523,6 +2751,8 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
       ? `Question wheel landed on ${wheelEvent.label}.`
       : activityRevealEvent
       ? `Revealed ${activityRevealEvent.option.label}.`
+      : mealBuilderEvent
+      ? `Chose ${mealBuilderEvent.labels.join(', ')} for the meal.`
       : hasActivityCompletionProtocol
       ? `Finished reenacting ${currentActivityOption.label}.`
       : hasMusicCompletionProtocol
@@ -2569,6 +2799,7 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
     recentMessages,
     name: getDisplayName(user),
     wheelQuestion: wheelEvent?.question || session.interactionState?.questionWheel?.question,
+    mealChoice: mealBuilderEvent?.labels?.join(', ') || session.interactionState?.mealBuilder?.labels?.join(', '),
     currentAffairs,
     themeSong,
   };
@@ -2616,6 +2847,9 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
       ? parseNamingSlotAnswer(userContent, {
           count: currentNamingSlotState.count,
           filled: currentNamingSlotState.filled,
+          contentRules: step.namingSlots.matchByContent
+            ? SCRIPTED_INSTRUMENT_RULES[step.id] || OPEN_NAMING_SLOT_IDENTIFY_RULES[step.id]
+            : null,
         })
       : null;
   const newlyFilledNamingSlots = namingSlotParse?.slots || [];
@@ -2643,13 +2877,22 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
           slotIndices: newlyFilledNamingSlots,
         })
       : null;
+  const namingSlotRevealUpdates =
+    namingSlotStep && newlyFilledNamingSlots.length > 0
+      ? resolveNamingSlotReveal({ step, content: userContent, slotIndices: newlyFilledNamingSlots })
+      : [];
+  const nextNamingSlotRevealed = namingSlotStep
+    ? currentNamingSlotState.revealed.map(
+        (existing, index) => namingSlotRevealUpdates.find((update) => update.index === index)?.text || existing
+      )
+    : [];
 
   let answeredCurrentQuestion = true;
   let adaptiveText = '';
   let adaptiveFollowUpQuestion = null;
   let emotionalSupportTurn = null;
   let orientationTurn = null;
-  if (!isQuestionWheelEvent && !isActivityInteractionEvent && userContent && hasDeliveredQuestion) {
+  if (!isQuestionWheelEvent && !isActivityInteractionEvent && !mealBuilderEvent && userContent && hasDeliveredQuestion) {
     emotionalSupportTurn = evaluateEmotionalSupportAnswer({
       content: userContent,
       hasActiveSupport: activeAdaptiveFollowUp?.kind === 'emotional_support',
@@ -2799,17 +3042,24 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
     newlyFilledNamingSlots.length > 0
   ) {
     const rules = SCRIPTED_INSTRUMENT_RULES[step.id];
-    const namedSounds = newlyFilledNamingSlots
+    // Every naming-slots step with scripted rules is a "finish the phrase" step
+    // except the original sound-naming one - that is the only case that needs
+    // the instrument-guessing framing instead.
+    const isSoundNamingStep = step.id === 'sounds_naming_instruments';
+    const namedItems = newlyFilledNamingSlots
       .filter((slotIndex) => rules[slotIndex])
-      .map(
-        (slotIndex) =>
-          `the ${step.namingSlots.labels?.[slotIndex] || `${slotIndex + 1}`} sound is ${rules[slotIndex].label}`
+      .map((slotIndex) =>
+        isSoundNamingStep
+          ? `the ${step.namingSlots.labels?.[slotIndex] || `${slotIndex + 1}`} sound is ${rules[slotIndex].label}`
+          : `the "${step.namingSlots.labels?.[slotIndex] || `${slotIndex + 1}`}" saying is missing ${rules[slotIndex].label}`
       );
     adaptiveText = await generateResponse(
       [
         {
           role: 'system',
-          content: buildCstInstrumentGuessInstructions({ recentMessages, namedSounds }),
+          content: isSoundNamingStep
+            ? buildCstInstrumentGuessInstructions({ recentMessages, namedSounds: namedItems })
+            : buildCstFoodPhraseGuessInstructions({ recentMessages, namedPhrases: namedItems }),
         },
         { role: 'user', content: userContent },
       ],
@@ -2819,9 +3069,47 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
         maxTokens: 80,
         model: useFastScriptedTurn ? process.env.OPENAI_FAST_TEXT_MODEL : undefined,
       }
-    );
+    ).catch((error) => {
+      console.warn('[session] Naming-slot acknowledgement fallback:', error.message);
+      return '';
+    });
     if (!collapseRepeatedAdjacentSpeech(adaptiveText || '').trim()) {
       adaptiveText = namingSlotAcknowledgement?.response || '';
+    }
+  } else if (
+    namingSlotStep &&
+    !SCRIPTED_INSTRUMENT_RULES[step.id] &&
+    userContent &&
+    hasDeliveredQuestion &&
+    newlyFilledNamingSlots.length > 0
+  ) {
+    // No scripted answer for this slide (e.g. an open "whatever comes to
+    // mind" blank) - the reveal itself is their own word echoed back on the
+    // card, but the spoken acknowledgement should still vary and react to
+    // what they actually said, not a single fixed fallback line.
+    const namedItems = namingSlotRevealUpdates.map(
+      ({ index, text }) => `the ${step.namingSlots.labels?.[index] || `${index + 1}`} blank got the word "${text}"`
+    );
+    adaptiveText = await generateResponse(
+      [
+        {
+          role: 'system',
+          content: buildCstOpenBlankAcknowledgementInstructions({ recentMessages, namedItems }),
+        },
+        { role: 'user', content: userContent },
+      ],
+      {
+        provider: llmProvider,
+        temperature: 0.5,
+        maxTokens: 60,
+        model: useFastScriptedTurn ? process.env.OPENAI_FAST_TEXT_MODEL : undefined,
+      }
+    ).catch((error) => {
+      console.warn('[session] Open-blank acknowledgement fallback:', error.message);
+      return '';
+    });
+    if (!collapseRepeatedAdjacentSpeech(adaptiveText || '').trim()) {
+      adaptiveText = 'Lovely, thank you.';
     }
   }
 
@@ -2975,7 +3263,11 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
     hasDeliveredQuestion &&
     !namingSlotsComplete &&
     !shouldForceProgress
-      ? buildNamingSlotPrompt(namingMissingLabels, step.namingSlots.noun || 'sound')
+      ? buildNamingSlotPrompt(
+          namingMissingLabels,
+          step.namingSlots.noun || 'sound',
+          step.namingSlots.singlePrompt
+        )
       : '';
   const scriptedNextLine = categorizingTurn && !categorizingTurn.complete && !emotionalSupportTurn
     ? categorizingTurn.prompt
@@ -3139,6 +3431,11 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
   } else {
     delete nextInteractionState.questionWheel;
   }
+  if (mealBuilderEvent && step.interaction?.type === 'mealBuilder') {
+    nextInteractionState.mealBuilder = mealBuilderEvent;
+  } else if (displaySlide.interaction?.type !== 'mealBuilder') {
+    delete nextInteractionState.mealBuilder;
+  }
   if (displaySlide.interaction?.type === 'activityReveal') {
     nextInteractionState.activityReveal = step.interaction?.type === 'activityReveal'
       ? createActivityRevealState(displaySlide, nextActivityRevealState)
@@ -3146,8 +3443,12 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
   } else {
     delete nextInteractionState.activityReveal;
   }
-  if (namingSlotStep && displaySlide.id === step.id) {
-    nextInteractionState.namingSlots = { stepId: step.id, filled: nextNamingSlotFilled };
+  if (namingSlotStep) {
+    // Keyed by the step just answered, not displaySlide - on the completing
+    // turn displaySlide has already moved on to the next step, but the
+    // reveal still needs to reach the frontend so it can show on the old
+    // slide during the deferred transition before it flips over.
+    nextInteractionState.namingSlots = { stepId: step.id, filled: nextNamingSlotFilled, revealed: nextNamingSlotRevealed };
   } else if (nextInteractionState.namingSlots?.stepId !== displaySlide.id) {
     delete nextInteractionState.namingSlots;
   }
@@ -3199,6 +3500,7 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
       sessionId: session._id,
       suggestions:
         wheelEvent ||
+        mealBuilderEvent ||
         isActivityInteractionEvent ||
         isNameThatTuneStep(step) ||
         hasMusicCompletionProtocol ||
@@ -3248,6 +3550,8 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
         : null,
     questionWheel: session.interactionState?.questionWheel || null,
     activityReveal: session.interactionState?.activityReveal || null,
+    mealBuilder: session.interactionState?.mealBuilder || null,
+    namingSlots: session.interactionState?.namingSlots || null,
     assistantText,
     speechSegments,
     sessionCompleteAfterResponse,

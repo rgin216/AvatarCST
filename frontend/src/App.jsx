@@ -73,16 +73,13 @@ const TEST_SESSIONS = [
     title: "Sounds",
     theme: "Sounds",
   },
-  ...Array.from({ length: 1 }, (_, i) => {
-    const n = i + 5;
-    return {
-      id: `placeholder_session_${n}`,
-      label: `Session ${n}`,
-      title: "Coming soon",
-      theme: "",
-      disabled: true,
-    };
-  }),
+  {
+    id: "cst_food",
+    label: "Session 5",
+    title: "Food",
+    theme: "Food",
+    icon: "🍽️",
+  },
   {
     id: "cst_current_affairs",
     label: "Session 6",
@@ -97,8 +94,15 @@ const TEST_SESSIONS = [
     theme: "Faces and Scenes",
     icon: "🖼️",
   },
-  ...Array.from({ length: 8 }, (_, i) => {
-    const n = i + 8;
+  {
+    id: "cst_word_associations",
+    label: "Session 8",
+    title: "Word Associations",
+    theme: "Word Associations",
+    icon: "🔤",
+  },
+  ...Array.from({ length: 7 }, (_, i) => {
+    const n = i + 9;
     if (n === 10) return { id: "cst_categorizing_objects", label: "Session 10", title: "Categorizing Objects", theme: "Categorizing Objects" };
     return {
       id: `placeholder_session_${n}`,

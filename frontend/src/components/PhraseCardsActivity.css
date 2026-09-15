@@ -1,0 +1,9 @@
+.ppt-slide.has-phrase-cards-interaction { background:linear-gradient(160deg, #fff8ec, #fdeee0); }
+.ppt-slide.has-phrase-cards-interaction::before { display:none; }
+.phrase-cards-activity { position:absolute; inset:0; display:flex; flex-direction:column; gap:clamp(10px,1.8cqh,20px); padding:clamp(36px,6cqh,54px) clamp(16px,2.6cqw,36px) clamp(20px,3cqh,36px); color:#4a3423; box-sizing:border-box; }
+.ppt-slide .phrase-cards-activity h1 { font-size:clamp(20px,2.7cqw,32px); line-height:1.15; margin:0 0 6px; color:#4a3423; }
+.phrase-cards-activity p { margin:0; font-size:clamp(14px,1.55cqw,19px); line-height:1.3; }
+.phrase-cards-board { flex:1; min-height:0; display:flex; flex-direction:column; justify-content:center; gap:clamp(14px,2.4cqh,26px); overflow:auto; padding:4px; }
+.phrase-card { position:relative; padding:clamp(16px,2.6cqh,28px) clamp(20px,3cqw,32px); border-radius:16px; background:#fffdf8; border:2px solid #e8c9a0; box-shadow:0 4px 12px rgba(120,80,30,.12); font-size:clamp(17px,2.1cqw,26px); font-style:italic; line-height:1.4; }
+.phrase-card::before { content:var(--phrase-card-icon, "🍽️"); position:absolute; top:-14px; left:20px; font-size:clamp(18px,2cqw,24px); background:#fff8ec; padding:0 6px; border-radius:50%; }
+.phrase-card-answer { font-style:normal; font-weight:700; color:#4b7a3f; text-decoration:underline; text-underline-offset:3px; }

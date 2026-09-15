@@ -1,5 +1,7 @@
 import ObjectSelectionActivity from "../components/ObjectSelectionActivity.jsx";
 import MatchingActivity from "../components/MatchingActivity.jsx";
+import MealBuilderActivity from "../components/MealBuilderActivity.jsx";
+import PhraseCardsActivity from "../components/PhraseCardsActivity.jsx";
 import { useEffect, useRef, useState } from "react";
 import AvatarViewer from "../components/avatar/AvatarViewer";
 import api from "../services/api.js";
@@ -220,6 +222,7 @@ export default function SessionPage({
   const [musicPlaybackState, setMusicPlaybackState] = useState("idle");
   const [questionWheel, setQuestionWheel] = useState(null);
   const [activityReveal, setActivityReveal] = useState(null);
+  const [namingSlots, setNamingSlots] = useState(null);
   const [playingAudioClipId, setPlayingAudioClipId] = useState(null);
   const audioClipElsRef = useRef({});
   const [wheelSpinning, setWheelSpinning] = useState(false);
@@ -316,13 +319,19 @@ export default function SessionPage({
   );
   const objectInteraction = slide.interaction?.type === "objectSelection";
   const matchingInteraction = slide.interaction?.type === "matching" ? slide.interaction : null;
+  const mealBuilderInteraction = slide.interaction?.type === "mealBuilder" ? slide.interaction : null;
+  const phraseCardsInteraction = slide.interaction?.type === "phraseCards" ? slide.interaction : null;
+  // namingSlots state can briefly still belong to the previous phraseCards
+  // step (it persists until the next turn's response overwrites it) - guard
+  // by stepId so a fresh phraseCards slide never shows the old one's reveals.
+  const namingSlotsForSlide = namingSlots?.stepId === slide.id ? namingSlots : null;
   const realOrAiInteraction = slide.interaction?.type === "realOrAi";
   const hasSlideInteraction =
     hasWheelInteraction ||
     Boolean(exerciseVideo) ||
     hasPositiveNewsInteraction ||
     Boolean(musicInteraction) ||
-    hasActivityRevealInteraction || Boolean(matchingInteraction) || objectInteraction || isSingleAudioClip;
+    hasActivityRevealInteraction || Boolean(matchingInteraction) || objectInteraction || Boolean(mealBuilderInteraction) || Boolean(phraseCardsInteraction) || isSingleAudioClip;
   const landedWheelResult = questionWheel?.status === "landed" ? questionWheel : null;
   const sessionInputDisabled =
     typing ||
@@ -455,6 +464,7 @@ export default function SessionPage({
     );
     setQuestionWheel(turn.questionWheel || null);
     setActivityReveal(turn.activityReveal || null);
+    setNamingSlots(turn.namingSlots || null);
     spotifyAutoplayPendingRef.current = shouldAutoplayThemeSong;
     videoAutoplayPendingRef.current = shouldAutoplayExercise;
   }
@@ -480,8 +490,13 @@ export default function SessionPage({
     pendingSlideTransitionRef.current = deferredTransition
       ? { ...deferredTransition, turn }
       : null;
-    commitSlide(deferredTransition?.from || slideData);
-    if (!deferredTransition) applyInteractionState(turn, slideData);
+    const displayedSlide = deferredTransition?.from || slideData;
+    commitSlide(displayedSlide);
+    // Applied immediately even when deferred, so state like a naming-slots
+    // reveal shows on the still-displayed (old) slide right away instead of
+    // waiting for the slide to flip over - it's re-applied for the new slide
+    // in commitPendingSlideTransition once the deferred transition commits.
+    applyInteractionState(turn, displayedSlide);
     const audioSegments = Array.isArray(turn.avatar?.audio?.segments)
       ? turn.avatar.audio.segments.filter((segment) => segment?.url)
       : turn.avatar?.audio?.url
@@ -1232,7 +1247,7 @@ export default function SessionPage({
 
   async function sendMessage(text, displayText = text) {
     const content = text.trim();
-    if (!content || typing || wheelResultPendingRef.current) return;
+    if (!content || typing || wheelResultPendingRef.current) return false;
     registerUserActivity();
 
     setMessages((items) => [...items, { from: "user", text: displayText.trim() }]);
@@ -1540,7 +1555,7 @@ export default function SessionPage({
 
       <main className="session-slide-shell">
         <section
-          className={`ppt-slide${slide.imageUrl && !hasSlideInteraction ? " has-slide-image" : ""}${hasSlideInteraction ? " has-slide-interaction" : ""}${exerciseVideo ? " has-video-interaction" : ""}${hasPositiveNewsInteraction ? " has-news-interaction" : ""}${musicInteraction ? " has-music-interaction" : ""}${hasActivityRevealInteraction ? " has-activity-reveal-interaction" : ""}${objectInteraction ? " has-object-interaction" : ""}${matchingInteraction ? " has-matching-interaction" : ""}${isSingleAudioClip ? " has-audioclips-interaction" : ""}`}
+          className={`ppt-slide${slide.imageUrl && !hasSlideInteraction ? " has-slide-image" : ""}${hasSlideInteraction ? " has-slide-interaction" : ""}${exerciseVideo ? " has-video-interaction" : ""}${hasPositiveNewsInteraction ? " has-news-interaction" : ""}${musicInteraction ? " has-music-interaction" : ""}${hasActivityRevealInteraction ? " has-activity-reveal-interaction" : ""}${objectInteraction ? " has-object-interaction" : ""}${matchingInteraction ? " has-matching-interaction" : ""}${mealBuilderInteraction ? " has-meal-builder-interaction" : ""}${phraseCardsInteraction ? " has-phrase-cards-interaction" : ""}${isSingleAudioClip ? " has-audioclips-interaction" : ""}`}
           style={{
             "--slide-accent": slide.accent || theme.blush,
             backgroundImage: slide.imageUrl && !hasSlideInteraction ? `url(${slide.imageUrl})` : undefined,
@@ -1616,6 +1631,8 @@ export default function SessionPage({
           )}
           {objectInteraction && <ObjectSelectionActivity key={slide.id} slide={slide} disabled={sessionInputDisabled || isRecording} onActivity={registerUserActivity} onSubmit={sendMessage} />}
           {matchingInteraction && <MatchingActivity key={slide.id || slide.index} interaction={matchingInteraction} title={slide.title} disabled={typing || wheelResultPending} submitDisabled={sessionInputDisabled} onActivity={registerUserActivity} onComplete={(content) => sendMessage(content, "My matches are ready.")} />}
+          {mealBuilderInteraction && <MealBuilderActivity key={slide.id || slide.index} interaction={mealBuilderInteraction} title={slide.title} disabled={typing || wheelResultPending || isRecording} submitDisabled={sessionInputDisabled || isRecording} onActivity={registerUserActivity} onComplete={(content) => sendMessage(content, "My plate is ready.")} />}
+          {phraseCardsInteraction && <PhraseCardsActivity key={slide.id || slide.index} interaction={phraseCardsInteraction} title={slide.title} namingSlots={namingSlotsForSlide} />}
           {realOrAiInteraction && <div className="real-ai-choices" aria-label="Choose your guess">
             {['Real person', 'AI generated', 'Not sure'].map((answer) => <button type="button" key={answer} disabled={sessionInputDisabled} onClick={() => sendMessage(answer)}>{answer}</button>)}
           </div>}
@@ -1627,20 +1644,47 @@ export default function SessionPage({
                 style={{
                   "--wheel-rotation": `${wheelRotation}deg`,
                   "--wheel-spin-rotation": `${-wheelRotation}deg`,
+                  // A label's box width was a fixed 26cqi no matter how many
+                  // slices there were, so with many (narrow) slices the text
+                  // box was wider than the wedge itself and bled into its
+                  // neighbours. Scale it down as slices get narrower - 35.5
+                  // matches the label's own translateY radius below.
+                  "--wheel-label-max-width": `${Math.min(26, Math.max(12, 35.5 * (wheelSliceDegrees * Math.PI / 180) * 1.4))}cqi`,
+                  // The divider-line period was hardcoded to 18deg (correct
+                  // only for exactly 20 options, e.g. Food's wheel) - drawn
+                  // independently of the actual color wedges, so with a
+                  // different option count the lines landed nowhere near
+                  // where the colors or labels actually changed.
+                  "--wheel-slice-degrees": `${wheelSliceDegrees}deg`,
                   background: `conic-gradient(${wheelGradient})`,
                 }}
               >
-                {wheelOptions.map((option, index) => (
-                  <span
-                    key={option.label}
-                    className="slide-wheel-label"
-                    style={{
-                      "--label-angle": `${index * wheelSliceDegrees + wheelSliceDegrees / 2}deg`,
-                    }}
-                  >
-                    <span>{option.label}</span>
-                  </span>
-                ))}
+                {wheelOptions.map((option, index) => {
+                  const labelAngle = index * wheelSliceDegrees + wheelSliceDegrees / 2;
+                  // 0deg = top, sweeping clockwise (90 = right, 180 = bottom,
+                  // 270 = left). Labels from bottom-through-left-to-top
+                  // (>180) need an extra 180deg on top of the base
+                  // reading-direction correction below, or they render
+                  // upside down - only the top-through-right-to-bottom half
+                  // reads correctly with the base correction alone. The whole
+                  // disc (labels included) rotates by wheelRotation once
+                  // spun, so readability depends on the label's CURRENT
+                  // visual angle, not just its fixed slot in the wheel.
+                  const visualAngle = ((labelAngle + wheelRotation) % 360 + 360) % 360;
+                  const labelFlip = visualAngle > 180 ? 180 : 0;
+                  return (
+                    <span
+                      key={option.label}
+                      className="slide-wheel-label"
+                      style={{
+                        "--label-angle": `${labelAngle}deg`,
+                        "--label-flip": `${labelFlip}deg`,
+                      }}
+                    >
+                      <span>{option.label}</span>
+                    </span>
+                  );
+                })}
                 <button
                   type="button"
                   className="slide-wheel-spin"
