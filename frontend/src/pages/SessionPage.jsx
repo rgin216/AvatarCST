@@ -4,6 +4,7 @@ import PhraseCardsActivity from "../components/PhraseCardsActivity.jsx";
 import { useEffect, useRef, useState } from "react";
 import AvatarViewer from "../components/avatar/AvatarViewer";
 import api from "../services/api.js";
+import OrientationActivity from "../components/OrientationActivity.jsx";
 import {
   createEmptyLipSyncFrame,
   getRhubarbMorphStateAtTime,
@@ -317,6 +318,7 @@ export default function SessionPage({
     Number(slide.inactivityTimeoutMs) || 0
   );
   const matchingInteraction = slide.interaction?.type === "matching" ? slide.interaction : null;
+  const orientationInteraction = ["choiceQuestion", "focusedQuestion"].includes(slide.interaction?.type) ? slide.interaction : null;
   const mealBuilderInteraction = slide.interaction?.type === "mealBuilder" ? slide.interaction : null;
   const phraseCardsInteraction = slide.interaction?.type === "phraseCards" ? slide.interaction : null;
   // namingSlots state can briefly still belong to the previous phraseCards
@@ -325,7 +327,7 @@ export default function SessionPage({
   const namingSlotsForSlide = namingSlots?.stepId === slide.id ? namingSlots : null;
   const realOrAiInteraction = slide.interaction?.type === "realOrAi";
   const hasSlideInteraction =
-    hasWheelInteraction ||
+    Boolean(orientationInteraction) || hasWheelInteraction ||
     Boolean(exerciseVideo) ||
     hasPositiveNewsInteraction ||
     Boolean(musicInteraction) ||
@@ -1570,6 +1572,7 @@ export default function SessionPage({
               {slide.deckSlide ? ` / Deck slide ${slide.deckSlide}` : ""}
             </div>
           )}
+          {orientationInteraction && <OrientationActivity key={slide.id || slide.index} interaction={orientationInteraction} title={slide.title} disabled={sessionInputDisabled || isRecording} onActivity={registerUserActivity} onComplete={sendMessage} />}
           {hasActivityRevealInteraction && (
             <div className="slide-activity-overlay">
               <header className="slide-activity-heading">

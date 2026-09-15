@@ -1,4 +1,5 @@
 import { createFacesScenesScript } from './facesScenesScript.js';
+import { createOrientationScript } from './orientationScript.js';
 ﻿import {
   adaptiveConversation,
   adaptiveReminiscence,
@@ -16,6 +17,7 @@ const scriptSlideFolders = {
   cst_current_affairs: 'session6',
   cst_faces_scenes: 'session7',
   cst_word_associations: 'session8',
+  cst_orientation: 'session11',
 };
 
 const physicalGamesWheelOptions = [
@@ -2223,6 +2225,7 @@ const scripts = {
 };
 
 scripts.cst_faces_scenes = createFacesScenesScript(scripts.cst_current_affairs);
+scripts.cst_orientation = createOrientationScript(scripts.cst_faces_scenes);
 
 export const getScript = (scriptId = 'cst_intro_reminiscence') =>
   scripts[scriptId] || scripts.cst_intro_reminiscence;

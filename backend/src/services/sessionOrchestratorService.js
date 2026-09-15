@@ -697,7 +697,19 @@ const SCRIPTED_TRIVIA_RULES = {
   },
 };
 
-const isScriptedTriviaQuestion = (step) => Boolean(SCRIPTED_TRIVIA_RULES[step?.id]);
+const getTriviaRule = (step) => {
+  if (!step?.trivia) return SCRIPTED_TRIVIA_RULES[step?.id];
+  const { choices, answer, aliases } = step.trivia;
+  return {
+    choices,
+    isCorrect: (content) => aliases.some((alias) => (` ${content} `).includes(` ${normalizeAnswer(alias.normalize('NFD').replace(/[\u0300-\u036f]/g, ''))} `)),
+    correctResponse: `Yes, that is right — ${answer}.`,
+    incorrectResponse: `Thank you for having a go. The answer is ${answer}.`,
+    unsureResponse: `That is okay. The answer is ${answer}.`,
+  };
+};
+
+const isScriptedTriviaQuestion = (step) => Boolean(getTriviaRule(step));
 
 // Only expand complete letter selections: the article "a" in a sentence must
 // not become option A.
@@ -712,18 +724,20 @@ const expandTriviaChoices = (content, choices) => {
 };
 
 export const evaluateTriviaAnswer = ({ step, content }) => {
-  const rule = SCRIPTED_TRIVIA_RULES[step?.id];
+  const rule = getTriviaRule(step);
   if (!rule || !content) return null;
 
   if (isDontKnowAnswer(content)) {
     return {
       answered: true,
-      response: 'No problem. Let us reveal the answer.',
+      response: rule.unsureResponse || 'No problem. Let us reveal the answer.',
       outcome: 'unsure',
     };
   }
 
-  const correct = rule.isCorrect(normalizeAnswer(expandTriviaChoices(content, rule.choices)));
+  const expanded = expandTriviaChoices(content, rule.choices);
+  const answer = step.trivia ? expanded.normalize('NFD').replace(/[\u0300-\u036f]/g, '') : expanded;
+  const correct = rule.isCorrect(normalizeAnswer(answer));
   return {
     answered: true,
     response: correct ? rule.correctResponse : rule.incorrectResponse,
@@ -1777,7 +1791,19 @@ export const buildTopicSessionSummary = (answers = [], { themeSong = null } = {}
   if (meaningful.some((item) => item.stepId === 'word_associations_spin_question')) {
     addTopic('reflecting on a question from the wheel');
   }
-  const wheelAnswer = meaningful.find((item) => ['current_affairs_spin_question', 'faces_scenes_spin_question'].includes(item.stepId));
+  if (meaningful.some((item) => item.stepId?.startsWith('orientation_landmark_'))) {
+    addTopic('exploring New Zealand landmarks');
+  }
+  if (meaningful.some((item) => item.stepId === 'orientation_favourite_place' || item.stepId?.startsWith('orientation_sensory_'))) {
+    addTopic('imagining a favourite place through your senses');
+  }
+  if (meaningful.some((item) => item.stepId?.startsWith('orientation_neighbour_'))) {
+    addTopic('remembering your neighbourhood');
+  }
+  if (meaningful.some((item) => ['orientation_grew_up', 'orientation_australia', 'orientation_pacific', 'orientation_europe', 'orientation_orienteering'].includes(item.stepId))) {
+    addTopic('talking about maps and familiar places');
+  }
+  const wheelAnswer = meaningful.find((item) => ['current_affairs_spin_question', 'faces_scenes_spin_question', 'orientation_spin_question'].includes(item.stepId));
   let wheelTopic = '';
   if (wheelAnswer) {
     const wheelText = `${wheelAnswer.answer || ''} ${wheelAnswer.adaptiveFollowUp?.answer || ''}`;
