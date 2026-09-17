@@ -6,7 +6,7 @@ export async function recallChildhoodPlace({ userId, sessionId, memoryEntries })
   const remembered = childhoodPlaceFromMemory(memoryEntries);
   if (remembered) return remembered;
   // Conflicting approved memories need an open question, not an older guess.
-  if (memoryEntries.some(entry => (!entry.status || entry.status === 'approved') && extractChildhoodPlace(entry.content))) return null;
+  if (memoryEntries.some(entry => entry.status === 'approved' && extractChildhoodPlace(entry.content))) return null;
   // Only this participant's earlier sessions; never cross participant boundaries.
   const sessions = await Session.find({userId, _id:{$ne:sessionId}}).sort({createdAt:-1}).limit(20).select('_id').lean();
   if (!sessions.length) return null;

@@ -44,7 +44,7 @@ export function extractChildhoodPlace(content = '', allowBare = false) {
   return match ? cleanPlace(match[1]) : allowBare ? cleanPlace(content) : null;
 }
 export function childhoodPlaceFromMemory(entries = []) {
-  const places = entries.filter(entry=>!entry.status || entry.status === 'approved')
+  const places = entries.filter(entry=>entry.status === 'approved')
     .map(entry=>extractChildhoodPlace(entry.content)).filter(Boolean);
   const distinct = [...new Map(places.map(place=>[place.toLowerCase(),place])).values()];
   return distinct.length === 1 ? distinct[0] : null;
