@@ -1,4 +1,6 @@
 import { answerNewsQuestion, newsContext } from './newsConversationService.js';
+import { orientationPracticeContext } from './orientationContext.js';
+import { recallChildhoodPlace } from './childhoodRecallService.js';
 import { parseMatchingAnswer } from './matchingService.js';
 import Message from '../models/Message.js';
 import Session from '../models/Session.js';
@@ -723,9 +725,35 @@ const expandTriviaChoices = (content, choices) => {
   return choices[letter.charCodeAt(0) - 97] || content;
 };
 
-export const evaluateTriviaAnswer = ({ step, content }) => {
+export const evaluateTriviaAnswer = ({ step, content, answers = [] }) => {
   const rule = getTriviaRule(step);
   if (!rule || !content) return null;
+
+  if (step?.id?.startsWith('orientation_landmark_')) {
+    const previous = answers.filter(item => item.stepId.startsWith('orientation_landmark_'));
+    let streak = 0;
+    for (const item of [...previous].reverse()) {
+      const index = getScriptStepIndex('cst_orientation', item.stepId);
+      if (index < 0 || evaluateTriviaAnswer({ step: getScriptStep('cst_orientation', index).step, content: item.answer })?.outcome !== 'correct') break;
+      streak += 1;
+    }
+    const answer = step.trivia.answer;
+    const variant = previous.length;
+    const praise = ['Well done!', 'You have got it!', 'Exactly right!', 'Lovely work!', 'That is correct!'];
+    const encouragement = streak === 1 ? ' Two in a row — you are on a roll!' : streak === 3 ? ' Four in a row — well done!' : '';
+    rule.correctResponse = `${praise[variant % praise.length]} ${answer}.${encouragement}`;
+    rule.incorrectResponse = [
+      `Good effort. This one is ${answer}. Let us try the next one.`,
+      `Thank you for giving it a go. The answer is ${answer}.`,
+      `This time it is ${answer}. There is no rush — take your time.`,
+      `The answer is ${answer}. It is all right to miss a few; we are just exploring together.`,
+    ][variant % 4];
+    rule.unsureResponse = [
+      `That is all right. This one is ${answer}.`,
+      `No problem at all. The answer is ${answer}. Let us keep exploring.`,
+      `We can discover it together — it is ${answer}.`,
+    ][variant % 3];
+  }
 
   if (isDontKnowAnswer(content)) {
     return {
@@ -2484,6 +2512,8 @@ const getSessionInactivityReminderWrite = async (sessionId, expectedActivityRevi
     const currentAffairs = session.interactionState?.currentAffairs || null;
     const scriptContext = {
       name: getDisplayName(user),
+      orientationPractice: session.interactionState?.orientationPractice,
+      rememberedChildhoodPlace: session.interactionState?.orientationPractice?.rememberedChildhoodPlace,
       wheelQuestion: session.interactionState?.questionWheel?.question,
       mealChoice: session.interactionState?.mealBuilder?.labels?.join(', '),
       currentAffairs,
@@ -2826,7 +2856,23 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
       })
     : null;
   let themeSong = getThemeSongForSession(session, user);
+  const orientationPractice = orientationPracticeContext(
+    session.interactionState?.orientationPractice,
+    step,
+    effectiveTurnIndex > 0 ? userContent : '',
+  );
+  if ([step, nextStep].some(candidate => candidate?.id === 'orientation_grew_up') &&
+      !Object.hasOwn(orientationPractice, 'rememberedChildhoodPlace')) {
+    try {
+      orientationPractice.rememberedChildhoodPlace = await recallChildhoodPlace({ userId: session.userId, sessionId: session._id, memoryEntries });
+    } catch {
+      // A failed memory lookup must never prevent the participant continuing.
+      orientationPractice.rememberedChildhoodPlace = null;
+    }
+  }
   const scriptContext = {
+    orientationPractice,
+    rememberedChildhoodPlace: orientationPractice.rememberedChildhoodPlace,
     previousAnswer: userContent,
     recentMessages,
     name: getDisplayName(user),
@@ -2835,6 +2881,13 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
     currentAffairs,
     themeSong,
   };
+  for (const [candidate, candidateSlide] of [[step, slide], [nextStep, nextSlide]]) {
+    if (!candidate?.contextualQuestion || !candidateSlide) continue;
+    candidateSlide.prompt = candidate.contextualQuestion(scriptContext);
+    if (candidateSlide.interaction?.type === 'focusedQuestion') {
+      candidateSlide.interaction = { ...candidateSlide.interaction, question: candidateSlide.prompt };
+    }
+  }
   const hasUserContent = Boolean(userContent);
   const hasDeliveredQuestion = effectiveTurnIndex > 0;
   const expectedQuestion =
@@ -2942,6 +2995,7 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
       : null) || emotionalSupportTurn || orientationTurn || (matchingAnswer ? { answered: true, response: matchingAnswer.response } : null) || evaluateTriviaAnswer({
       step,
       content: userContent,
+      answers: storedAnswers,
     }) || evaluateMusicCompletionAnswer({
       step,
       content: userContent,
@@ -3429,6 +3483,7 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
   const nextInteractionState = {
     ...(session.interactionState || {}),
     sessionAnswers,
+    ...(session.scriptId === 'cst_orientation' ? { orientationPractice } : {}),
   };
   if (themeSong) {
     nextInteractionState.themeSong = themeSong;

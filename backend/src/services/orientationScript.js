@@ -1,3 +1,4 @@
+import { sensoryQuestion, neighbourhoodQuestion, grewUpQuestion } from './orientationContext.js';
 import { adaptiveConversation } from './cstScriptHelpers.js';
 
 // Reuse the established 15-slide opening and closing controls. Preserve getters
@@ -35,12 +36,18 @@ export function createOrientationScript(shared) {
         inactivityTimeoutMs: 180000,
         trivia: { choices: options, answer, aliases: [answer, ...aliases] },
         interaction: { type: 'choiceQuestion', question, progress: `Question ${number} of 5`, options },
-        reply: () => `${question} ${options.map((option, index) => `${'ABCD'[index]}, ${option}`).join('; ')}. You can choose from the list, say the letter or place, or say I am not sure.`,
+        reply: () => `${number === 1 ? (slide === 17 ? 'Let us move on to some general geography trivia. These are just for fun, so take your time. ' : 'Now, let us move on to some general landmark trivia. ') : ''}${question} ${options.map((option, index) => `${'ABCD'[index]}, ${option}`).join('; ')}. You can choose from the list, say the letter or place, or say I am not sure.`,
       });
   };
   const focused = (suffix, slide, title, question, progress) => discussion(suffix, slide, title, question,
     'Ask only this question and wait. Accept a short answer, an approximation, no memory, or a wish to pass. Do not grade personal memories or add another question; the next scripted step supplies it. Keep acknowledgement brief.', {
       interaction: { type: 'focusedQuestion', question, progress }, inactivityTimeoutMs: 120000,
+      contextualQuestion: (context) => suffix.startsWith('sensory_')
+        ? sensoryQuestion(suffix.slice(8), context)
+        : suffix.startsWith('neighbour_') ? neighbourhoodQuestion(suffix.slice(10), question, context) : question,
+      reply: (context) => suffix.startsWith('sensory_')
+        ? sensoryQuestion(suffix.slice(8), context)
+        : suffix.startsWith('neighbour_') ? neighbourhoodQuestion(suffix.slice(10), question, context) : question,
     });
   const reminiscence = adaptiveConversation('Invite at most one related memory if they seem interested. Do not assume they travelled, lived in New Zealand, or remember exact details. Respect uncertainty and wishes to move on.');
   return [
@@ -66,7 +73,7 @@ export function createOrientationScript(shared) {
     focused('neighbour_lines', 20, 'Your neighbourhood', 'Are the telephone lines overhead or below ground, or are you not sure?', 'Question 4 of 6'),
     focused('neighbour_footpaths', 20, 'Your neighbourhood', 'Are there footpaths on both sides of the street? If so, are they mostly smooth or cracked?', 'Question 5 of 6'),
     focused('neighbour_flowers', 20, 'Your neighbourhood', 'What flowers or plants do you remember along that street?', 'Question 6 of 6'),
-    discussion('grew_up', 21, 'Where did you grow up?', 'These maps show the world and New Zealand. Where did you grow up?', 'Accept any country or place. Never assume a New Zealand childhood.', { adaptiveFollowUp: reminiscence }),
+    discussion('grew_up', 21, 'Where did you grow up?', 'These maps show the world and New Zealand. Where did you grow up?', 'If a childhood place is recalled, ask whether it is correct. Accept corrections and uncertainty; never insist the memory is right. Otherwise accept any place without assuming a New Zealand childhood.', { reply: grewUpQuestion, contextualQuestion: grewUpQuestion, adaptiveFollowUp: reminiscence }),
     discussion('australia', 22, 'Holiday places', 'This is a map of Australia. Is there somewhere there you enjoyed visiting, or would like to visit? You can also tell me about a holiday closer to home.', 'Do not assume a visit to Australia. A local outing or no travel is equally welcome.', { adaptiveFollowUp: reminiscence }),
     discussion('pacific', 23, 'The Pacific', 'This map shows islands in the Pacific. Is there an island or place on it that you recognise?', 'The map includes Fiji, Samoa, Tonga, the Cook Islands, Papua New Guinea, and other Pacific places. Accept any recognisable place or personal connection.', { adaptiveFollowUp: reminiscence }),
     discussion('europe', 24, 'Europe and nearby places', 'Here is a map of Europe and nearby places. Is there a country you recognise or feel a connection with?', 'Accept any visible country or a connection through family, travel, or stories. Do not require travel experience.', { adaptiveFollowUp: reminiscence }),

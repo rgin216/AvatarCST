@@ -492,11 +492,13 @@ export default function SessionPage({
       : null;
     const displayedSlide = deferredTransition?.from || slideData;
     commitSlide(displayedSlide);
-    // Applied immediately even when deferred, so state like a naming-slots
-    // reveal shows on the still-displayed (old) slide right away instead of
-    // waiting for the slide to flip over - it's re-applied for the new slide
-    // in commitPendingSlideTransition once the deferred transition commits.
-    applyInteractionState(turn, displayedSlide);
+    // The outgoing slide keeps its own song/news/media state until the
+    // acknowledgement ends. Only a reveal belonging to that slide updates now.
+    if (deferredTransition) {
+      if (turn.namingSlots?.stepId === displayedSlide.id) setNamingSlots(turn.namingSlots);
+    } else {
+      applyInteractionState(turn, displayedSlide);
+    }
     const audioSegments = Array.isArray(turn.avatar?.audio?.segments)
       ? turn.avatar.audio.segments.filter((segment) => segment?.url)
       : turn.avatar?.audio?.url

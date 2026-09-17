@@ -84,15 +84,17 @@ test('Session 11 answers advance exactly one question and retain the correct dec
     interactionState:{sessionAnswers:[]}, save:async()=>session };
   t.mock.method(Session,'findOneAndUpdate',async()=>session);
   t.mock.method(User,'findById',()=>({lean:async()=>({_id:session.userId,name:'Test'})}));
-  t.mock.method(Memory,'findOne',()=>({lean:async()=>null}));
+  t.mock.method(Memory,'findOne',()=>({lean:async()=>({entries:[{content:'Grew up in Wellington',status:'approved'}]})}));
   t.mock.method(Message,'find',()=>({sort(){return this},limit(){return this},lean:async()=>[{role:'assistant',content:script[session.scriptStepIndex].reply({})}]}));
   t.mock.method(Message,'create',async(message)=>({_id:'test-message',...message}));
   t.mock.method(globalThis,'fetch',async()=>({ok:true,json:async()=>({choices:[{message:{content:'Thank you for sharing.'}}]})}));
   for (const [suffix,content,next] of [
     ['landmark_17_1','B','landmark_17_2'],
     ['landmark_17_5','I am not sure','landmark_18_1'],
+    ['favourite_place','pass','sensory_see'],
     ['sensory_see','Trees and the sea','sensory_smell'],
     ['neighbour_colour','I would like to pass','neighbour_block'],
+    ['neighbour_flowers','Roses','grew_up'],
   ]) {
     session.scriptStepIndex=script.indexOf(find(suffix));
     session.scriptStepTurnIndex=1;
@@ -101,6 +103,35 @@ test('Session 11 answers advance exactly one question and retain the correct dec
     assert.equal(session.scriptStepIndex,script.indexOf(find(next)),suffix);
     assert.equal(response.slide.id,find(next).id);
     assert.equal(response.slide.deckSlide,find(next).deckSlide);
-    assert.equal(response.slide.interaction.type,find(next).interaction.type);
+    assert.equal(response.slide.interaction?.type,find(next).interaction?.type);
+    if (suffix === 'favourite_place' || suffix === 'neighbour_colour') {
+      const example = suffix === 'favourite_place' ? /garden/ : /street/;
+      assert.match(response.assistantText, example);
+      assert.match(response.slide.interaction.question, example);
+      const continued = await respondToSessionTurn({sessionId:session._id,content:'Some trees'});
+      assert.match(continued.slide.interaction.question, example);
+    }
+    if (next === 'grew_up') {
+      assert.match(response.assistantText, /Wellington.*remembered that correctly/);
+      assert.match(response.slide.prompt, /Wellington.*remembered that correctly/);
+    }
   }
+});
+
+test('trivia feedback varies, celebrates streaks, and resets encouragement after a miss', () => {
+  const questions = script.filter(step=>step.trivia);
+  const answers = [];
+  const responses = [];
+  for (const step of questions) {
+    responses.push(evaluateTriviaAnswer({step,content:step.trivia.answer,answers}).response);
+    answers.push({stepId:step.id,answer:step.trivia.answer});
+  }
+  assert.match(responses[1], /on a roll/);
+  assert.match(responses[3], /Four in a row/);
+  assert.ok(new Set(responses.map(response=>response.split('!')[0])).size >= 5);
+  answers[answers.length-1].answer='I am not sure';
+  assert.doesNotMatch(evaluateTriviaAnswer({step:questions[0],content:'B',answers}).response, /in a row|on a roll/);
+  assert.notEqual(evaluateTriviaAnswer({step:questions[0],content:'A'}).response, evaluateTriviaAnswer({step:questions[0],content:'A',answers:[answers[0]]}).response);
+  assert.match(questions[0].reply(), /move on to some general geography trivia/);
+  assert.match(questions[5].reply(), /move on to some general landmark trivia/);
 });

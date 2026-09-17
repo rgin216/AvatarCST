@@ -144,7 +144,7 @@ Acknowledge any way of navigating, including asking someone for help.
 
 Deck slide 17: Geography & Landmarks
 
-Accept an option letter or place name. The answer is Lake Taupō. Give gentle feedback and move on after one attempt, including uncertainty.
+Accept an option letter or place name. The answer is Lake Taupō. Give varied, gentle feedback and move on after one attempt, including uncertainty. Occasionally acknowledge consecutive correct answers with encouragement.
 
 ---
 
@@ -152,7 +152,7 @@ Accept an option letter or place name. The answer is Lake Taupō. Give gentle fe
 
 Deck slide 17: Geography & Landmarks
 
-Accept an option letter or place name. The answer is Auckland / Tāmaki Makaurau. Give gentle feedback and move on after one attempt, including uncertainty.
+Accept an option letter or place name. The answer is Auckland / Tāmaki Makaurau. Give varied, gentle feedback and move on after one attempt, including uncertainty. Occasionally acknowledge consecutive correct answers with encouragement.
 
 ---
 
@@ -160,7 +160,7 @@ Accept an option letter or place name. The answer is Auckland / Tāmaki Makaurau
 
 Deck slide 17: Geography & Landmarks
 
-Accept an option letter or place name. The answer is Rotorua. Give gentle feedback and move on after one attempt, including uncertainty.
+Accept an option letter or place name. The answer is Rotorua. Give varied, gentle feedback and move on after one attempt, including uncertainty. Occasionally acknowledge consecutive correct answers with encouragement.
 
 ---
 
@@ -168,7 +168,7 @@ Accept an option letter or place name. The answer is Rotorua. Give gentle feedba
 
 Deck slide 17: Geography & Landmarks
 
-Accept an option letter or place name. The answer is Northland. Give gentle feedback and move on after one attempt, including uncertainty.
+Accept an option letter or place name. The answer is Northland. Give varied, gentle feedback and move on after one attempt, including uncertainty. Occasionally acknowledge consecutive correct answers with encouragement.
 
 ---
 
@@ -176,7 +176,7 @@ Accept an option letter or place name. The answer is Northland. Give gentle feed
 
 Deck slide 17: Geography & Landmarks
 
-Accept an option letter or place name. The answer is Mount Taranaki / Mount Egmont. Give gentle feedback and move on after one attempt, including uncertainty.
+Accept an option letter or place name. The answer is Mount Taranaki / Mount Egmont. Give varied, gentle feedback and move on after one attempt, including uncertainty. Occasionally acknowledge consecutive correct answers with encouragement.
 
 ---
 
@@ -184,7 +184,7 @@ Accept an option letter or place name. The answer is Mount Taranaki / Mount Egmo
 
 Deck slide 18: Geography & Landmarks
 
-Accept an option letter or place name. The answer is Napier. Give gentle feedback and move on after one attempt, including uncertainty.
+Accept an option letter or place name. The answer is Napier. Give varied, gentle feedback and move on after one attempt, including uncertainty. Occasionally acknowledge consecutive correct answers with encouragement.
 
 ---
 
@@ -192,7 +192,7 @@ Accept an option letter or place name. The answer is Napier. Give gentle feedbac
 
 Deck slide 18: Geography & Landmarks
 
-Accept an option letter or place name. The answer is Auckland / Tāmaki Makaurau. Give gentle feedback and move on after one attempt, including uncertainty.
+Accept an option letter or place name. The answer is Auckland / Tāmaki Makaurau. Give varied, gentle feedback and move on after one attempt, including uncertainty. Occasionally acknowledge consecutive correct answers with encouragement.
 
 ---
 
@@ -200,7 +200,7 @@ Accept an option letter or place name. The answer is Auckland / Tāmaki Makaurau
 
 Deck slide 18: Geography & Landmarks
 
-Accept an option letter or place name. The answer is Waitomo Caves. Give gentle feedback and move on after one attempt, including uncertainty.
+Accept an option letter or place name. The answer is Waitomo Caves. Give varied, gentle feedback and move on after one attempt, including uncertainty. Occasionally acknowledge consecutive correct answers with encouragement.
 
 ---
 
@@ -208,7 +208,7 @@ Accept an option letter or place name. The answer is Waitomo Caves. Give gentle 
 
 Deck slide 18: Geography & Landmarks
 
-Accept an option letter or place name. The answer is Punakaiki. Give gentle feedback and move on after one attempt, including uncertainty.
+Accept an option letter or place name. The answer is Punakaiki. Give varied, gentle feedback and move on after one attempt, including uncertainty. Occasionally acknowledge consecutive correct answers with encouragement.
 
 ---
 
@@ -216,7 +216,7 @@ Accept an option letter or place name. The answer is Punakaiki. Give gentle feed
 
 Deck slide 18: Geography & Landmarks
 
-Accept an option letter or place name. The answer is Ōhakune. Give gentle feedback and move on after one attempt, including uncertainty.
+Accept an option letter or place name. The answer is Ōhakune. Give varied, gentle feedback and move on after one attempt, including uncertainty. Occasionally acknowledge consecutive correct answers with encouragement.
 
 ---
 
@@ -224,7 +224,7 @@ Accept an option letter or place name. The answer is Ōhakune. Give gentle feedb
 
 Deck slide 19: Your favourite place
 
-Ask only this question and wait. Accept a short answer, an approximation, no memory, or a wish to pass. Do not grade personal memories or add another question; the next scripted step supplies it. Keep acknowledgement brief.
+Ask only this question and wait. Accept a short answer, an approximation, no memory, or a wish to pass. Do not grade personal memories or add another question; the next scripted step supplies it. Keep acknowledgement brief. If the initial place question was passed, use the supplied imaginary garden or street consistently in later questions; never describe it as a real memory.
 
 ---
 
@@ -232,7 +232,7 @@ Ask only this question and wait. Accept a short answer, an approximation, no mem
 
 Deck slide 19: Your favourite place
 
-Ask only this question and wait. Accept a short answer, an approximation, no memory, or a wish to pass. Do not grade personal memories or add another question; the next scripted step supplies it. Keep acknowledgement brief.
+Ask only this question and wait. Accept a short answer, an approximation, no memory, or a wish to pass. Do not grade personal memories or add another question; the next scripted step supplies it. Keep acknowledgement brief. If the initial place question was passed, use the supplied imaginary garden or street consistently in later questions; never describe it as a real memory.
 
 ---
 
@@ -240,7 +240,7 @@ Ask only this question and wait. Accept a short answer, an approximation, no mem
 
 Deck slide 19: Your favourite place
 
-Ask only this question and wait. Accept a short answer, an approximation, no memory, or a wish to pass. Do not grade personal memories or add another question; the next scripted step supplies it. Keep acknowledgement brief.
+Ask only this question and wait. Accept a short answer, an approximation, no memory, or a wish to pass. Do not grade personal memories or add another question; the next scripted step supplies it. Keep acknowledgement brief. If the initial place question was passed, use the supplied imaginary garden or street consistently in later questions; never describe it as a real memory.
 
 ---
 
@@ -248,7 +248,7 @@ Ask only this question and wait. Accept a short answer, an approximation, no mem
 
 Deck slide 19: Your favourite place
 
-Ask only this question and wait. Accept a short answer, an approximation, no memory, or a wish to pass. Do not grade personal memories or add another question; the next scripted step supplies it. Keep acknowledgement brief.
+Ask only this question and wait. Accept a short answer, an approximation, no memory, or a wish to pass. Do not grade personal memories or add another question; the next scripted step supplies it. Keep acknowledgement brief. If the initial place question was passed, use the supplied imaginary garden or street consistently in later questions; never describe it as a real memory.
 
 ---
 
@@ -256,7 +256,7 @@ Ask only this question and wait. Accept a short answer, an approximation, no mem
 
 Deck slide 19: Your favourite place
 
-Ask only this question and wait. Accept a short answer, an approximation, no memory, or a wish to pass. Do not grade personal memories or add another question; the next scripted step supplies it. Keep acknowledgement brief.
+Ask only this question and wait. Accept a short answer, an approximation, no memory, or a wish to pass. Do not grade personal memories or add another question; the next scripted step supplies it. Keep acknowledgement brief. If the initial place question was passed, use the supplied imaginary garden or street consistently in later questions; never describe it as a real memory.
 
 ---
 
@@ -264,7 +264,7 @@ Ask only this question and wait. Accept a short answer, an approximation, no mem
 
 Deck slide 19: Your favourite place
 
-Ask only this question and wait. Accept a short answer, an approximation, no memory, or a wish to pass. Do not grade personal memories or add another question; the next scripted step supplies it. Keep acknowledgement brief.
+Ask only this question and wait. Accept a short answer, an approximation, no memory, or a wish to pass. Do not grade personal memories or add another question; the next scripted step supplies it. Keep acknowledgement brief. If the initial place question was passed, use the supplied imaginary garden or street consistently in later questions; never describe it as a real memory.
 
 ---
 
@@ -272,7 +272,7 @@ Ask only this question and wait. Accept a short answer, an approximation, no mem
 
 Deck slide 20: Your neighbourhood
 
-Ask only this question and wait. Accept a short answer, an approximation, no memory, or a wish to pass. Do not grade personal memories or add another question; the next scripted step supplies it. Keep acknowledgement brief.
+Ask only this question and wait. Accept a short answer, an approximation, no memory, or a wish to pass. Do not grade personal memories or add another question; the next scripted step supplies it. Keep acknowledgement brief. If the initial place question was passed, use the supplied imaginary garden or street consistently in later questions; never describe it as a real memory.
 
 ---
 
@@ -280,7 +280,7 @@ Ask only this question and wait. Accept a short answer, an approximation, no mem
 
 Deck slide 20: Your neighbourhood
 
-Ask only this question and wait. Accept a short answer, an approximation, no memory, or a wish to pass. Do not grade personal memories or add another question; the next scripted step supplies it. Keep acknowledgement brief.
+Ask only this question and wait. Accept a short answer, an approximation, no memory, or a wish to pass. Do not grade personal memories or add another question; the next scripted step supplies it. Keep acknowledgement brief. If the initial place question was passed, use the supplied imaginary garden or street consistently in later questions; never describe it as a real memory.
 
 ---
 
@@ -288,7 +288,7 @@ Ask only this question and wait. Accept a short answer, an approximation, no mem
 
 Deck slide 20: Your neighbourhood
 
-Ask only this question and wait. Accept a short answer, an approximation, no memory, or a wish to pass. Do not grade personal memories or add another question; the next scripted step supplies it. Keep acknowledgement brief.
+Ask only this question and wait. Accept a short answer, an approximation, no memory, or a wish to pass. Do not grade personal memories or add another question; the next scripted step supplies it. Keep acknowledgement brief. If the initial place question was passed, use the supplied imaginary garden or street consistently in later questions; never describe it as a real memory.
 
 ---
 
@@ -296,7 +296,7 @@ Ask only this question and wait. Accept a short answer, an approximation, no mem
 
 Deck slide 20: Your neighbourhood
 
-Ask only this question and wait. Accept a short answer, an approximation, no memory, or a wish to pass. Do not grade personal memories or add another question; the next scripted step supplies it. Keep acknowledgement brief.
+Ask only this question and wait. Accept a short answer, an approximation, no memory, or a wish to pass. Do not grade personal memories or add another question; the next scripted step supplies it. Keep acknowledgement brief. If the initial place question was passed, use the supplied imaginary garden or street consistently in later questions; never describe it as a real memory.
 
 ---
 
@@ -304,7 +304,7 @@ Ask only this question and wait. Accept a short answer, an approximation, no mem
 
 Deck slide 20: Your neighbourhood
 
-Ask only this question and wait. Accept a short answer, an approximation, no memory, or a wish to pass. Do not grade personal memories or add another question; the next scripted step supplies it. Keep acknowledgement brief.
+Ask only this question and wait. Accept a short answer, an approximation, no memory, or a wish to pass. Do not grade personal memories or add another question; the next scripted step supplies it. Keep acknowledgement brief. If the initial place question was passed, use the supplied imaginary garden or street consistently in later questions; never describe it as a real memory.
 
 ---
 
@@ -312,7 +312,7 @@ Ask only this question and wait. Accept a short answer, an approximation, no mem
 
 Deck slide 20: Your neighbourhood
 
-Ask only this question and wait. Accept a short answer, an approximation, no memory, or a wish to pass. Do not grade personal memories or add another question; the next scripted step supplies it. Keep acknowledgement brief.
+Ask only this question and wait. Accept a short answer, an approximation, no memory, or a wish to pass. Do not grade personal memories or add another question; the next scripted step supplies it. Keep acknowledgement brief. If the initial place question was passed, use the supplied imaginary garden or street consistently in later questions; never describe it as a real memory.
 
 ---
 
@@ -320,7 +320,7 @@ Ask only this question and wait. Accept a short answer, an approximation, no mem
 
 Deck slide 21: Where did you grow up?
 
-Accept any country or place. Never assume a New Zealand childhood.
+First check approved memory and earlier sessions for a clear childhood place. If one is recalled, ask whether it is correct, and accept corrections or uncertainty. Otherwise ask where they grew up. Never assume a New Zealand childhood.
 
 ---
 
