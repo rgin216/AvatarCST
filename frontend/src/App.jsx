@@ -129,6 +129,17 @@ function SessionRoute({ userName, fallbackPipelineMode, defaultAvatarMode, onSes
   });
 
   useEffect(() => {
+    // Reset route-owned state before loading a different session. This effect
+    // synchronizes the router and browser storage with the session screen.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setSessionInfo({ id: sessionId, data: sessionId === "dev-session"
+      ? { status: "pending", title: "Practice session" } : null });
+    setInvalid(false);
+    try {
+      setPracticeCompletedFor(sessionStorage.getItem(tutorialStorageKey(sessionId)) === "done" ? sessionId : null);
+    } catch {
+      setPracticeCompletedFor(null);
+    }
     if (sessionId === "dev-session") return undefined;
     let cancelled = false;
     api.get(`/sessions/${sessionId}`)
@@ -142,10 +153,10 @@ function SessionRoute({ userName, fallbackPipelineMode, defaultAvatarMode, onSes
     return () => { cancelled = true; };
   }, [sessionId]);
 
-  if (invalid) return <Navigate to="/landing" replace />;
+  if (invalid && sessionInfo?.id === sessionId) return <Navigate to="/landing" replace />;
   // Mount the live session only after practice. Its initial response, narration,
   // and inactivity timer must not run while the participant is learning.
-  if (sessionInfo?.id !== sessionId) return <div className="session-stage" role="status">Preparing your session…</div>;
+  if (sessionInfo?.id !== sessionId || !sessionInfo.data) return <div className="session-stage" role="status">Preparing your session…</div>;
   if (shouldShowInputTutorial(sessionInfo.data, practiceCompletedFor === sessionId)) {
     return <SessionInputTutorial key={sessionId} sessionTitle={sessionInfo.data.title} onComplete={() => {
       try { sessionStorage.setItem(tutorialStorageKey(sessionId), "done"); } catch { /* Practice still works without storage. */ }
