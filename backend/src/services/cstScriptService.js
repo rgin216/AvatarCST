@@ -15,6 +15,7 @@ const scriptSlideFolders = {
   cst_food: 'session5',
   cst_current_affairs: 'session6',
   cst_faces_scenes: 'session7',
+  cst_using_money: 'session12',
 };
 
 const physicalGamesWheelOptions = [
@@ -107,6 +108,25 @@ const foodWheelOptions = [
   { label: 'Then and Now', question: 'How has the food you eat changed over the years?' },
   { label: 'A Kitchen Gadget', question: 'Is there a kitchen tool or gadget you have always liked using?' },
   { label: 'Sharing a Meal', question: 'Who do you most enjoy sharing a meal with?' },
+];
+
+const moneyWheelOptions = [
+  { label: 'First Pay', question: 'Do you remember your first pay packet or wage? What did you do with it?' },
+  { label: 'Pocket Money', question: 'Did you get pocket money as a child? What did you spend it on?' },
+  { label: 'Saving Up', question: 'Have you ever saved up for something special? What was it?' },
+  { label: 'A Big Purchase', question: 'What is the biggest or most memorable thing you have ever bought?' },
+  { label: 'First Job', question: 'What was your first job, and what did it pay?' },
+  { label: 'A Splurge', question: 'Have you ever treated yourself to something you did not really need?' },
+  { label: 'Family Advice', question: 'Did your parents or family give you any advice about money?' },
+  { label: 'A Bargain', question: 'Do you remember finding a really good bargain?' },
+  { label: 'Piggy Bank', question: 'Did you have a piggy bank or a special place you kept your money as a child?' },
+  { label: 'Rainy Day', question: 'Have you ever kept money aside for a rainy day? What was it for?' },
+  { label: 'A Gift', question: 'Do you remember giving or receiving money as a gift?' },
+  { label: 'Prices Then', question: 'What do you remember something costing that feels very different now?' },
+  { label: 'A Memorable Trip', question: 'Have you ever spent money on a memorable trip or holiday?' },
+  { label: 'Lending a Hand', question: 'Have you ever lent or given money to help someone out?' },
+  { label: 'Old Currency', question: 'Do you remember using old New Zealand pounds, shillings, or pence?' },
+  { label: 'A Good Deal', question: 'Is there a shop or market you remember for its good prices?' },
 ];
 
 const scripts = {
@@ -1440,61 +1460,77 @@ const scripts = {
       bullets: ['By heat, by our ears, or by vibrations', '435 km/hr, 300 km/second, or 1,200 km/hr'],
       visualHint: 'Source deck: NZ04. Sounds, slide 18',
       accent: '#00AEEF',
-      acceptAnyAnswer: true,
+      interaction: {
+        type: 'triviaChoice',
+        rounds: [
+          {
+            question: 'How is sound created?',
+            options: [
+              { id: 'a', label: 'By Heat' },
+              { id: 'b', label: 'By our Ears' },
+              { id: 'c', label: 'By Vibrations' },
+            ],
+            correctOptionId: 'c',
+            fact: 'Sound is created by vibrations that travel as waves.',
+          },
+          {
+            question: 'How fast does sound travel?',
+            options: [
+              { id: 'a', label: '435 km/hr' },
+              { id: 'b', label: '300 km/second' },
+              { id: 'c', label: '1,200 km/hr' },
+            ],
+            correctOptionId: 'c',
+            fact: 'Sound travels through the air at about 1,200 kilometres per hour.',
+          },
+        ],
+      },
       reply: () =>
-        'It is time for some sound trivia. These are just for fun, and it is completely alright to guess or say, "I am not sure." First question: how is sound created? Is it by heat, by our ears, or by vibrations? And second: how fast does sound travel? Is it 435 kilometres per hour, 300 kilometres per second, or 1,200 kilometres per hour?',
-    },
-    {
-      id: 'sounds_trivia_1_answer',
-      turns: 1,
-      deckSlide: 19,
-      title: 'The Answers',
-      subtitle: 'Vibrations, and about 1,200 km/hr',
-      prompt: 'By vibrations; about 1,200 km/hr',
-      bullets: ['Sound is created by vibrations', 'Sound travels through air at about 1,200 km/hr'],
-      visualHint: 'Source deck: NZ04. Sounds, slide 19',
-      accent: '#F47C20',
-      interaction: { type: 'autoAdvance' },
-      isAnswerReveal: true,
-      recordAnswer: false,
-      reply: () =>
-        'Sound is created by vibrations that travel as waves, and it moves through the air at about 1,200 kilometres per hour.',
+        'It is time for some sound trivia. These are just for fun, so pick whichever option you like. First: how is sound created? And second: how fast does sound travel?',
     },
     {
       id: 'sounds_trivia_2',
       turns: 1,
-      deckSlide: 20,
+      deckSlide: 19,
       title: 'Can You Guess?',
       subtitle: 'Echoes and silence',
       prompt: 'What is it called when sound bounces, and where can you not hear sound?',
       bullets: ['Echo, reflection, or vibration', 'Outside in open air, in space, or underwater'],
-      visualHint: 'Source deck: NZ04. Sounds, slide 20',
+      visualHint: 'Source deck: NZ04. Sounds, slide 19',
       accent: '#A8C5A0',
-      acceptAnyAnswer: true,
+      interaction: {
+        type: 'triviaChoice',
+        rounds: [
+          {
+            question: 'What is it called when sound bounces off an object?',
+            options: [
+              { id: 'a', label: 'Echo' },
+              { id: 'b', label: 'Reflection' },
+              { id: 'c', label: 'Vibration' },
+            ],
+            correctOptionId: 'a',
+            fact: 'When sound bounces off an object, we call it an echo.',
+          },
+          {
+            question: 'In which of these places could you not hear sound at all?',
+            options: [
+              { id: 'a', label: 'Outside in open air' },
+              { id: 'b', label: 'In space' },
+              { id: 'c', label: 'Underwater' },
+            ],
+            correctOptionId: 'b',
+            fact: 'You could not hear sound in space, because a vacuum has no air for sound waves to travel through.',
+          },
+        ],
+      },
       reply: () =>
-        'Next: what is it called when sound bounces off an object? Is it an echo, a reflection, or a vibration? And in which of these places could you not hear sound at all: outside in open air, in space, or underwater?',
-    },
-    {
-      id: 'sounds_trivia_2_answer',
-      turns: 1,
-      deckSlide: 21,
-      title: 'The Answers',
-      subtitle: 'An echo, and space',
-      prompt: 'An echo; in space',
-      bullets: ['Sound bouncing off an object is an echo', 'You cannot hear sound in space'],
-      visualHint: 'Source deck: NZ04. Sounds, slide 21',
-      accent: '#4472C4',
-      interaction: { type: 'autoAdvance' },
-      isAnswerReveal: true,
-      recordAnswer: false,
-      reply: () =>
-        'When sound bounces off an object we call it an echo. And you could not hear sound in space, because a vacuum has no air for the sound waves to travel through.',
+        'Next: what is it called when sound bounces off an object? And in which of these places could you not hear sound at all?',
     },
     {
       id: 'sounds_name_that_tune_intro',
       turns: 1,
       acceptAnyAnswer: true,
-      deckSlide: 22,
+      deckSlide: 20,
       title: 'Name That Tune',
       subtitle: 'Songs from different eras',
       prompt: 'Are you ready to name that tune?',
@@ -1508,12 +1544,12 @@ const scripts = {
       id: 'sounds_name_that_tune_1950s',
       turns: 1,
       acceptAnyAnswer: true,
-      deckSlide: 23,
+      deckSlide: 21,
       title: 'Name That Tune: 1950s',
       subtitle: 'Guess the song',
       prompt: 'Can you name this song or artist?',
       bullets: ['Have a listen', 'Any guess is welcome'],
-      visualHint: 'Source deck: NZ04. Sounds, slide 23',
+      visualHint: 'Source deck: NZ04. Sounds, slide 21',
       accent: '#A8C5A0',
       // Canonical answer, revealed by the app after the participant's guess.
       tuneAnswer: 'Jailhouse Rock, by Elvis Presley',
@@ -1528,12 +1564,12 @@ const scripts = {
       id: 'sounds_name_that_tune_1960s',
       turns: 1,
       acceptAnyAnswer: true,
-      deckSlide: 24,
+      deckSlide: 22,
       title: 'Name That Tune: 1960s',
       subtitle: 'Guess the song',
       prompt: 'Can you name this song or artist?',
       bullets: ['Have a listen', 'Any guess is welcome'],
-      visualHint: 'Source deck: NZ04. Sounds, slide 24',
+      visualHint: 'Source deck: NZ04. Sounds, slide 22',
       accent: '#7A9DAD',
       tuneAnswer: 'Sympathy for the Devil, by The Rolling Stones',
       interaction: {
@@ -1547,12 +1583,12 @@ const scripts = {
       id: 'sounds_name_that_tune_motown',
       turns: 1,
       acceptAnyAnswer: true,
-      deckSlide: 25,
+      deckSlide: 23,
       title: 'Name That Tune: Motown',
       subtitle: 'The 1960s and 1970s',
       prompt: 'Can you name this song or artist?',
       bullets: ['Have a listen', 'Any guess is welcome'],
-      visualHint: 'Source deck: NZ04. Sounds, slide 25',
+      visualHint: 'Source deck: NZ04. Sounds, slide 23',
       accent: '#F47C20',
       tuneAnswer: 'Superstition, by Stevie Wonder',
       interaction: {
@@ -1566,12 +1602,12 @@ const scripts = {
       id: 'sounds_name_that_tune_classical',
       turns: 1,
       acceptAnyAnswer: true,
-      deckSlide: 26,
+      deckSlide: 24,
       title: 'Name That Tune: Classical',
       subtitle: 'Guess the piece',
       prompt: 'Can you name this piece or composer?',
       bullets: ['Have a listen', 'Any guess is welcome'],
-      visualHint: 'Source deck: NZ04. Sounds, slide 26',
+      visualHint: 'Source deck: NZ04. Sounds, slide 24',
       accent: '#4472C4',
       tuneAnswer: 'Für Elise, by Beethoven',
       interaction: {
@@ -1585,12 +1621,12 @@ const scripts = {
       id: 'sounds_modern_music_opinion',
       turns: 1,
       acceptAnyAnswer: true,
-      deckSlide: 27,
+      deckSlide: 25,
       title: 'Modern Music',
       subtitle: 'What do you think?',
       prompt: 'What is your opinion of this artist?',
       bullets: ['A more recent song', 'There is no right answer'],
-      visualHint: 'Source deck: NZ04. Sounds, slide 27',
+      visualHint: 'Source deck: NZ04. Sounds, slide 25',
       accent: '#F4C8B0',
       interaction: {
         type: 'audioClips',
@@ -1605,12 +1641,12 @@ const scripts = {
     {
       id: 'sounds_onomatopoeia',
       turns: 1,
-      deckSlide: 28,
+      deckSlide: 26,
       title: 'Words That Are Sounds',
       subtitle: 'Onomatopoeia',
       prompt: 'Which sound words can you think of?',
       bullets: ['Words like boom or crash', 'Work through the alphabet from A', 'Tell Aria your words'],
-      visualHint: 'Source deck: NZ04. Sounds, slide 28',
+      visualHint: 'Source deck: NZ04. Sounds, slide 26',
       accent: '#F4C8B0',
       inactivityTimeoutMs: 4 * 60 * 1000,
       adaptiveFollowUp: adaptiveReminiscence(
@@ -1622,12 +1658,12 @@ const scripts = {
     {
       id: 'sounds_spin_question',
       turns: 2,
-      deckSlide: 29,
+      deckSlide: 27,
       title: 'Question Wheel',
       subtitle: 'Spin',
       prompt: 'Spin the wheel',
       bullets: ['Music', 'Memories', 'Places', 'Everyday life'],
-      visualHint: 'Source deck: NZ04. Sounds, slide 29',
+      visualHint: 'Source deck: NZ04. Sounds, slide 27',
       accent: '#A8C5A0',
       interaction: {
         type: 'questionWheel',
@@ -1644,12 +1680,12 @@ const scripts = {
     {
       id: 'sounds_summary_song',
       turns: 2,
-      deckSlide: 30,
+      deckSlide: 28,
       title: 'Finally',
       subtitle: 'Looking back over today',
       prompt: 'What have we done today?',
       bullets: ['Theme song', 'Summarise today'],
-      visualHint: 'Source deck: NZ04. Sounds, slide 30',
+      visualHint: 'Source deck: NZ04. Sounds, slide 28',
       accent: '#F4C8B0',
       interaction: spotifySongInteraction({ summarizeOnComplete: true }),
       recordAnswer: false,
@@ -1666,12 +1702,12 @@ const scripts = {
       id: 'sounds_closing',
       turns: 1,
       autoCompleteAfterNarration: true,
-      deckSlide: 31,
+      deckSlide: 29,
       title: 'The Theme of the Next Session',
       subtitle: 'Session 5: Food',
       prompt: 'See you next time',
       bullets: ['Thank you', 'Next session', 'Food'],
-      visualHint: 'Source deck: NZ04. Sounds, slide 31',
+      visualHint: 'Source deck: NZ04. Sounds, slide 29',
       accent: '#4472C4',
       recordAnswer: false,
       reply: ({ name }) =>
@@ -1921,6 +1957,377 @@ const scripts = {
       recordAnswer: false,
       reply: ({ name }) =>
         `That brings us to the end of today's session, ${name}. Our next session will explore Current Affairs. Take good care, and I will look forward to seeing you next time.`,
+    },
+  ],
+  cst_using_money: [
+    ...buildStandardSessionOpening({
+      prefix: 'money',
+      deckLabel: 'NZ09. Using Money',
+      welcome: {
+        title: 'AI-supported Individual Cognitive Stimulation Therapy',
+        sessionNumber: 12,
+        sessionTitle: 'Using Money',
+        reply: ({ name }) =>
+          `Welcome back, ${name}. It is lovely to see you again. Today is our twelfth session, and our theme will be Using Money. When you are ready, say "I'm ready" to begin.`,
+      },
+      themeSong: {
+        title: 'Theme Song',
+        subtitle: 'Our song from an earlier session',
+        bullets: ['Theme song', 'Listen together'],
+        reply: ({ themeSong }) =>
+          themeSong?.status === 'available'
+            ? `Let us begin with the theme song you chose earlier, ${themeSong.track.name} by ${themeSong.track.artistLabel}. It can play for up to one minute. When you have finished listening, press Done, or say or type done.`
+            : 'I could not find a saved theme song from an earlier session. Press Done, or say or type done, when you are ready to continue.',
+      },
+      currentAffairsSlide: {
+        subtitle: 'A positive story',
+        reply: ({ currentAffairs }) =>
+          currentAffairs?.status === 'available'
+            ? `Here is a positive story from New Zealand: ${currentAffairs.article.title}. You can ask me to tell you more, or tell me what you think about it.`
+            : 'I could not find a new positive New Zealand story just now. Have you heard anything pleasant or interesting lately?',
+      },
+      exercise: {
+        reply: () =>
+          'Next is a short seated exercise to get the blood flowing. Please sit comfortably and safely on a sturdy chair. The video will start after I finish speaking. Only do what feels comfortable. When you are finished, press Done, or say or type done.',
+      },
+      themeIntro: {
+        sessionTitle: 'Using Money',
+        bullets: ['Prices then and now', 'Everyday choices', 'What money means'],
+      },
+    }),
+    {
+      id: 'money_trivia_income',
+      turns: 1,
+      deckSlide: 16,
+      title: 'Can You Guess?',
+      subtitle: 'Average family income',
+      prompt: 'How much did the average New Zealand family make in 1980 and in 2024?',
+      bullets: ['1980: $20,000, $40,000, or $60,000', '2024: $80,000, $100,000, or $120,000'],
+      visualHint: 'Source deck: NZ09. Using Money, slide 16',
+      accent: '#00AEEF',
+      interaction: {
+        type: 'triviaChoice',
+        rounds: [
+          {
+            question: 'How much did the average New Zealand family make in a year, back in 1980?',
+            options: [
+              { id: 'a', label: '$20,000' },
+              { id: 'b', label: '$40,000' },
+              { id: 'c', label: '$60,000' },
+            ],
+            correctOptionId: 'a',
+            fact: 'The average New Zealand family made about $20,000 a year in 1980.',
+          },
+          {
+            question: 'And how much does the average family make in a year now, in 2024?',
+            options: [
+              { id: 'a', label: '$80,000' },
+              { id: 'b', label: '$100,000' },
+              { id: 'c', label: '$120,000' },
+            ],
+            correctOptionId: 'c',
+            fact: 'The average New Zealand family makes about $120,000 a year now, in 2024.',
+          },
+        ],
+      },
+      reply: () =>
+        'Let us play a guessing game about prices, then and now. It is just for fun, so pick whichever option you like. First: how much did the average New Zealand family make in a year, back in 1980? And then: how much does the average family make in a year now, in 2024?',
+    },
+    {
+      id: 'money_trivia_newspaper',
+      turns: 1,
+      deckSlide: 17,
+      title: 'Can You Guess?',
+      subtitle: 'Newspaper subscription',
+      prompt: 'What did a New Zealand Herald subscription cost in 1980 and in 2024?',
+      bullets: ['1980: $85, $105, or $125', '2024: $530, $730, or $930'],
+      visualHint: 'Source deck: NZ09. Using Money, slide 17',
+      accent: '#F47C20',
+      interaction: {
+        type: 'triviaChoice',
+        rounds: [
+          {
+            question: 'What did a year of the New Zealand Herald newspaper cost, back in 1980?',
+            options: [
+              { id: 'a', label: '$85' },
+              { id: 'b', label: '$105' },
+              { id: 'c', label: '$125' },
+            ],
+            correctOptionId: 'a',
+            fact: 'A yearly New Zealand Herald subscription cost about $85 in 1980.',
+          },
+          {
+            question: 'And what does it cost now, in 2024?',
+            options: [
+              { id: 'a', label: '$530' },
+              { id: 'b', label: '$730' },
+              { id: 'c', label: '$930' },
+            ],
+            correctOptionId: 'b',
+            fact: 'A yearly New Zealand Herald subscription costs about $730 now, in 2024.',
+          },
+        ],
+      },
+      reply: () =>
+        'Next: what did a year of the New Zealand Herald newspaper cost, back in 1980? And what does it cost now, in 2024?',
+    },
+    {
+      id: 'money_trivia_milk',
+      turns: 1,
+      deckSlide: 18,
+      title: 'Can You Guess?',
+      subtitle: 'A litre of milk',
+      prompt: 'What did a 1 litre bottle of Anchor milk cost in 1980 and in 2024?',
+      bullets: ['1980: $0.30, $1.30, or $2.30', '2024: $2.00, $3.00, or $4.00'],
+      visualHint: 'Source deck: NZ09. Using Money, slide 18',
+      accent: '#A8C5A0',
+      interaction: {
+        type: 'triviaChoice',
+        rounds: [
+          {
+            question: 'What did a 1 litre bottle of Anchor milk cost back in 1980?',
+            options: [
+              { id: 'a', label: '$0.30' },
+              { id: 'b', label: '$1.30' },
+              { id: 'c', label: '$2.30' },
+            ],
+            correctOptionId: 'a',
+            fact: 'A 1 litre bottle of Anchor milk cost about 30 cents in 1980.',
+          },
+          {
+            question: 'And what does it cost now, in 2024?',
+            options: [
+              { id: 'a', label: '$2.00' },
+              { id: 'b', label: '$3.00' },
+              { id: 'c', label: '$4.00' },
+            ],
+            correctOptionId: 'b',
+            fact: 'A 1 litre bottle of Anchor milk costs about $3 now, in 2024.',
+          },
+        ],
+      },
+      reply: () =>
+        'Now, milk: what did a 1 litre bottle of Anchor milk cost back in 1980? And what does it cost now, in 2024?',
+    },
+    {
+      id: 'money_trivia_house',
+      turns: 1,
+      deckSlide: 19,
+      title: 'Can You Guess?',
+      subtitle: 'Median house price',
+      prompt: 'What was the median house price in New Zealand in 1980 and in 2024?',
+      bullets: ['1980: $35,000, $45,000, or $55,000', '2024: $680,000, $780,000, or $880,000'],
+      visualHint: 'Source deck: NZ09. Using Money, slide 19',
+      accent: '#4472C4',
+      interaction: {
+        type: 'triviaChoice',
+        rounds: [
+          {
+            question: 'What was the median house price in New Zealand back in 1980?',
+            options: [
+              { id: 'a', label: '$35,000' },
+              { id: 'b', label: '$45,000' },
+              { id: 'c', label: '$55,000' },
+            ],
+            correctOptionId: 'a',
+            fact: 'The median house price in New Zealand was about $35,000 in 1980.',
+          },
+          {
+            question: 'And what is it now, in 2024?',
+            options: [
+              { id: 'a', label: '$680,000' },
+              { id: 'b', label: '$780,000' },
+              { id: 'c', label: '$880,000' },
+            ],
+            correctOptionId: 'b',
+            fact: 'The median house price in New Zealand is about $780,000 now, in 2024.',
+          },
+        ],
+      },
+      reply: () =>
+        'Last one: what was the median house price in New Zealand back in 1980? And what is it now, in 2024?',
+    },
+    {
+      id: 'money_world_currencies',
+      turns: 1,
+      acceptAnyAnswer: true,
+      deckSlide: 20,
+      title: 'World Currencies',
+      subtitle: 'What is $100 worth?',
+      prompt: 'Have you ever travelled somewhere that used a different currency?',
+      bullets: [
+        '100 Euros = 190 NZD',
+        '100 Australian Dollars = 110 NZD',
+        '100 Canadian Dollars = 120 NZD',
+        '100 US Dollars = 170 NZD',
+      ],
+      visualHint: 'Source deck: NZ09. Using Money, slide 20',
+      accent: '#F4C8B0',
+      adaptiveFollowUp: adaptiveReminiscence(
+        'Gently explore any travel memory they share, or reassure them if they have not travelled abroad.'
+      ),
+      reply: () =>
+        'Here is what $100 New Zealand dollars looks like in other currencies. 100 Euros is about 190 New Zealand dollars, and you could spend euros in many European countries, like France, Germany, and Italy. 100 Australian dollars is about 110 New Zealand dollars. 100 Canadian dollars is about 120 New Zealand dollars. And 100 US dollars is about 170 New Zealand dollars. Have you ever travelled somewhere that used a different currency?',
+    },
+    {
+      id: 'money_payment_house',
+      turns: 1,
+      acceptAnyAnswer: true,
+      deckSlide: 21,
+      title: 'Method of Payment',
+      subtitle: 'Buying a house',
+      prompt: 'What method of payment would you use to buy a house?',
+      bullets: ['Cash', 'EFTPOS card', 'Credit card', 'Debit card', 'Bank loan'],
+      visualHint: 'Source deck: NZ09. Using Money, slide 21',
+      accent: '#7A9DAD',
+      reply: () =>
+        'Let us think about how we pay for things. If you were buying a house, what method of payment would you use — cash, an EFTPOS card, a credit card, a debit card, or a bank loan?',
+    },
+    {
+      id: 'money_payment_petrol',
+      turns: 1,
+      acceptAnyAnswer: true,
+      deckSlide: 22,
+      title: 'Method of Payment',
+      subtitle: 'Filling up with petrol',
+      prompt: 'What method of payment would you use to fill up with petrol?',
+      bullets: ['Cash', 'EFTPOS card', 'Credit card', 'Debit card', 'Bank loan'],
+      visualHint: 'Source deck: NZ09. Using Money, slide 22',
+      accent: '#00AEEF',
+      reply: () =>
+        'What about filling up a car with petrol — what method of payment would you use for that?',
+    },
+    {
+      id: 'money_payment_doctor',
+      turns: 1,
+      acceptAnyAnswer: true,
+      deckSlide: 23,
+      title: 'Method of Payment',
+      subtitle: "Paying at the doctor's",
+      prompt: "What method of payment would you use to pay for a doctor's visit?",
+      bullets: ['Cash', 'EFTPOS card', 'Credit card', 'Debit card', 'Bank loan'],
+      visualHint: 'Source deck: NZ09. Using Money, slide 23',
+      accent: '#F47C20',
+      reply: () =>
+        "And what about paying for a visit to the doctor — what method of payment would you use?",
+    },
+    {
+      id: 'money_windfall_300',
+      turns: 1,
+      acceptAnyAnswer: true,
+      deckSlide: 24,
+      title: 'If You Won $300',
+      subtitle: 'Give, save, or spend',
+      prompt: 'If you won $300, would you give it away, save it, or spend it?',
+      bullets: ['Give it away', 'Save it', 'Spend it'],
+      visualHint: 'Source deck: NZ09. Using Money, slide 24',
+      accent: '#A8C5A0',
+      reply: () =>
+        'Here is a fun one. If you won $300, would you give it away, save it, or spend it?',
+    },
+    {
+      id: 'money_windfall_300000',
+      turns: 1,
+      acceptAnyAnswer: true,
+      deckSlide: 25,
+      title: 'If You Won $300,000',
+      subtitle: 'Give, save, or spend',
+      prompt: 'If you won $300,000, would you give it away, save it, or spend it?',
+      bullets: ['Give it away', 'Save it', 'Spend it'],
+      visualHint: 'Source deck: NZ09. Using Money, slide 25',
+      accent: '#4472C4',
+      reply: () =>
+        'Now, what if it were a lot more — $300,000? Would you give it away, save it, or spend it?',
+    },
+    {
+      id: 'money_habits',
+      turns: 1,
+      acceptAnyAnswer: true,
+      deckSlide: 26,
+      title: 'Things People Do With Money',
+      subtitle: 'Is it OK or foolish?',
+      prompt: 'Are these things OK, or a bit foolish?',
+      bullets: [
+        'Emotional or impulse spending',
+        'Giving money to strangers on the street',
+        'Only paying the credit card minimum',
+      ],
+      visualHint: 'Source deck: NZ09. Using Money, slide 26',
+      accent: '#F4C8B0',
+      reply: () =>
+        'Here are a few things people do with money: emotional or impulse spending, giving money to strangers on the street, and only ever making the minimum credit card payment when more could be afforded. Do these seem OK to you, or a bit foolish?',
+    },
+    {
+      id: 'money_quote',
+      turns: 1,
+      acceptAnyAnswer: true,
+      deckSlide: 27,
+      title: 'A Quote About Money',
+      subtitle: 'What does money mean to you?',
+      prompt: 'Which part of this feels most true to you?',
+      bullets: ['Power', 'Freedom', 'A cushion', 'The root of all evil', 'The sum of blessings'],
+      visualHint: 'Source deck: NZ09. Using Money, slide 27',
+      accent: '#00AEEF',
+      reply: () =>
+        'Here is a quote: money is power, freedom, a cushion, the root of all evil, the sum of blessings. Which part of that feels most true to you? Or, what does money mean to you personally?',
+    },
+    {
+      id: 'money_spin_question',
+      turns: 2,
+      deckSlide: 28,
+      title: 'Question Wheel',
+      subtitle: 'Spin',
+      prompt: 'Spin the wheel',
+      bullets: ['Memories', 'Choices', 'Everyday life'],
+      visualHint: 'Source deck: NZ09. Using Money, slide 28',
+      accent: '#A8C5A0',
+      interaction: {
+        type: 'questionWheel',
+        options: moneyWheelOptions,
+      },
+      adaptiveFollowUp: adaptiveReminiscence(
+        'Deepen the landed topic with one question about a memory, preference, reason, person, place, or then-versus-now comparison.'
+      ),
+      reply: () => 'Now we have the question wheel. Press spin the wheel, and I will ask the question it lands on.',
+      followUps: [
+        ({ wheelQuestion }) => wheelQuestion || 'What question did the wheel land on?',
+      ],
+    },
+    {
+      id: 'money_summary_song',
+      turns: 2,
+      deckSlide: 29,
+      title: 'Finally',
+      subtitle: 'Looking back over today',
+      prompt: 'What have we done today?',
+      bullets: ['Theme song', 'Summarise today'],
+      visualHint: 'Source deck: NZ09. Using Money, slide 29',
+      accent: '#F47C20',
+      interaction: spotifySongInteraction({ summarizeOnComplete: true }),
+      recordAnswer: false,
+      reply: ({ themeSong }) =>
+        themeSong?.status === 'available'
+          ? `Before we look back over today, your theme song, ${themeSong.track.name} by ${themeSong.track.artistLabel}, is ready to play again. When you have finished listening, press Done, or say or type done.`
+          : 'Before we look back over today, I was not able to prepare the theme song this time. Press Done, or say or type done, when you are ready to continue.',
+      followUps: [
+        ({ sessionSummary }) =>
+          `Now let us look back over what we have done today. ${sessionSummary || 'Today, you thought about prices, payments, and what money means to you.'} What is one part of today that you would like to remember?`,
+      ],
+    },
+    {
+      id: 'money_closing',
+      turns: 1,
+      autoCompleteAfterNarration: true,
+      deckSlide: 30,
+      title: 'The Theme of the Next Session',
+      subtitle: 'Session 13: Number Games',
+      prompt: 'See you next time',
+      bullets: ['Thank you', 'Next session', 'Number Games'],
+      visualHint: 'Source deck: NZ09. Using Money, slide 30',
+      accent: '#4472C4',
+      recordAnswer: false,
+      reply: ({ name }) =>
+        `That brings us to the end of today's session, ${name}. Our next session will explore Number Games. Take good care, and I will look forward to seeing you next time.`,
     },
   ],
 };

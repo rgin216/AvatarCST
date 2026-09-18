@@ -94,8 +94,25 @@ const TEST_SESSIONS = [
     theme: "Faces and Scenes",
     icon: "🖼️",
   },
-  ...Array.from({ length: 8 }, (_, i) => {
+  ...Array.from({ length: 4 }, (_, i) => {
     const n = i + 8;
+    return {
+      id: `placeholder_session_${n}`,
+      label: `Session ${n}`,
+      title: "Coming soon",
+      theme: "",
+      disabled: true,
+    };
+  }),
+  {
+    id: "cst_using_money",
+    label: "Session 12",
+    title: "Using Money",
+    theme: "Using Money",
+    icon: "💰",
+  },
+  ...Array.from({ length: 3 }, (_, i) => {
+    const n = i + 13;
     return {
       id: `placeholder_session_${n}`,
       label: `Session ${n}`,

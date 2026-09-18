@@ -24,6 +24,9 @@ import {
   evaluateOrientationAnswer,
   hasMeaningfulUserContent,
   evaluateTriviaAnswer,
+  parseTriviaChoiceEvent,
+  matchTriviaChoiceRounds,
+  evaluateTriviaChoiceAnswer,
   isNameThatTuneStep,
   hasSubstantialSpeechOverlap,
   inferMemorySuggestions,
@@ -48,6 +51,7 @@ import {
   buildCstAdaptiveTurnInstructions,
   buildCstFoodPhraseGuessInstructions,
   buildCstInstrumentGuessInstructions,
+  buildCstTriviaChoiceInstructions,
 } from './promptService.js';
 import { getScript, getScriptStep, getScriptStepIndex, renderScriptFollowUp, renderScriptReply } from './cstScriptService.js';
 import Message from '../models/Message.js';
@@ -457,9 +461,9 @@ test('gently handles uncertainty during Session 3 trivia', () => {
   });
 });
 
-test('gives Session 4 a 31-step script aligned one-to-one with its markdown sections', () => {
+test('gives Session 4 a 29-step script aligned one-to-one with its markdown sections', () => {
   const script = getScript('cst_sounds');
-  assert.equal(script.length, 31);
+  assert.equal(script.length, 29);
 
   const md = readFileSync(
     new URL('../../context/vCST_Session4_AI_Script.md', import.meta.url),
@@ -469,10 +473,10 @@ test('gives Session 4 a 31-step script aligned one-to-one with its markdown sect
   // One preamble section plus one section per executable step, in order.
   assert.equal(sections.length, script.length + 1);
 
-  // Every step maps to exactly one deck slide, 1..31 with no gaps.
+  // Every step maps to exactly one deck slide, 1..29 with no gaps.
   assert.deepEqual(
     script.map((step) => step.deckSlide),
-    Array.from({ length: 31 }, (_, i) => i + 1)
+    Array.from({ length: 29 }, (_, i) => i + 1)
   );
 });
 
@@ -480,7 +484,7 @@ test('ports reusable ready-state, season branching, and closing behaviour to Ses
   const welcomeStep = getScriptStep('cst_sounds', 0).step;
   const seasonStep = getScriptStep('cst_sounds', 6).step;
   const trivia1Step = getScriptStep('cst_sounds', 17).step;
-  const closingStep = getScriptStep('cst_sounds', 30).step;
+  const closingStep = getScriptStep('cst_sounds', 28).step;
 
   assert.equal(welcomeStep.id, 'sounds_welcome');
   assert.equal(welcomeStep.acceptAnyAnswer, true);
@@ -492,7 +496,7 @@ test('ports reusable ready-state, season branching, and closing behaviour to Ses
   });
   // The trivia intro was merged into the first trivia question.
   assert.equal(trivia1Step.id, 'sounds_trivia_1');
-  assert.equal(trivia1Step.acceptAnyAnswer, true);
+  assert.equal(trivia1Step.interaction.type, 'triviaChoice');
   assert.match(renderScriptReply(trivia1Step, {}), /just for fun|fine to guess|alright to guess/i);
   assert.equal(closingStep.autoCompleteAfterNarration, true);
   assert.match(renderScriptReply(closingStep, { name: 'Sam' }), /explore Food/i);
@@ -526,21 +530,89 @@ test('uses distinct confirmations for the Session 4 orientation questions', () =
   assert.equal(new Set(responses).size, responses.length);
 });
 
-test('acknowledges correct and incorrect Session 4 sound trivia answers', () => {
-  const cases = [
-    [17, 'It is by vibrations, and about 1,200 km/hr', 'By our ears, 300 km per second'],
-    [19, 'An echo, and you cannot hear sound in space', 'A reflection, underwater'],
-  ];
-  for (const [stepIndex, correctAnswer, incorrectAnswer] of cases) {
+test('resolves Session 4 sound trivia tap-choice rounds one at a time, regardless of correctness', () => {
+  const cases = [17, 18];
+  for (const stepIndex of cases) {
     const step = getScriptStep('cst_sounds', stepIndex).step;
-    const correct = evaluateTriviaAnswer({ step, content: correctAnswer });
-    const incorrect = evaluateTriviaAnswer({ step, content: incorrectAnswer });
+    assert.equal(step.interaction.type, 'triviaChoice', step.id);
+    const rounds = step.interaction.rounds;
+    assert.equal(rounds.length, 2, step.id);
+    assert.ok(rounds.every((round) => round.question), step.id);
 
-    assert.equal(correct.outcome, 'correct', step.id);
-    assert.equal(incorrect.outcome, 'incorrect', step.id);
+    // Tapping round 0 resolves just that round.
+    const event = parseTriviaChoiceEvent(
+      `[[trivia-choice:${JSON.stringify({ roundIndex: 0, optionId: rounds[0].correctOptionId })}]]`,
+      step
+    );
+    assert.ok(event, step.id);
+    assert.equal(event.resolved.length, 1, step.id);
+    assert.equal(event.resolved[0].roundIndex, 0, step.id);
+    assert.deepEqual(
+      evaluateTriviaChoiceAnswer({ step, resolvedCount: event.resolved.length, complete: false }),
+      { answered: true, response: '' },
+      step.id
+    );
 
-    const unsure = evaluateTriviaAnswer({ step, content: "I'm not sure" });
-    assert.equal(unsure.outcome, 'unsure', step.id);
+    // An out-of-range round or unknown option is rejected.
+    assert.equal(parseTriviaChoiceEvent('[[trivia-choice:{"roundIndex":9,"optionId":"a"}]]', step), null, step.id);
+    assert.equal(parseTriviaChoiceEvent('[[trivia-choice:{"roundIndex":0,"optionId":"zz"}]]', step), null, step.id);
+
+    // No answer resolved yet still short-circuits (like namingSlotStep) so an
+    // "I'm not sure" never falls through to the generic adaptive LLM path -
+    // it just isn't marked as having answered the missing round.
+    assert.deepEqual(
+      evaluateTriviaChoiceAnswer({ step, resolvedCount: 0, complete: false }),
+      { answered: false, response: '' },
+      step.id
+    );
+    assert.equal(evaluateTriviaChoiceAnswer({ step: { interaction: { type: 'other' } }, resolvedCount: 0, complete: false }), null);
+  }
+});
+
+test('matches a free-text/spoken trivia guess to the right round, like naming slots', () => {
+  const incomeStep = getScriptStep('cst_using_money', 15).step;
+  // Both rounds guessed in one message, numbers only (typical of speech-to-text).
+  const both = matchTriviaChoiceRounds('I think it was 20000 back then and 120000 now', incomeStep, []);
+  assert.equal(both.length, 2);
+  assert.equal(both[0].roundIndex, 0);
+  assert.equal(both[0].option.id, 'a');
+  assert.equal(both[1].roundIndex, 1);
+  assert.equal(both[1].option.id, 'c');
+
+  // Already-answered rounds are skipped even if mentioned again.
+  const onlySecond = matchTriviaChoiceRounds('120000 now', incomeStep, [0]);
+  assert.equal(onlySecond.length, 1);
+  assert.equal(onlySecond[0].roundIndex, 1);
+
+  const milkStep = getScriptStep('cst_using_money', 17).step;
+  const cents = matchTriviaChoiceRounds('30 cents in 1980 and 2 dollar now', milkStep, []);
+  assert.equal(cents.length, 2);
+  assert.equal(cents[0].option.id, 'a');
+  assert.equal(cents[1].option.id, 'a');
+
+  const soundsStep = getScriptStep('cst_sounds', 17).step;
+  const worded = matchTriviaChoiceRounds('I think it is by vibrations', soundsStep, []);
+  assert.equal(worded.length, 1);
+  assert.equal(worded[0].roundIndex, 0);
+  assert.equal(worded[0].option.id, 'c');
+
+  assert.deepEqual(matchTriviaChoiceRounds('no idea, just guessing', incomeStep, []), []);
+});
+
+test('gives the trivia-choice adaptive prompt each guess, its correctness, and the real fact', () => {
+  const step = getScriptStep('cst_using_money', 15).step;
+  const resolved = step.interaction.rounds.map((round) => ({
+    question: round.question,
+    fact: round.fact,
+    guessedLabel: round.options.find((o) => o.id !== round.correctOptionId).label,
+    isCorrect: false,
+  }));
+  const md = buildCstTriviaChoiceInstructions({ recentMessages: [], resolved });
+  for (const entry of resolved) {
+    assert.ok(md.includes(entry.question), entry.question);
+    assert.ok(md.includes(entry.fact), entry.fact);
+    assert.ok(md.includes(entry.guessedLabel), entry.guessedLabel);
+    assert.match(md, /NOT correct/);
   }
 });
 
@@ -589,7 +661,7 @@ test('gives the instrument and Name That Tune slides playable audio clips', () =
   assert.equal(instrumentStep.interaction.clips.length, 3);
   assert.ok(instrumentStep.interaction.clips.every((clip) => clip.id && clip.src));
 
-  for (const stepIndex of [22, 23, 24, 25, 26]) {
+  for (const stepIndex of [20, 21, 22, 23, 24]) {
     const step = getScriptStep('cst_sounds', stepIndex).step;
     assert.equal(step.interaction.type, 'audioClips', step.id);
     assert.equal(step.interaction.clips.length, 1, step.id);
@@ -670,10 +742,10 @@ test('carries the Name That Tune answer on the step and in its markdown guidance
     'utf8'
   );
   const expected = [
-    [22, 'sounds_name_that_tune_1950s', 'Jailhouse Rock', 'Elvis Presley'],
-    [23, 'sounds_name_that_tune_1960s', 'Sympathy for the Devil', 'The Rolling Stones'],
-    [24, 'sounds_name_that_tune_motown', 'Superstition', 'Stevie Wonder'],
-    [25, 'sounds_name_that_tune_classical', 'Für Elise', 'Beethoven'],
+    [20, 'sounds_name_that_tune_1950s', 'Jailhouse Rock', 'Elvis Presley'],
+    [21, 'sounds_name_that_tune_1960s', 'Sympathy for the Devil', 'The Rolling Stones'],
+    [22, 'sounds_name_that_tune_motown', 'Superstition', 'Stevie Wonder'],
+    [23, 'sounds_name_that_tune_classical', 'Für Elise', 'Beethoven'],
   ];
 
   for (const [index, id, title, artist] of expected) {
@@ -689,7 +761,7 @@ test('carries the Name That Tune answer on the step and in its markdown guidance
   // Guidance is about judging garbled speech-to-text guesses by sound.
   assert.match(md, /Judge (?:their|the) guess by (?:how it sounds|sound)/i);
 
-  assert.equal(isNameThatTuneStep(getScriptStep('cst_sounds', 26).step), false);
+  assert.equal(isNameThatTuneStep(getScriptStep('cst_sounds', 24).step), false);
 });
 
 test('summarises Session 4 sound activities', () => {
@@ -703,6 +775,59 @@ test('summarises Session 4 sound activities', () => {
   assert.match(summary, /naming instruments/i);
   assert.match(summary, /Name That Tune/i);
   assert.match(summary, /sound words/i);
+});
+
+test('gives Session 12 a 30-step script aligned one-to-one with its markdown sections', () => {
+  const script = getScript('cst_using_money');
+  assert.equal(script.length, 30);
+
+  const md = readFileSync(
+    new URL('../../context/vCST_Session12_AI_Script.md', import.meta.url),
+    'utf8'
+  );
+  const sections = md.split(/\r?\n---\r?\n/).map((s) => s.trim()).filter(Boolean);
+  assert.equal(sections.length, script.length + 1);
+
+  assert.deepEqual(
+    script.map((step) => step.deckSlide),
+    Array.from({ length: 30 }, (_, i) => i + 1)
+  );
+});
+
+test('resolves Session 12 price-guessing tap-choice rounds one at a time, regardless of correctness', () => {
+  for (const stepIndex of [15, 16, 17, 18]) {
+    const step = getScriptStep('cst_using_money', stepIndex).step;
+    assert.equal(step.interaction.type, 'triviaChoice', step.id);
+    const rounds = step.interaction.rounds;
+    assert.equal(rounds.length, 2, step.id);
+    assert.ok(rounds.every((round) => round.question), step.id);
+
+    const wrongOption = rounds[0].options.find((o) => o.id !== rounds[0].correctOptionId);
+    const event = parseTriviaChoiceEvent(
+      `[[trivia-choice:${JSON.stringify({ roundIndex: 0, optionId: wrongOption.id })}]]`,
+      step
+    );
+    assert.ok(event, step.id);
+    assert.deepEqual(
+      evaluateTriviaChoiceAnswer({ step, resolvedCount: event.resolved.length, complete: false }),
+      { answered: true, response: '' },
+      step.id
+    );
+  }
+});
+
+test('summarises Session 12 money activities', () => {
+  const summary = buildTopicSessionSummary([
+    { stepId: 'money_trivia_income', answer: 'Guessed $120,000, then $20,000.' },
+    { stepId: 'money_payment_house', answer: 'I would use a bank loan.' },
+    { stepId: 'money_windfall_300000', answer: 'I would save most of it.' },
+    { stepId: 'money_quote', answer: 'Freedom feels most true to me.' },
+  ]);
+
+  assert.match(summary, /guessing how prices have changed/i);
+  assert.match(summary, /everyday ways to pay/i);
+  assert.match(summary, /windfall/i);
+  assert.match(summary, /what money means to you/i);
 });
 
 test('recognises button, typed, and spoken music completion answers', () => {
