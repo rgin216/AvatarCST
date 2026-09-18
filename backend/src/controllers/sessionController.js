@@ -220,7 +220,7 @@ async function createAudioForTurn(assistantText, pipelineMode, avatarMode, lipSy
 }
 
 async function attachAudioToTurn(turn, pipelineMode, avatarMode, lipSyncMode, timings) {
-  const segmentDefinitions = Array.isArray(turn.speechSegments) && turn.speechSegments.length > 0
+  const segmentDefinitions = turn.speechSegments?.length
     ? turn.speechSegments
     : [{ text: turn.assistantText, role: 'script' }];
   const audioSegments = [];
