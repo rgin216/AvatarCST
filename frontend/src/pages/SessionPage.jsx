@@ -5,6 +5,7 @@ import PhraseCardsActivity from "../components/PhraseCardsActivity.jsx";
 import { useEffect, useRef, useState } from "react";
 import AvatarViewer from "../components/avatar/AvatarViewer";
 import api from "../services/api.js";
+import SessionInputBar from "../components/SessionInputBar.jsx";
 import {
   createEmptyLipSyncFrame,
   getRhubarbMorphStateAtTime,
@@ -2020,52 +2021,18 @@ export default function SessionPage({
         </section>
       </main>
 
-      <footer className="session-input-bar">
-        <button
-          type="button"
-          onClick={handleMicClick}
-          className={`mic-btn${isRecording ? " mic-btn-active" : ""}`}
-          aria-label={isRecording ? "Stop recording" : "Start microphone"}
-          disabled={(sessionInputDisabled || avatarNarrationActive || pendingPlay) && !isRecording}
-          title={
-            avatarNarrationActive || pendingPlay
-              ? "Please wait until Aria finishes speaking"
-              : pipelineMode === "openai-fast-scripted"
-              ? "Recorded transcription"
-              : undefined
-          }
-        >
-          {isRecording ? (
-            // Stop square
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-              <rect x="5" y="5" width="14" height="14" rx="2" />
-            </svg>
-          ) : (
-            // Microphone
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-              <path d="M12 1a4 4 0 0 1 4 4v7a4 4 0 0 1-8 0V5a4 4 0 0 1 4-4z"/>
-              <path d="M19 10v2a7 7 0 0 1-14 0v-2M12 19v4M8 23h8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" fill="none"/>
-            </svg>
-          )}
-        </button>
-        <input
-          value={input}
-          onChange={(event) => {
-            setInput(event.target.value);
-            registerUserActivity();
-          }}
-          onKeyDown={(event) => event.key === "Enter" && sendMessage(input)}
-          placeholder="Type your response..."
-          className="chat-input"
-          disabled={sessionInputDisabled}
-        />
-        <button type="button" onClick={() => sendMessage(input)} className="send-btn" aria-label="Send" disabled={sessionInputDisabled}>
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <line x1="22" y1="2" x2="11" y2="13"/>
-            <polygon points="22 2 15 22 11 13 2 9 22 2"/>
-          </svg>
-        </button>
-      </footer>
+      <SessionInputBar
+        value={input}
+        onChange={(value) => { setInput(value); registerUserActivity(); }}
+        onSend={sendMessage}
+        onMicClick={handleMicClick}
+        isRecording={isRecording}
+        textDisabled={sessionInputDisabled}
+        micDisabled={(sessionInputDisabled || avatarNarrationActive || pendingPlay) && !isRecording}
+        micTitle={avatarNarrationActive || pendingPlay
+          ? "Please wait until Aria finishes speaking"
+          : pipelineMode === "openai-fast-scripted" ? "Recorded transcription" : undefined}
+      />
     </div>
   );
 }
