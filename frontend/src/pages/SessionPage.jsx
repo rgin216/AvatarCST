@@ -1,3 +1,4 @@
+import ObjectSelectionActivity from "../components/ObjectSelectionActivity.jsx";
 import MatchingActivity from "../components/MatchingActivity.jsx";
 import MealBuilderActivity from "../components/MealBuilderActivity.jsx";
 import PhraseCardsActivity from "../components/PhraseCardsActivity.jsx";
@@ -5,6 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import AvatarViewer from "../components/avatar/AvatarViewer";
 import api from "../services/api.js";
 import OrientationActivity from "../components/OrientationActivity.jsx";
+import SessionInputBar from "../components/SessionInputBar.jsx";
 import {
   createEmptyLipSyncFrame,
   getRhubarbMorphStateAtTime,
@@ -317,6 +319,7 @@ export default function SessionPage({
     INACTIVITY_TIMEOUT_MS,
     Number(slide.inactivityTimeoutMs) || 0
   );
+  const objectInteraction = slide.interaction?.type === "objectSelection";
   const matchingInteraction = slide.interaction?.type === "matching" ? slide.interaction : null;
   const orientationInteraction = ["choiceQuestion", "focusedQuestion"].includes(slide.interaction?.type) ? slide.interaction : null;
   const mealBuilderInteraction = slide.interaction?.type === "mealBuilder" ? slide.interaction : null;
@@ -331,7 +334,7 @@ export default function SessionPage({
     Boolean(exerciseVideo) ||
     hasPositiveNewsInteraction ||
     Boolean(musicInteraction) ||
-    hasActivityRevealInteraction || Boolean(matchingInteraction) || Boolean(mealBuilderInteraction) || Boolean(phraseCardsInteraction) || isSingleAudioClip;
+    hasActivityRevealInteraction || Boolean(matchingInteraction) || objectInteraction || Boolean(mealBuilderInteraction) || Boolean(phraseCardsInteraction) || isSingleAudioClip;
   const landedWheelResult = questionWheel?.status === "landed" ? questionWheel : null;
   const sessionInputDisabled =
     typing ||
@@ -1557,7 +1560,7 @@ export default function SessionPage({
 
       <main className="session-slide-shell">
         <section
-          className={`ppt-slide${slide.imageUrl && !hasSlideInteraction ? " has-slide-image" : ""}${hasSlideInteraction ? " has-slide-interaction" : ""}${exerciseVideo ? " has-video-interaction" : ""}${hasPositiveNewsInteraction ? " has-news-interaction" : ""}${musicInteraction ? " has-music-interaction" : ""}${hasActivityRevealInteraction ? " has-activity-reveal-interaction" : ""}${matchingInteraction ? " has-matching-interaction" : ""}${mealBuilderInteraction ? " has-meal-builder-interaction" : ""}${phraseCardsInteraction ? " has-phrase-cards-interaction" : ""}${isSingleAudioClip ? " has-audioclips-interaction" : ""}`}
+          className={`ppt-slide${slide.imageUrl && !hasSlideInteraction ? " has-slide-image" : ""}${hasSlideInteraction ? " has-slide-interaction" : ""}${exerciseVideo ? " has-video-interaction" : ""}${hasPositiveNewsInteraction ? " has-news-interaction" : ""}${musicInteraction ? " has-music-interaction" : ""}${hasActivityRevealInteraction ? " has-activity-reveal-interaction" : ""}${objectInteraction ? " has-object-interaction" : ""}${matchingInteraction ? " has-matching-interaction" : ""}${mealBuilderInteraction ? " has-meal-builder-interaction" : ""}${phraseCardsInteraction ? " has-phrase-cards-interaction" : ""}${isSingleAudioClip ? " has-audioclips-interaction" : ""}`}
           style={{
             "--slide-accent": slide.accent || theme.blush,
             backgroundImage: slide.imageUrl && !hasSlideInteraction ? `url(${slide.imageUrl})` : undefined,
@@ -1632,6 +1635,7 @@ export default function SessionPage({
               </footer>
             </div>
           )}
+          {objectInteraction && <ObjectSelectionActivity key={slide.id} slide={slide} disabled={sessionInputDisabled || isRecording} onActivity={registerUserActivity} onSubmit={sendMessage} />}
           {matchingInteraction && <MatchingActivity key={slide.id || slide.index} interaction={matchingInteraction} title={slide.title} disabled={typing || wheelResultPending} submitDisabled={sessionInputDisabled} onActivity={registerUserActivity} onComplete={(content) => sendMessage(content, "My matches are ready.")} />}
           {mealBuilderInteraction && <MealBuilderActivity key={slide.id || slide.index} interaction={mealBuilderInteraction} title={slide.title} disabled={typing || wheelResultPending || isRecording} submitDisabled={sessionInputDisabled || isRecording} onActivity={registerUserActivity} onComplete={(content) => sendMessage(content, "My plate is ready.")} />}
           {phraseCardsInteraction && <PhraseCardsActivity key={slide.id || slide.index} interaction={phraseCardsInteraction} title={slide.title} namingSlots={namingSlotsForSlide} />}
@@ -2022,52 +2026,18 @@ export default function SessionPage({
         </section>
       </main>
 
-      <footer className="session-input-bar">
-        <button
-          type="button"
-          onClick={handleMicClick}
-          className={`mic-btn${isRecording ? " mic-btn-active" : ""}`}
-          aria-label={isRecording ? "Stop recording" : "Start microphone"}
-          disabled={(sessionInputDisabled || avatarNarrationActive || pendingPlay) && !isRecording}
-          title={
-            avatarNarrationActive || pendingPlay
-              ? "Please wait until Aria finishes speaking"
-              : pipelineMode === "openai-fast-scripted"
-              ? "Recorded transcription"
-              : undefined
-          }
-        >
-          {isRecording ? (
-            // Stop square
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-              <rect x="5" y="5" width="14" height="14" rx="2" />
-            </svg>
-          ) : (
-            // Microphone
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-              <path d="M12 1a4 4 0 0 1 4 4v7a4 4 0 0 1-8 0V5a4 4 0 0 1 4-4z"/>
-              <path d="M19 10v2a7 7 0 0 1-14 0v-2M12 19v4M8 23h8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" fill="none"/>
-            </svg>
-          )}
-        </button>
-        <input
-          value={input}
-          onChange={(event) => {
-            setInput(event.target.value);
-            registerUserActivity();
-          }}
-          onKeyDown={(event) => event.key === "Enter" && sendMessage(input)}
-          placeholder="Type your response..."
-          className="chat-input"
-          disabled={sessionInputDisabled}
-        />
-        <button type="button" onClick={() => sendMessage(input)} className="send-btn" aria-label="Send" disabled={sessionInputDisabled}>
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <line x1="22" y1="2" x2="11" y2="13"/>
-            <polygon points="22 2 15 22 11 13 2 9 22 2"/>
-          </svg>
-        </button>
-      </footer>
+      <SessionInputBar
+        value={input}
+        onChange={(value) => { setInput(value); registerUserActivity(); }}
+        onSend={sendMessage}
+        onMicClick={handleMicClick}
+        isRecording={isRecording}
+        textDisabled={sessionInputDisabled}
+        micDisabled={(sessionInputDisabled || avatarNarrationActive || pendingPlay) && !isRecording}
+        micTitle={avatarNarrationActive || pendingPlay
+          ? "Please wait until Aria finishes speaking"
+          : pipelineMode === "openai-fast-scripted" ? "Recorded transcription" : undefined}
+      />
     </div>
   );
 }
