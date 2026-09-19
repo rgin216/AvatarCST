@@ -2321,14 +2321,14 @@ const scripts = {
             fact: 'The average New Zealand family made about $20,000 a year in 1980.',
           },
           {
-            question: 'And how much does the average family make in a year now, in 2024?',
+            question: 'And how much does the average family make in a year in 2024?',
             options: [
               { id: 'a', label: '$80,000' },
               { id: 'b', label: '$100,000' },
               { id: 'c', label: '$120,000' },
             ],
             correctOptionId: 'c',
-            fact: 'The average New Zealand family makes about $120,000 a year now, in 2024.',
+            fact: 'The average New Zealand family makes about $120,000 a year in 2024.',
           },
         ],
       },
@@ -2359,14 +2359,14 @@ const scripts = {
             fact: 'A yearly New Zealand Herald subscription cost about $85 in 1980.',
           },
           {
-            question: 'And what does it cost now, in 2024?',
+            question: 'And what does it cost in 2024?',
             options: [
               { id: 'a', label: '$530' },
               { id: 'b', label: '$730' },
               { id: 'c', label: '$930' },
             ],
             correctOptionId: 'b',
-            fact: 'A yearly New Zealand Herald subscription costs about $730 now, in 2024.',
+            fact: 'A yearly New Zealand Herald subscription costs about $730 in 2024.',
           },
         ],
       },
@@ -2397,14 +2397,14 @@ const scripts = {
             fact: 'A 1 litre bottle of Anchor milk cost about 30 cents in 1980.',
           },
           {
-            question: 'And what does it cost now, in 2024?',
+            question: 'And what does it cost in 2024?',
             options: [
               { id: 'a', label: '$2.00' },
               { id: 'b', label: '$3.00' },
               { id: 'c', label: '$4.00' },
             ],
             correctOptionId: 'b',
-            fact: 'A 1 litre bottle of Anchor milk costs about $3 now, in 2024.',
+            fact: 'A 1 litre bottle of Anchor milk costs about $3 in 2024.',
           },
         ],
       },
@@ -2435,14 +2435,14 @@ const scripts = {
             fact: 'The median house price in New Zealand was about $35,000 in 1980.',
           },
           {
-            question: 'And what is it now, in 2024?',
+            question: 'And what is it in 2024?',
             options: [
               { id: 'a', label: '$680,000' },
               { id: 'b', label: '$780,000' },
               { id: 'c', label: '$880,000' },
             ],
             correctOptionId: 'b',
-            fact: 'The median house price in New Zealand is about $780,000 now, in 2024.',
+            fact: 'The median house price in New Zealand is about $780,000 in 2024.',
           },
         ],
       },
@@ -2469,7 +2469,7 @@ const scripts = {
         'Gently explore any travel memory they share, or reassure them if they have not travelled abroad.'
       ),
       reply: () =>
-        'Here is what $100 New Zealand dollars looks like in other currencies. 100 Euros is about 190 New Zealand dollars, and you could spend euros in many European countries, like France, Germany, and Italy. 100 Australian dollars is about 110 New Zealand dollars. 100 Canadian dollars is about 120 New Zealand dollars. And 100 US dollars is about 170 New Zealand dollars. Have you ever travelled somewhere that used a different currency?',
+        'Here is what 100 units of other currencies are worth in New Zealand dollars. 100 Euros is about 190 New Zealand dollars, and you could spend euros in many European countries, like France, Germany, and Italy. 100 Australian dollars is about 110 New Zealand dollars. 100 Canadian dollars is about 120 New Zealand dollars. And 100 US dollars is about 170 New Zealand dollars. Have you ever travelled somewhere that used a different currency?',
     },
     {
       id: 'money_payment_house',

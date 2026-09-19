@@ -1,7 +1,7 @@
 .ppt-slide.has-trivia-choice-interaction { background:linear-gradient(160deg, #eaf4fb, #cfe6f5); }
 .ppt-slide.has-trivia-choice-interaction::before { display:none; }
-.trivia-choice-activity { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; padding:clamp(24px,4cqh,40px) clamp(16px,2.6cqw,36px); box-sizing:border-box; overflow:auto; }
-.trivia-choice-card { width:100%; max-width:clamp(360px,64cqw,760px); display:flex; flex-direction:column; gap:clamp(14px,2cqh,22px); color:#1f3a4a; }
+.trivia-choice-activity { position:absolute; inset:0; display:flex; align-items:flex-start; justify-content:center; padding:clamp(24px,4cqh,40px) clamp(16px,2.6cqw,36px); box-sizing:border-box; overflow:auto; }
+.trivia-choice-card { width:100%; max-width:clamp(360px,64cqw,760px); margin-block:auto; display:flex; flex-direction:column; gap:clamp(14px,2cqh,22px); color:#1f3a4a; }
 .ppt-slide .trivia-choice-card h1 { font-size:clamp(20px,2.7cqw,32px); line-height:1.15; margin:0; color:#1f3a4a; text-align:center; }
 .trivia-choice-rounds { display:flex; flex-direction:column; gap:clamp(16px,2.4cqh,26px); }
 .trivia-choice-round { display:flex; flex-direction:column; gap:10px; padding:clamp(14px,2cqh,20px) clamp(14px,2cqw,22px); border-radius:16px; background:#ffffffb3; box-shadow:0 2px 10px rgba(20,60,90,.1); }

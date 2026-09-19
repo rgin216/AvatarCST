@@ -817,39 +817,45 @@ const isNumericRound = (round) =>
   (round.options || []).every((option) => optionNumericValue(option.label) !== null);
 
 // Resolves as many still-unanswered rounds as it confidently can from one
-// message - numeric rounds match the closest mentioned number in order,
-// word-answer rounds (e.g. "By Vibrations") match by keyword.
+// message. Numeric rounds only match a mentioned number to a round that
+// actually lists that value (within a small tolerance for representation,
+// e.g. rounding) - not merely the closest one - and are matched against every
+// unresolved numeric round regardless of mention order, since a later round's
+// answer can be spoken before an earlier one's. Word-answer rounds (e.g. "By
+// Vibrations") match by keyword.
 export const matchTriviaChoiceRounds = (content, step, answeredRoundIndices = []) => {
   if (!isTriviaChoiceStep(step) || !content) return [];
   const rounds = step.interaction.rounds || [];
   const normalizedContent = normalizeGuessText(content);
   const numericGuesses = numericGuessesFromText(content);
   const resolved = [];
-  let numericCursor = 0;
+  const unresolvedNumericRounds = new Set(
+    rounds
+      .map((round, roundIndex) => roundIndex)
+      .filter((roundIndex) => !answeredRoundIndices.includes(roundIndex) && isNumericRound(rounds[roundIndex]))
+  );
+
+  for (const guess of numericGuesses) {
+    if (unresolvedNumericRounds.size === 0) break;
+    for (const roundIndex of unresolvedNumericRounds) {
+      const round = rounds[roundIndex];
+      const match = (round.options || []).find((option) => {
+        const value = optionNumericValue(option.label);
+        return value !== null && Math.abs(value - guess) <= Math.max(Math.abs(value), 1e-6) * 0.01;
+      });
+      if (match) {
+        resolved.push({ roundIndex, round, option: match });
+        unresolvedNumericRounds.delete(roundIndex);
+        break;
+      }
+    }
+  }
 
   rounds.forEach((round, roundIndex) => {
-    if (answeredRoundIndices.includes(roundIndex)) return;
+    if (answeredRoundIndices.includes(roundIndex) || resolved.some((entry) => entry.roundIndex === roundIndex)) return;
     const options = round.options || [];
 
-    if (isNumericRound(round)) {
-      for (let i = numericCursor; i < numericGuesses.length; i += 1) {
-        const guess = numericGuesses[i];
-        let closest = null;
-        for (const option of options) {
-          const value = optionNumericValue(option.label);
-          const diff = Math.abs(value - guess);
-          if (!closest || diff < closest.diff) closest = { option, diff, value };
-        }
-        // Require the guess to be in the right ballpark (within half the
-        // guessed or actual value) so an unrelated number in the same
-        // sentence does not get misread as an answer to this round.
-        if (closest && closest.diff <= Math.max(closest.value, guess) * 0.5) {
-          resolved.push({ roundIndex, round, option: closest.option });
-          numericCursor = i + 1;
-          break;
-        }
-      }
-    } else {
+    if (!isNumericRound(round)) {
       const match = options.find((option) => labelMatchesContent(option.label, normalizedContent));
       if (match) resolved.push({ roundIndex, round, option: match });
     }

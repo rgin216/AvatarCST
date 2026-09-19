@@ -18,7 +18,7 @@ The project has moved beyond the old "basic backend foundation" phase. The main 
 
 - React/Vite frontend and Express/Mongo backend.
 - Login flow that creates or loads a patient user by name.
-- Landing flow with ten test sessions (Sessions 9, 13, 14, and 15 are placeholder "coming soon" entries):
+- Landing flow with eleven test sessions (Sessions 9, 13, 14, and 15 are placeholder "coming soon" entries):
   - `cst_intro_reminiscence` - Session 1: Introduction and Welcome.
   - `cst_childhood` - Session 2: Getting to Know You: Childhood.
   - `cst_physical_games` - Session 3: Physical Games.
@@ -35,7 +35,7 @@ The project has moved beyond the old "basic backend foundation" phase. The main 
 - Slide-backed session UI using exported slide images under `frontend/public/slides/session1/` through `session8/`, `session10/`, `session11/`, and `session12/`.
 - Session 4 adds an `audioClips` slide interaction: local `.mp3` clips in `frontend/public/audio/session4/` for the instrument-sounds slide and the Name That Tune slides, with a per-slot naming tracker and lenient right/wrong acknowledgement.
 - Session 5 adds a `mealBuilder` slide interaction (drag-or-tap food cards onto a plate, mobile/desktop via Pointer Events) and a `phraseCards` slide interaction (blanked food sayings, judged the same way as Session 4's instrument naming but by content rather than turn order, so an out-of-order answer still lands on the right saying).
-- Session 4 and Session 12 use a `triviaChoice` slide interaction for guessing games: tap-to-choose answer buttons resolve each round client-side (the correct option and reveal fact travel with the interaction data), with all rounds submitted together as one event once every round has an answer.
+- Session 4 and Session 12 use a `triviaChoice` slide interaction for guessing games: tap-to-choose answer buttons, or a typed/spoken guess, resolve one round at a time. Each tap emits one `[[trivia-choice:...]]` event, which the backend validates and persists before the next selection.
 - Local avatar rendering with:
   - male avatar path based on `frontend/public/models/harry.glb`,
   - experimental female/avatar mode path,
@@ -50,7 +50,7 @@ The project has moved beyond the old "basic backend foundation" phase. The main 
 - Memory is stored, reviewed, and injected, but retrieval is currently broad and simple: the orchestrator loads approved memory entries and passes a small slice back as `memoryUsed`. There is no semantic search or scoring yet.
 - `suggestedMemoryUpdates` is heuristic only, based on simple regexes in `sessionOrchestratorService.js`, and is saved as pending caregiver-review memory.
 - The current voice paths still wait for a recorded browser audio blob before transcription starts; they are lower-latency response paths, not live full-duplex voice.
-- The ten sessions are useful test scripts, not polished clinical content.
+- The eleven sessions are useful test scripts, not polished clinical content.
 - Docs other than this file may still be stale; prefer source files over README text when they disagree.
 
 ## Current Audio / LLM Pipeline

@@ -580,6 +580,14 @@ test('matches a free-text/spoken trivia guess to the right round, like naming sl
   assert.equal(both[1].roundIndex, 1);
   assert.equal(both[1].option.id, 'c');
 
+  // The later round's answer can be spoken before the earlier round's - each
+  // number must still land on the round that actually lists it, not just
+  // whichever round is processed first.
+  const outOfOrder = matchTriviaChoiceRounds('120000 now, and 20000 back then', incomeStep, []);
+  assert.equal(outOfOrder.length, 2);
+  assert.equal(outOfOrder.find((entry) => entry.roundIndex === 0)?.option.id, 'a');
+  assert.equal(outOfOrder.find((entry) => entry.roundIndex === 1)?.option.id, 'c');
+
   // Already-answered rounds are skipped even if mentioned again.
   const onlySecond = matchTriviaChoiceRounds('120000 now', incomeStep, [0]);
   assert.equal(onlySecond.length, 1);
