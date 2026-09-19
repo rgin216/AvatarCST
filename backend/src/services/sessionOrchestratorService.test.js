@@ -571,7 +571,7 @@ test('resolves Session 4 sound trivia tap-choice rounds one at a time, regardles
 });
 
 test('matches a free-text/spoken trivia guess to the right round, like naming slots', () => {
-  const incomeStep = getScriptStep('cst_using_money', 15).step;
+  const incomeStep = getScriptStep('cst_using_money', 16).step;
   // Both rounds guessed in one message, numbers only (typical of speech-to-text).
   const both = matchTriviaChoiceRounds('I think it was 20000 back then and 120000 now', incomeStep, []);
   assert.equal(both.length, 2);
@@ -593,7 +593,7 @@ test('matches a free-text/spoken trivia guess to the right round, like naming sl
   assert.equal(onlySecond.length, 1);
   assert.equal(onlySecond[0].roundIndex, 1);
 
-  const milkStep = getScriptStep('cst_using_money', 17).step;
+  const milkStep = getScriptStep('cst_using_money', 18).step;
   const cents = matchTriviaChoiceRounds('30 cents in 1980 and 2 dollar now', milkStep, []);
   assert.equal(cents.length, 2);
   assert.equal(cents[0].option.id, 'a');
@@ -609,7 +609,7 @@ test('matches a free-text/spoken trivia guess to the right round, like naming sl
 });
 
 test('gives the trivia-choice adaptive prompt each guess, its correctness, and the real fact', () => {
-  const step = getScriptStep('cst_using_money', 15).step;
+  const step = getScriptStep('cst_using_money', 16).step;
   const resolved = step.interaction.rounds.map((round) => ({
     question: round.question,
     fact: round.fact,
@@ -786,9 +786,9 @@ test('summarises Session 4 sound activities', () => {
   assert.match(summary, /sound words/i);
 });
 
-test('gives Session 12 a 30-step script aligned one-to-one with its markdown sections', () => {
+test('gives Session 12 a 31-step script aligned one-to-one with its markdown sections', () => {
   const script = getScript('cst_using_money');
-  assert.equal(script.length, 30);
+  assert.equal(script.length, 31);
 
   const md = readFileSync(
     new URL('../../context/vCST_Session12_AI_Script.md', import.meta.url),
@@ -797,14 +797,20 @@ test('gives Session 12 a 30-step script aligned one-to-one with its markdown sec
   const sections = md.split(/\r?\n---\r?\n/).map((s) => s.trim()).filter(Boolean);
   assert.equal(sections.length, script.length + 1);
 
+  // Check-in shares the theme song's slide (this deck has no dedicated theme
+  // song slide) and the year reveal adds its own slide, so deckSlide 1..30
+  // appears once each except 2, which is used by both the theme song and
+  // check-in steps.
+  const expectedDeckSlides = Array.from({ length: 30 }, (_, i) => i + 1);
+  expectedDeckSlides.splice(1, 0, 2);
   assert.deepEqual(
     script.map((step) => step.deckSlide),
-    Array.from({ length: 30 }, (_, i) => i + 1)
+    expectedDeckSlides
   );
 });
 
 test('resolves Session 12 price-guessing tap-choice rounds one at a time, regardless of correctness', () => {
-  for (const stepIndex of [15, 16, 17, 18]) {
+  for (const stepIndex of [16, 17, 18, 19]) {
     const step = getScriptStep('cst_using_money', stepIndex).step;
     assert.equal(step.interaction.type, 'triviaChoice', step.id);
     const rounds = step.interaction.rounds;

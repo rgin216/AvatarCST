@@ -2281,6 +2281,15 @@ const scripts = {
             ? `Let us begin with the theme song you chose earlier, ${themeSong.track.name} by ${themeSong.track.artistLabel}. It can play for up to one minute. When you have finished listening, press Done, or say or type done.`
             : 'I could not find a saved theme song from an earlier session. Press Done, or say or type done, when you are ready to continue.',
       },
+      // This deck has no dedicated theme-song slide - it goes straight from the
+      // title slide to "Check in" (slide 2), then day/month/year (3/4/5). Without
+      // this, check-in and every step after it grab the next slide along instead
+      // of the one that actually matches, and stay permanently off by one.
+      checkIn: { shareThemeSongSlide: true },
+      // The deck also has its own year-reveal slide (slide 6, "2026") between
+      // "What year is it?" and "Which season are we enjoying?" - without this,
+      // season question and everything after it would land one slide early.
+      includeYearReveal: true,
       currentAffairsSlide: {
         subtitle: 'A positive story',
         reply: ({ currentAffairs }) =>
