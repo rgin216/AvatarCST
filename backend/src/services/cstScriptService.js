@@ -1,4 +1,6 @@
+import { createCategorizingObjectsScript } from './categorizingObjectsScript.js';
 import { createFacesScenesScript } from './facesScenesScript.js';
+import { createOrientationScript } from './orientationScript.js';
 ﻿import {
   adaptiveConversation,
   adaptiveReminiscence,
@@ -15,6 +17,9 @@ const scriptSlideFolders = {
   cst_food: 'session5',
   cst_current_affairs: 'session6',
   cst_faces_scenes: 'session7',
+  cst_categorizing_objects: 'session10',
+  cst_word_associations: 'session8',
+  cst_orientation: 'session11',
   cst_using_money: 'session12',
 };
 
@@ -108,6 +113,25 @@ const foodWheelOptions = [
   { label: 'Then and Now', question: 'How has the food you eat changed over the years?' },
   { label: 'A Kitchen Gadget', question: 'Is there a kitchen tool or gadget you have always liked using?' },
   { label: 'Sharing a Meal', question: 'Who do you most enjoy sharing a meal with?' },
+];
+
+const wordAssociationsWheelOptions = [
+  { label: 'Sayings', question: 'Is there a saying or phrase you have always liked, or one your family used often?' },
+  { label: 'Reading', question: 'What do you remember about learning to read or write as a child?' },
+  { label: 'Nicknames', question: 'Did you or anyone in your family have a nickname growing up?' },
+  { label: 'Letters', question: 'Do you remember writing or receiving letters? Who did you write to?' },
+  { label: 'Books', question: 'Is there a book or story you have always enjoyed?' },
+  { label: 'Word Games', question: 'Did you ever enjoy crosswords, word games, or puzzles?' },
+  { label: 'Traditions', question: 'Was there a phrase or expression your parents or grandparents often said?' },
+  { label: 'Storytelling', question: 'Did anyone in your family enjoy telling stories?' },
+  { label: 'Wordplay', question: 'Is there a word you have always liked the sound of?' },
+  { label: 'Languages', question: 'Have you ever learned or spoken another language?' },
+  { label: 'Pen Pals', question: 'Did you ever have a pen pal or someone you wrote to regularly?' },
+  { label: 'Handwriting', question: 'What do you remember about your handwriting, or someone else’s?' },
+  { label: 'Newspapers', question: 'Did you ever enjoy reading a particular newspaper or magazine column?' },
+  { label: 'Speeches', question: 'Have you ever given a speech or a toast? What was the occasion?' },
+  { label: 'Poetry', question: 'Do you remember a poem or rhyme from when you were young?' },
+  { label: 'Lyrics', question: 'Is there a song lyric that has always stuck with you?' },
 ];
 
 const moneyWheelOptions = [
@@ -1152,11 +1176,11 @@ const scripts = {
       title: 'Olympic Trivia',
       subtitle: 'The next Summer Olympics',
       prompt: 'When is the next Summer Olympics, and who is hosting it?',
-      bullets: ['Year', 'Host city'],
+      bullets: ["A. 2028 New Zealand","B. 2028 Los Angeles","C. 2029 London","D. 2029 Sweden"],
       visualHint: 'Source deck: NZ03. Physical Games, slide 22',
       accent: '#00AEEF',
       acceptAnyAnswer: true,
-      reply: () => 'When is the next Summer Olympics, and who is hosting the next Summer Olympics?',
+      reply: () => 'When is the next Summer Olympics, and who is hosting the next Summer Olympics? A. 2028 New Zealand. B. 2028 Los Angeles. C. 2029 London. D. 2029 Sweden. You can say the letter or the answer.',
     },
     {
       id: 'physical_games_trivia_next_olympics_answer',
@@ -1180,11 +1204,11 @@ const scripts = {
       title: 'Olympic Trivia Question 1',
       subtitle: 'New Zealand sporting colour',
       prompt: "What colour has traditionally formed the base of New Zealand's Olympic sporting uniform?",
-      bullets: ['New Zealand', 'Traditional sporting colour'],
+      bullets: ["A. Black","B. Blue","C. White","D. Red"],
       visualHint: 'Source deck: NZ03. Physical Games, slide 24',
       accent: '#A8C5A0',
       acceptAnyAnswer: true,
-      reply: () => "What colour has traditionally formed the base of New Zealand's Olympic sporting uniform?",
+      reply: () => "What colour has traditionally formed the base of New Zealand's Olympic sporting uniform? A. Black. B. Blue. C. White. D. Red. You can say the letter or the answer.",
     },
     {
       id: 'physical_games_trivia_uniform_answer',
@@ -1208,11 +1232,11 @@ const scripts = {
       title: 'Olympic Trivia Question 2',
       subtitle: 'First individual gold',
       prompt: 'Who was the first New Zealander to win an individual Olympic gold medal?',
-      bullets: ['New Zealand', 'Individual gold medal'],
+      bullets: ["A. Valerie Adams","B. Lisa Carrington","C. Ted Morgan","D. Hamish Bond"],
       visualHint: 'Source deck: NZ03. Physical Games, slide 26',
       accent: '#4472C4',
       acceptAnyAnswer: true,
-      reply: () => 'Who was the first New Zealander to win an individual Olympic gold medal?',
+      reply: () => 'Who was the first New Zealander to win an individual Olympic gold medal? A. Valerie Adams. B. Lisa Carrington. C. Ted Morgan. D. Hamish Bond. You can say the letter or the answer.',
     },
     {
       id: 'physical_games_trivia_first_gold_answer',
@@ -1237,12 +1261,12 @@ const scripts = {
       title: 'Olympic Trivia Question 3',
       subtitle: 'A famous New Zealand runner',
       prompt: 'Who won Olympic gold in the 800 metres in 1960, then both the 800 and 1500 metres in 1964?',
-      bullets: ['800 metres: 1960 and 1964', '1500 metres: 1964'],
+      bullets: ["A. Peter Snell","B. Lisa Carrington"],
       visualHint: 'Source deck: NZ03. Physical Games, slide 28',
       accent: '#00AEEF',
       acceptAnyAnswer: true,
       reply: () =>
-        'Which famous New Zealand athlete won Olympic gold in the 800 metres in 1960, then both the 800 and 1500 metres in 1964?',
+        'Which famous New Zealand athlete won Olympic gold in the 800 metres in 1960, then both the 800 and 1500 metres in 1964? A. Peter Snell. B. Lisa Carrington. You can say the letter or the answer.',
     },
     {
       id: 'physical_games_trivia_runner_answer',
@@ -1266,11 +1290,11 @@ const scripts = {
       title: 'Olympic Trivia Question 4',
       subtitle: 'New Zealand gold medals',
       prompt: 'Through the Paris 2024 Olympic Games, in which sport has New Zealand won the most Olympic gold medals?',
-      bullets: ['Through Paris 2024', 'New Zealand gold medals'],
+      bullets: ["A. Rugby","B. Football","C. Badminton","D. Rowing"],
       visualHint: 'Source deck: NZ03. Physical Games, slide 30',
       accent: '#F47C20',
       acceptAnyAnswer: true,
-      reply: () => 'Through the Paris 2024 Olympic Games, in which sport has New Zealand won the most Olympic gold medals?',
+      reply: () => 'Through the Paris 2024 Olympic Games, in which sport has New Zealand won the most Olympic gold medals? A. Rugby. B. Football. C. Badminton. D. Rowing. You can say the letter or the answer.',
     },
     {
       id: 'physical_games_trivia_most_gold_answer',
@@ -1294,12 +1318,12 @@ const scripts = {
       title: 'Olympic Trivia Question 5',
       subtitle: 'Lisa Carrington',
       prompt: 'How many gold medals did Lisa Carrington win at Tokyo 2020?',
-      bullets: ['Lisa Carrington', 'Tokyo 2020'],
+      bullets: ["A. Two","B. Three","C. Four"],
       visualHint: 'Source deck: NZ03. Physical Games, slide 32',
       accent: '#4472C4',
       acceptAnyAnswer: true,
       reply: () =>
-        'Lisa Carrington became New Zealand’s most decorated Olympian at Tokyo 2020. How many gold medals did she win at those Games alone?',
+        'Lisa Carrington became New Zealand’s most decorated Olympian at Tokyo 2020. How many gold medals did she win at those Games alone? A. Two. B. Three. C. Four. You can say the letter or the answer.',
     },
     {
       id: 'physical_games_trivia_carrington_answer',
@@ -1959,6 +1983,284 @@ const scripts = {
         `That brings us to the end of today's session, ${name}. Our next session will explore Current Affairs. Take good care, and I will look forward to seeing you next time.`,
     },
   ],
+  cst_word_associations: [
+    ...buildStandardSessionOpening({
+      prefix: 'word_associations',
+      deckLabel: 'NZ08. Word Associations',
+      welcome: {
+        title: 'AI-supported Individual Cognitive Stimulation Therapy',
+        sessionNumber: 8,
+        sessionTitle: 'Word Associations',
+        reply: ({ name }) =>
+          `Welcome back, ${name}. It is lovely to see you again. Today is our eighth session, and our theme will be Word Associations. When you are ready, say "I'm ready" to begin.`,
+      },
+      themeSong: {
+        title: 'Theme Song',
+        subtitle: 'Our song from an earlier session',
+        bullets: ['Theme song', 'Listen together'],
+        reply: ({ themeSong }) =>
+          themeSong?.status === 'available'
+            ? `Let us begin with the theme song you chose earlier, ${themeSong.track.name} by ${themeSong.track.artistLabel}. It can play for up to one minute. When you have finished listening, press Done, or say or type done.`
+            : 'I could not find a saved theme song from an earlier session. Press Done, or say or type done, when you are ready to continue.',
+      },
+      currentAffairsSlide: {
+        subtitle: 'A positive story',
+        reply: ({ currentAffairs }) =>
+          currentAffairs?.status === 'available'
+            ? `Here is a positive story from New Zealand: ${currentAffairs.article.title}. You can ask me to tell you more, or tell me what you think about it.`
+            : 'I could not find a new positive New Zealand story just now. Have you heard anything pleasant or interesting lately?',
+      },
+      exercise: {
+        reply: () =>
+          'Next is a short seated exercise to get the blood flowing. Please sit comfortably and safely on a sturdy chair. The video will start after I finish speaking. Only do what feels comfortable. When you are finished, press Done, or say or type done.',
+      },
+      themeIntro: {
+        sessionTitle: 'Word Associations',
+        bullets: ['Words', 'Sayings', 'Wordplay'],
+      },
+    }),
+    {
+      id: 'word_associations_missing_word',
+      turns: 1,
+      deckSlide: 16,
+      title: 'Supplying a Missing Word',
+      subtitle: 'Whatever comes to mind',
+      prompt: 'Fill in the blank however you like',
+      bullets: ['A cup of...', 'A pair of...', 'A pint of...', 'No wrong answers'],
+      visualHint: 'Source deck: NZ08. Word Associations, slide 16',
+      accent: '#00AEEF',
+      // Genuinely open - there is no scripted answer, so the reveal echoes back
+      // whatever the participant says (see resolveNamingSlotReveal).
+      namingSlots: {
+        count: 3,
+        labels: ['cup', 'pair', 'pint'],
+        noun: 'word',
+        singlePrompt: (label) => `And what about the ${label} - what comes to mind?`,
+        // The container word ("a pair of...") is safe to route on - it's
+        // never the blank, just what's already printed on the card - so an
+        // out-of-order answer still lands on the right one.
+        matchByContent: true,
+      },
+      interaction: {
+        type: 'phraseCards',
+        icon: '💬',
+        cards: [
+          { id: 'cup', text: 'A cup of ___.' },
+          { id: 'pair', text: 'A pair of ___.' },
+          { id: 'pint', text: 'A pint of ___.' },
+        ],
+      },
+      reply: () =>
+        'On the slide are three everyday phrases, each missing a word. There is no right answer here — whatever word comes to mind fills the blank. Have a go at each one, in any order.',
+    },
+    {
+      id: 'word_associations_pairs',
+      turns: 1,
+      deckSlide: 17,
+      title: 'Word Associations',
+      subtitle: 'Finish the pair',
+      prompt: 'Can you finish these familiar pairs?',
+      bullets: ['Salt and...', 'Peanut butter and...', 'Lock and...'],
+      visualHint: 'Source deck: NZ08. Word Associations, slide 17',
+      accent: '#F47C20',
+      // Labels are purely positional (not "salt"/"peanut"/"lock") so a re-prompt
+      // for an unattempted pair never gives away its blanked word.
+      namingSlots: {
+        count: 3,
+        labels: ['first', 'second', 'third'],
+        noun: 'pair',
+        singlePrompt: (label) => `And how does the ${label} pair go?`,
+        matchByContent: true,
+      },
+      interaction: {
+        type: 'phraseCards',
+        icon: '🔗',
+        cards: [
+          { id: 'salt-pepper', text: 'Salt and ___.' },
+          { id: 'peanut-butter-jelly', text: 'Peanut butter and ___.' },
+          { id: 'lock-key', text: 'Lock and ___.' },
+        ],
+      },
+      reply: () =>
+        'On the slide are three familiar word pairs, each missing the second word. Have a look at each one and see if you can finish it. It is completely fine to guess.',
+    },
+    {
+      id: 'word_associations_famous_phrases',
+      turns: 1,
+      deckSlide: 18,
+      title: 'Famous Phrases',
+      subtitle: 'Finish the saying',
+      prompt: 'Can you finish these old sayings?',
+      bullets: ['Practice makes...', 'Better safe than...', 'Through thick and...'],
+      visualHint: 'Source deck: NZ08. Word Associations, slide 18',
+      accent: '#A8C5A0',
+      namingSlots: {
+        count: 3,
+        labels: ['first', 'second', 'third'],
+        noun: 'saying',
+        singlePrompt: (label) => `And how does the ${label} saying go?`,
+        matchByContent: true,
+      },
+      interaction: {
+        type: 'phraseCards',
+        icon: '💭',
+        cards: [
+          { id: 'practice-perfect', text: 'Practice makes ___.' },
+          { id: 'safe-sorry', text: 'Better safe than ___.' },
+          { id: 'thick-thin', text: 'Through thick and ___.' },
+        ],
+      },
+      reply: () =>
+        'On the slide are three well-known sayings, each missing a word. Have a look at each one and see if you can finish it. It is completely fine to guess.',
+    },
+    {
+      id: 'word_associations_match_phrase',
+      turns: 1,
+      deckSlide: 19,
+      title: 'Match the Phrase',
+      subtitle: 'Connect each saying to its ending',
+      prompt: 'Match each saying to how it ends',
+      bullets: ['Drag or tap to connect', 'Press Check matches when ready'],
+      visualHint: 'Source deck: NZ08. Word Associations, slide 19',
+      accent: '#4472C4',
+      inactivityTimeoutMs: 180000,
+      interaction: {
+        type: 'matching',
+        left: [
+          { id: 'beauty', label: 'Beauty is in…', answerId: 'beholder' },
+          { id: 'hands', label: 'My hands…', answerId: 'tied' },
+          { id: 'minds', label: 'Great minds…', answerId: 'alike' },
+          { id: 'pen', label: 'The pen is mightier…', answerId: 'sword' },
+        ],
+        // Deliberately not in the same order as `left` - otherwise every
+        // clue already sits next to its answer and there is nothing to match.
+        right: [
+          { id: 'tied', label: '…are tied' },
+          { id: 'sword', label: '…than the sword' },
+          { id: 'beholder', label: '…the eye of the beholder' },
+          { id: 'alike', label: '…think alike' },
+        ],
+      },
+      reply: () =>
+        'Match each saying to how it ends. Drag between them, or tap a saying then an ending. Press Check matches when you are ready.',
+    },
+    {
+      id: 'word_associations_sayings',
+      turns: 1,
+      deckSlide: 20,
+      title: 'Associations and Category',
+      subtitle: 'Finish the saying',
+      prompt: 'Can you finish these sayings?',
+      bullets: ['The best things in life are...', "Money can't buy...", "...can't be choosers"],
+      visualHint: 'Source deck: NZ08. Word Associations, slide 20',
+      accent: '#F4C8B0',
+      namingSlots: {
+        count: 3,
+        labels: ['first', 'second', 'third'],
+        noun: 'saying',
+        singlePrompt: (label) => `And how does the ${label} saying go?`,
+        matchByContent: true,
+      },
+      interaction: {
+        type: 'phraseCards',
+        icon: '💭',
+        cards: [
+          { id: 'best-free', text: 'The best things in life are ___.' },
+          { id: 'money-happiness', text: "Money can't buy ___." },
+          { id: 'beggars-choosers', text: "___ can't be choosers." },
+        ],
+      },
+      reply: () =>
+        'On the slide are three more familiar sayings, each missing a word. Have a look at each one and see if you can finish it. It is completely fine to guess.',
+    },
+    {
+      id: 'word_associations_category',
+      turns: 1,
+      acceptAnyAnswer: true,
+      deckSlide: 20,
+      title: 'Associations and Category',
+      subtitle: 'What ties them together?',
+      prompt: 'What do you think connects these sayings?',
+      bullets: ['Your own interpretation', 'There is no wrong answer'],
+      visualHint: 'Source deck: NZ08. Word Associations, slide 20',
+      accent: '#F4C8B0',
+      reply: () =>
+        'Now that those are filled in, what do you think ties these three sayings together?',
+    },
+    {
+      id: 'word_associations_connect_a_word',
+      turns: 1,
+      deckSlide: 21,
+      title: 'Connect a Word',
+      subtitle: 'A quick word game',
+      prompt: 'Keep the chain going',
+      bullets: ['Ant, Picnic, Basket...', 'Keep the chain going as far as you like'],
+      visualHint: 'Source deck: NZ08. Word Associations, slide 21',
+      accent: '#7A9DAD',
+      inactivityTimeoutMs: 4 * 60 * 1000,
+      reply: () =>
+        'Let\'s play a quick word game called Connect a Word. I will start with a word beginning with "A": Ant. The next word should be related to it, so: Picnic. Now it is your turn — keep the chain going as far as you would like.',
+    },
+    {
+      id: 'word_associations_spin_question',
+      turns: 2,
+      deckSlide: 22,
+      title: 'Question Wheel',
+      subtitle: 'Spin',
+      prompt: 'Spin the wheel',
+      bullets: ['Words', 'Sayings', 'Memories', 'Stories'],
+      visualHint: 'Source deck: NZ08. Word Associations, slide 22',
+      accent: '#00AEEF',
+      interaction: {
+        type: 'questionWheel',
+        options: wordAssociationsWheelOptions,
+      },
+      adaptiveFollowUp: adaptiveReminiscence(
+        'Deepen the landed topic with one question about a memory, preference, reason, person, place, or then-versus-now comparison.'
+      ),
+      reply: () => 'Now we have the question wheel. Press spin the wheel, and I will ask the question it lands on.',
+      followUps: [
+        ({ wheelQuestion }) => wheelQuestion || 'What question did the wheel land on?',
+      ],
+    },
+    {
+      id: 'word_associations_summary_song',
+      turns: 2,
+      deckSlide: 23,
+      title: 'Finally',
+      subtitle: 'Looking back over today',
+      prompt: 'What have we done today?',
+      bullets: ['Theme song', 'Summarise today'],
+      visualHint: 'Source deck: NZ08. Word Associations, slide 23',
+      accent: '#F47C20',
+      interaction: spotifySongInteraction({ summarizeOnComplete: true }),
+      recordAnswer: false,
+      reply: ({ themeSong }) =>
+        themeSong?.status === 'available'
+          ? `Before we look back over today, your theme song, ${themeSong.track.name} by ${themeSong.track.artistLabel}, is ready to play again. When you have finished listening, press Done, or say or type done.`
+          : 'Before we look back over today, I was not able to prepare the theme song this time. Press Done, or say or type done, when you are ready to continue.',
+      followUps: [
+        ({ sessionSummary }) =>
+          `Now let us look back over what we have done today. ${sessionSummary || 'Today, you explored words, sayings, and associations together.'} What is one part of today that you would like to remember?`,
+      ],
+    },
+    {
+      id: 'word_associations_closing',
+      turns: 1,
+      autoCompleteAfterNarration: true,
+      deckSlide: 24,
+      title: 'The Theme of the Next Session',
+      subtitle: 'Session 9: Being Creative',
+      prompt: 'See you next time',
+      bullets: ['Thank you', 'Next session', 'Being Creative'],
+      visualHint: 'Source deck: NZ08. Word Associations, slide 24',
+      accent: '#4472C4',
+      recordAnswer: false,
+      reply: ({ name }) =>
+        `That brings us to the end of today's session, ${name}. Our next session will explore Being Creative. Take good care, and I will look forward to seeing you next time.`,
+    },
+  ],
+
   cst_using_money: [
     ...buildStandardSessionOpening({
       prefix: 'money',
@@ -2333,6 +2635,8 @@ const scripts = {
 };
 
 scripts.cst_faces_scenes = createFacesScenesScript(scripts.cst_current_affairs);
+scripts.cst_orientation = createOrientationScript(scripts.cst_faces_scenes);
+scripts.cst_categorizing_objects = createCategorizingObjectsScript(scripts.cst_current_affairs);
 
 export const getScript = (scriptId = 'cst_intro_reminiscence') =>
   scripts[scriptId] || scripts.cst_intro_reminiscence;

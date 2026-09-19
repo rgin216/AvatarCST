@@ -40,6 +40,7 @@ import {
   parseAdaptiveTurn,
   parseActivityRevealEvent,
   parseMealBuilderEvent,
+  resolveNamingSlotReveal,
   resolveThemeSongSelectionAnswer,
   respondToSessionTurn,
   selectRelevantMemoryEntries,
@@ -391,17 +392,17 @@ test('keeps Session 3 Olympic trivia answers precise and current through Paris 2
 
   assert.equal(
     renderScriptReply(nextOlympicsQuestion, {}),
-    'When is the next Summer Olympics, and who is hosting the next Summer Olympics?'
+    'When is the next Summer Olympics, and who is hosting the next Summer Olympics? A. 2028 New Zealand. B. 2028 Los Angeles. C. 2029 London. D. 2029 Sweden. You can say the letter or the answer.'
   );
   assert.match(renderScriptReply(nextOlympicsAnswer, {}), /Los Angeles in 2028/i);
   assert.equal(
     renderScriptReply(uniformQuestion, {}),
-    "What colour has traditionally formed the base of New Zealand's Olympic sporting uniform?"
+    "What colour has traditionally formed the base of New Zealand's Olympic sporting uniform? A. Black. B. Blue. C. White. D. Red. You can say the letter or the answer."
   );
   assert.match(renderScriptReply(uniformAnswer, {}), /answer is black/i);
   assert.equal(
     renderScriptReply(firstGoldQuestion, {}),
-    'Who was the first New Zealander to win an individual Olympic gold medal?'
+    'Who was the first New Zealander to win an individual Olympic gold medal? A. Valerie Adams. B. Lisa Carrington. C. Ted Morgan. D. Hamish Bond. You can say the letter or the answer.'
   );
   assert.match(renderScriptReply(firstGoldAnswer, {}), /Ted Morgan.*welterweight boxing.*1928/i);
   assert.match(renderScriptReply(runnerQuestion, {}), /800 metres in 1960/i);
@@ -1975,6 +1976,119 @@ test('acknowledges food-saying attempts leniently, by which words are present', 
   );
 });
 
+test('gives Session 8 a 25-step script aligned one-to-one with its markdown sections', () => {
+  const script = getScript('cst_word_associations');
+  assert.equal(script.length, 25);
+
+  const md = readFileSync(
+    new URL('../../context/vCST_Session8_AI_Script.md', import.meta.url),
+    'utf8'
+  );
+  const sections = md.split(/\r?\n---\r?\n/).map((s) => s.trim()).filter(Boolean);
+  // One preamble section plus one section per executable step, in order.
+  assert.equal(sections.length, script.length + 1);
+
+  // Every step maps to a deck slide, 1..24 with no gaps - the fill-blanks
+  // step and its category follow-up intentionally share slide 20.
+  const deckSlides = script.map((step) => step.deckSlide);
+  assert.equal(deckSlides[0], 1);
+  assert.equal(Math.max(...deckSlides), 24);
+  const distinctInOrder = [...new Set(deckSlides)];
+  assert.deepEqual(distinctInOrder, Array.from({ length: 24 }, (_, i) => i + 1));
+});
+
+test('summarises Session 8 word-association activities', () => {
+  const summary = buildTopicSessionSummary([
+    { stepId: 'word_associations_missing_word', answer: 'A cup of tea, a pair of shoes, a pint of milk.' },
+    { stepId: 'word_associations_pairs', answer: 'Salt and pepper.' },
+    { stepId: 'word_associations_famous_phrases', answer: 'Practice makes perfect.' },
+    { stepId: 'word_associations_match_phrase', answer: 'Matched the sayings.' },
+  ]);
+
+  assert.match(summary, /missing words/i);
+  assert.match(summary, /word pairs/i);
+  assert.match(summary, /well-known sayings/i);
+  assert.match(summary, /matching sayings/i);
+});
+
+test('summarises Session 8 category and word-chain activities', () => {
+  const summary = buildTopicSessionSummary([
+    { stepId: 'word_associations_category', answer: 'They are all sayings about money.' },
+    { stepId: 'word_associations_connect_a_word', answer: 'Ant, picnic, basket.' },
+  ]);
+
+  assert.match(summary, /link between a set of sayings/i);
+  assert.match(summary, /word-association chain game/i);
+});
+
+test('reveals the scripted answer for a Session 8 phrase slot regardless of correctness', () => {
+  const step = getScriptStep('cst_word_associations', getScriptStepIndex('cst_word_associations', 'word_associations_famous_phrases')).step;
+
+  assert.deepEqual(
+    resolveNamingSlotReveal({ step, content: 'perfect', slotIndices: [0] }),
+    [{ index: 0, text: 'perfect' }]
+  );
+  // Revealed regardless of whether the guess was actually right.
+  assert.deepEqual(
+    resolveNamingSlotReveal({ step, content: 'banana', slotIndices: [0] }),
+    [{ index: 0, text: 'perfect' }]
+  );
+});
+
+test('echoes back the participant\'s own word for an open-ended Session 8 blank', () => {
+  const step = getScriptStep('cst_word_associations', getScriptStepIndex('cst_word_associations', 'word_associations_missing_word')).step;
+
+  assert.deepEqual(
+    resolveNamingSlotReveal({ step, content: 'tea', slotIndices: [0] }),
+    [{ index: 0, text: 'tea' }]
+  );
+});
+
+test('routes an open-ended blank by its container word, not turn order', () => {
+  const step = getScriptStep('cst_word_associations', getScriptStepIndex('cst_word_associations', 'word_associations_missing_word')).step;
+  assert.equal(step.namingSlots.matchByContent, true);
+  const fresh = createNamingSlotState(step);
+
+  // Answering "pair" first (out of order, no ordinal word) must land on slot
+  // 1, not slot 0 just because it was the first thing said.
+  const contentRules = [
+    { identify: /\bcups?\b/ },
+    { identify: /\bpairs?\b/ },
+    { identify: /\bpints?\b/ },
+  ];
+  assert.deepEqual(
+    parseNamingSlotAnswer('a pair of bunce', { ...fresh, contentRules }).slots,
+    [1]
+  );
+});
+
+test('caps an open-ended reveal to one word even for a rambling answer', () => {
+  const step = getScriptStep('cst_word_associations', getScriptStepIndex('cst_word_associations', 'word_associations_missing_word')).step;
+
+  assert.deepEqual(
+    resolveNamingSlotReveal({
+      step,
+      content: 'a cup of reminds me of a cup of water',
+      slotIndices: [0],
+    }),
+    [{ index: 0, text: 'water' }]
+  );
+});
+
+test('identifies all three slots from one rambling answer joined by "and then"', () => {
+  const step = getScriptStep('cst_word_associations', getScriptStepIndex('cst_word_associations', 'word_associations_missing_word')).step;
+  const fresh = createNamingSlotState(step);
+
+  // Previously "socks, and then a pint" only produced 2 fragments (the shared
+  // whitespace between "and" and "then" was eaten by the first match), so the
+  // third answer never got a slot and the app kept asking to repeat it.
+  const result = parseNamingSlotAnswer(
+    'a cup of water, a pair of socks, and then a pint of lager',
+    fresh
+  );
+  assert.deepEqual(result.slots, [0, 1, 2]);
+});
+
 test('builds the food-phrase acknowledgement prompt without asking a follow-up question', () => {
   const prompt = buildCstFoodPhraseGuessInstructions({
     recentMessages: [{ role: 'user', content: 'spill milk' }],
@@ -2088,4 +2202,37 @@ test('rejects a duplicate meal-builder submission once the plate has already bee
     }),
     (error) => error.status === 409
   );
+});
+
+
+test('Session 3 accepts each displayed option by letter or text', () => {
+  const cases = [
+    [21, ['2028 New Zealand', '2028 Los Angeles', '2029 London', '2029 Sweden'], 1],
+    [23, ['Black', 'Blue', 'White', 'Red'], 0],
+    [25, ['Valerie Adams', 'Lisa Carrington', 'Ted Morgan', 'Hamish Bond'], 2],
+    [27, ['Peter Snell', 'Lisa Carrington'], 0],
+    [29, ['Rugby', 'Football', 'Badminton', 'Rowing'], 3],
+    [31, ['Two', 'Three', 'Four'], 1],
+  ];
+  for (const [index, options, correct] of cases) {
+    const step = getScriptStep('cst_physical_games', index).step;
+    for (const [i, option] of options.entries()) {
+      const letter = 'ABCD'[i];
+      for (const content of [letter, letter.toLowerCase(), letter + '.', 'option ' + letter, 'I think ' + letter, 'I will go with ' + letter, option, 'I think ' + option]) {
+        assert.equal(evaluateTriviaAnswer({ step, content }).outcome, i === correct ? 'correct' : 'incorrect', step.id + ': ' + content);
+      }
+      assert.ok(renderScriptReply(step, {}).includes(letter + '. ' + option));
+    }
+  }
+});
+
+test('letter matching handles speech spellings without matching articles or unavailable choices', () => {
+  const outcome = (index, content) => evaluateTriviaAnswer({ step: getScriptStep('cst_physical_games', index).step, content }).outcome;
+  assert.equal(outcome(21, 'bee'), 'correct');
+  assert.equal(outcome(25, 'see'), 'correct');
+  assert.equal(outcome(29, 'dee'), 'correct');
+  assert.equal(outcome(23, 'a blue uniform'), 'incorrect');
+  assert.equal(outcome(27, 'D'), 'incorrect');
+  assert.equal(outcome(31, 'D'), 'incorrect');
+  assert.equal(outcome(23, 'A or B'), 'incorrect');
 });

@@ -4,6 +4,8 @@ import api from "./services/api.js";
 import LoginPage from "./pages/LoginPage";
 import LandingPage from "./pages/LandingPage";
 import SessionPage from "./pages/SessionPage";
+import SessionInputTutorial from "./components/SessionInputTutorial.jsx";
+import { shouldShowInputTutorial, tutorialStorageKey } from "./utils/inputTutorial.js";
 import EndPage from "./pages/EndPage";
 import CaregiverPage from "./pages/CaregiverPage";
 import SettingsPage from "./pages/SettingsPage";
@@ -94,25 +96,18 @@ const TEST_SESSIONS = [
     theme: "Faces and Scenes",
     icon: "🖼️",
   },
-  ...Array.from({ length: 4 }, (_, i) => {
-    const n = i + 8;
-    return {
-      id: `placeholder_session_${n}`,
-      label: `Session ${n}`,
-      title: "Coming soon",
-      theme: "",
-      disabled: true,
-    };
-  }),
   {
-    id: "cst_using_money",
-    label: "Session 12",
-    title: "Using Money",
-    theme: "Using Money",
-    icon: "💰",
+    id: "cst_word_associations",
+    label: "Session 8",
+    title: "Word Associations",
+    theme: "Word Associations",
+    icon: "🔤",
   },
-  ...Array.from({ length: 3 }, (_, i) => {
-    const n = i + 13;
+  ...Array.from({ length: 7 }, (_, i) => {
+    const n = i + 9;
+    if (n === 10) return { id: "cst_categorizing_objects", label: "Session 10", title: "Categorizing Objects", theme: "Categorizing Objects", icon: "🧩" };
+    if (n === 11) return { id: "cst_orientation", label: "Session 11", title: "Orientation", theme: "Orientation", icon: "🧭" };
+    if (n === 12) return { id: "cst_using_money", label: "Session 12", title: "Using Money", theme: "Using Money", icon: "💰" };
     return {
       id: `placeholder_session_${n}`,
       label: `Session ${n}`,
@@ -129,19 +124,48 @@ function SessionRoute({ userName, fallbackPipelineMode, defaultAvatarMode, onSes
   const { sessionId } = useParams();
   const [pipelineMode, setPipelineMode] = useState(fallbackPipelineMode);
   const [invalid, setInvalid] = useState(false);
+  const [sessionInfo, setSessionInfo] = useState(() => sessionId === "dev-session"
+    ? { id: sessionId, data: { status: "pending", title: "Practice session" } } : null);
+  const [practiceCompletedFor, setPracticeCompletedFor] = useState(() => {
+    try { return sessionStorage.getItem(tutorialStorageKey(sessionId)) === "done" ? sessionId : null; }
+    catch { return null; }
+  });
 
   useEffect(() => {
+    // Reset route-owned state before loading a different session. This effect
+    // synchronizes the router and browser storage with the session screen.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setSessionInfo({ id: sessionId, data: sessionId === "dev-session"
+      ? { status: "pending", title: "Practice session" } : null });
+    setInvalid(false);
+    try {
+      setPracticeCompletedFor(sessionStorage.getItem(tutorialStorageKey(sessionId)) === "done" ? sessionId : null);
+    } catch {
+      setPracticeCompletedFor(null);
+    }
     if (sessionId === "dev-session") return undefined;
     let cancelled = false;
     api.get(`/sessions/${sessionId}`)
       .then(({ data }) => {
-        if (!cancelled && data.pipelineMode) setPipelineMode(data.pipelineMode);
+        if (!cancelled) {
+          if (data.pipelineMode) setPipelineMode(data.pipelineMode);
+          setSessionInfo({ id: sessionId, data });
+        }
       })
       .catch(() => { if (!cancelled) setInvalid(true); });
     return () => { cancelled = true; };
   }, [sessionId]);
 
-  if (invalid) return <Navigate to="/landing" replace />;
+  if (invalid && sessionInfo?.id === sessionId) return <Navigate to="/landing" replace />;
+  // Mount the live session only after practice. Its initial response, narration,
+  // and inactivity timer must not run while the participant is learning.
+  if (sessionInfo?.id !== sessionId || !sessionInfo.data) return <div className="session-stage" role="status">Preparing your session…</div>;
+  if (shouldShowInputTutorial(sessionInfo.data, practiceCompletedFor === sessionId)) {
+    return <SessionInputTutorial key={sessionId} sessionTitle={sessionInfo.data.title} onComplete={() => {
+      try { sessionStorage.setItem(tutorialStorageKey(sessionId), "done"); } catch { /* Practice still works without storage. */ }
+      setPracticeCompletedFor(sessionId);
+    }} />;
+  }
 
   return (
     <SessionPage

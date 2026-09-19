@@ -1,3 +1,4 @@
+import { prepareSpeechText } from './speechPronunciation.js';
 import { MsEdgeTTS, OUTPUT_FORMAT } from 'msedge-tts';
 import fs from 'fs';
 import { pipeline } from 'stream/promises';
@@ -47,7 +48,7 @@ export function getVoiceDeliveryOptions(options = {}) {
 async function streamEdgeSpeech(text, writable, options = {}) {
   const tts = new MsEdgeTTS();
   await tts.setMetadata(options.voice || EDGE_MALE_VOICE, OUTPUT_FORMAT.AUDIO_24KHZ_96KBITRATE_MONO_MP3);
-  const { audioStream } = tts.toStream(text, getVoiceDeliveryOptions(options).edgeProsody);
+  const { audioStream } = tts.toStream(prepareSpeechText(text), getVoiceDeliveryOptions(options).edgeProsody);
   await pipeline(audioStream, writable);
 }
 
@@ -70,7 +71,7 @@ async function fetchOpenAISpeech(text, options = {}) {
     body: JSON.stringify({
       model,
       voice: options.voice || OPENAI_FEMALE_VOICE,
-      input: text,
+      input: prepareSpeechText(text),
       response_format: options.responseFormat || 'mp3',
       ...(model === 'gpt-4o-mini-tts' ? { instructions: getVoiceDeliveryOptions(options).instructions } : {}),
       speed: 1.0,

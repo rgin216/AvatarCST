@@ -1,4 +1,8 @@
+import { evaluateCategorizingTurn } from './categorizingObjectsService.js';
+import { personalizeCategorizingReply } from './categorizingAcknowledgementService.js';
 import { answerNewsQuestion, newsContext } from './newsConversationService.js';
+import { orientationPracticeContext } from './orientationContext.js';
+import { recallChildhoodPlace } from './childhoodRecallService.js';
 import { parseMatchingAnswer } from './matchingService.js';
 import Message from '../models/Message.js';
 import Session from '../models/Session.js';
@@ -18,6 +22,7 @@ import {
   buildCstInstrumentGuessInstructions,
   buildCstNameThatTuneInstructions,
   buildCstTriviaChoiceInstructions,
+  buildCstOpenBlankAcknowledgementInstructions,
 } from './promptService.js';
 import { generateResponse } from './llmService.js';
 import { getPositiveNzNews } from './newsService.js';
@@ -649,53 +654,111 @@ export const evaluateOrientationAnswer = ({ step, content, retryCount }) => {
 
 const SCRIPTED_TRIVIA_RULES = {
   physical_games_trivia_next_olympics: {
+    choices: ['2028 New Zealand', '2028 Los Angeles', '2029 London', '2029 Sweden'],
     isCorrect: (answer) =>
       /\b2028\b/.test(answer) && /\b(?:los angeles|l a)\b/.test(answer),
     correctResponse: 'Exactly — you got both the year and host city right.',
     incorrectResponse: 'Good try. One or both parts are not quite right.',
   },
   physical_games_trivia_uniform: {
+    choices: ['Black', 'Blue', 'White', 'Red'],
     isCorrect: (answer) => /\bblack\b/.test(answer),
     correctResponse: 'That is right — you chose the correct colour.',
     incorrectResponse: 'Not quite, but that was a good guess.',
   },
   physical_games_trivia_first_gold: {
+    choices: ['Valerie Adams', 'Lisa Carrington', 'Ted Morgan', 'Hamish Bond'],
     isCorrect: (answer) => /\b(?:ted morgan|morgan)\b/.test(answer),
     correctResponse: 'Spot on — you named the right Olympian.',
     incorrectResponse: 'That is not the Olympian we are looking for, but good try.',
   },
   physical_games_trivia_runner: {
+    choices: ['Peter Snell', 'Lisa Carrington'],
     isCorrect: (answer) => /\b(?:peter snell|snell)\b/.test(answer),
     correctResponse: 'Correct — you identified the runner.',
     incorrectResponse: 'That is not quite right, but it was worth a try.',
   },
   physical_games_trivia_most_gold: {
+    choices: ['Rugby', 'Football', 'Badminton', 'Rowing'],
     isCorrect: (answer) => /\browing\b/.test(answer),
     correctResponse: 'You have got it — that is the right sport.',
     incorrectResponse: 'Close, but that is not the sport in the answer.',
   },
   physical_games_trivia_carrington: {
+    choices: ['Two', 'Three', 'Four'],
     isCorrect: (answer) => /\b(?:3|three)\b/.test(answer),
     correctResponse: 'Well done — that number is correct.',
     incorrectResponse: 'That number is not quite right, but good guess.',
   },
 };
 
-const isScriptedTriviaQuestion = (step) => Boolean(SCRIPTED_TRIVIA_RULES[step?.id]);
+const getTriviaRule = (step) => {
+  if (!step?.trivia) return SCRIPTED_TRIVIA_RULES[step?.id];
+  const { choices, answer, aliases } = step.trivia;
+  return {
+    choices,
+    isCorrect: (content) => aliases.some((alias) => (` ${content} `).includes(` ${normalizeAnswer(alias.normalize('NFD').replace(/[\u0300-\u036f]/g, ''))} `)),
+    correctResponse: `Yes, that is right — ${answer}.`,
+    incorrectResponse: `Thank you for having a go. The answer is ${answer}.`,
+    unsureResponse: `That is okay. The answer is ${answer}.`,
+  };
+};
 
-export const evaluateTriviaAnswer = ({ step, content }) => {
-  const rule = SCRIPTED_TRIVIA_RULES[step?.id];
+const isScriptedTriviaQuestion = (step) => Boolean(getTriviaRule(step));
+
+// Only expand complete letter selections: the article "a" in a sentence must
+// not become option A.
+const expandTriviaChoices = (content, choices) => {
+  if (!choices) return content;
+  const answer = normalizeAnswer(content);
+  const selection = answer.match(/^(?:(?:i think|i choose|i pick|i will go with|i ll go with|it is|it s|the answer is)\s+)?(?:(?:option|letter|answer)\s+)?([abcd]|ay|bee|be|see|sea|dee)(?:\s+please)?$/);
+  if (!selection) return content;
+  const letters = { ay: 'a', bee: 'b', be: 'b', see: 'c', sea: 'c', dee: 'd' };
+  const letter = letters[selection[1]] || selection[1];
+  return choices[letter.charCodeAt(0) - 97] || content;
+};
+
+export const evaluateTriviaAnswer = ({ step, content, answers = [] }) => {
+  const rule = getTriviaRule(step);
   if (!rule || !content) return null;
+
+  if (step?.id?.startsWith('orientation_landmark_')) {
+    const previous = answers.filter(item => item.stepId.startsWith('orientation_landmark_'));
+    let streak = 0;
+    for (const item of [...previous].reverse()) {
+      const index = getScriptStepIndex('cst_orientation', item.stepId);
+      if (index < 0 || evaluateTriviaAnswer({ step: getScriptStep('cst_orientation', index).step, content: item.answer })?.outcome !== 'correct') break;
+      streak += 1;
+    }
+    const answer = step.trivia.answer;
+    const variant = previous.length;
+    const praise = ['Well done!', 'You have got it!', 'Exactly right!', 'Lovely work!', 'That is correct!'];
+    const encouragement = streak === 1 ? ' Two in a row — you are on a roll!' : streak === 3 ? ' Four in a row — well done!' : '';
+    rule.correctResponse = `${praise[variant % praise.length]} ${answer}.${encouragement}`;
+    rule.incorrectResponse = [
+      `Good effort. This one is ${answer}. Let us try the next one.`,
+      `Thank you for giving it a go. The answer is ${answer}.`,
+      `This time it is ${answer}. There is no rush — take your time.`,
+      `The answer is ${answer}. It is all right to miss a few; we are just exploring together.`,
+    ][variant % 4];
+    rule.unsureResponse = [
+      `That is all right. This one is ${answer}.`,
+      `No problem at all. The answer is ${answer}. Let us keep exploring.`,
+      `We can discover it together — it is ${answer}.`,
+    ][variant % 3];
+  }
 
   if (isDontKnowAnswer(content)) {
     return {
       answered: true,
-      response: 'No problem. Let us reveal the answer.',
+      response: rule.unsureResponse || 'No problem. Let us reveal the answer.',
       outcome: 'unsure',
     };
   }
 
-  const correct = rule.isCorrect(normalizeAnswer(content));
+  const expanded = expandTriviaChoices(content, rule.choices);
+  const answer = step.trivia ? expanded.normalize('NFD').replace(/[\u0300-\u036f]/g, '') : expanded;
+  const correct = rule.isCorrect(normalizeAnswer(answer));
   return {
     answered: true,
     response: correct ? rule.correctResponse : rule.incorrectResponse,
@@ -1245,17 +1308,31 @@ const NAMING_SLOT_ORDINALS = [
 
 // Split a normalized answer into the separate things the person listed, so a
 // multi-slot reply ("first a trumpet, second a drum") can be judged per slot.
-const splitNamingFragments = (normalized = '') =>
-  normalized
-    .split(/\s+(?:and|then)\s+|\s*,\s*|\s*;\s*/)
+// Takes the RAW content, not the shared normalizeAnswer() output - that strips
+// commas/semicolons entirely (replacing them with a space), which silently
+// destroyed the strongest signal for "here are three separate answers" before
+// this function ever saw the text. This does its own lowercasing, keeping just
+// comma/semicolon as punctuation to split on, plus word-boundary "and"/"then"
+// splits (not \s+...\s+) so adjacent connectors like "socks, and then a pint"
+// don't have their shared whitespace eaten by the first match, which
+// previously collapsed "and then" into one delimiter and merged two answers.
+const splitNamingFragments = (content = '') =>
+  String(content)
+    .toLowerCase()
+    .replace(/[^a-z0-9,;\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .split(/\s*,\s*|\s*;\s*|\band\b|\bthen\b/)
     .filter((fragment) => /[a-z]{3}/.test(fragment));
 
 export const createNamingSlotState = (step, persisted = null) => {
   const count = Math.max(0, Math.trunc(Number(step?.namingSlots?.count) || 0));
   const source = Array.isArray(persisted?.filled) ? persisted.filled : [];
+  const revealedSource = Array.isArray(persisted?.revealed) ? persisted.revealed : [];
   return {
     count,
     filled: Array.from({ length: count }, (_, index) => Boolean(source[index])),
+    revealed: Array.from({ length: count }, (_, index) => revealedSource[index] || null),
   };
 };
 
@@ -1308,7 +1385,7 @@ export const parseNamingSlotAnswer = (content = '', { count = 3, filled = [], co
   }
 
   // Otherwise treat it as naming the next empty slot(s), one per listed fragment.
-  const fragments = splitNamingFragments(normalized);
+  const fragments = splitNamingFragments(content);
   const fillCount = Math.min(Math.max(fragments.length, 1), emptySlots.length);
   return { slots: emptySlots.slice(0, fillCount) };
 };
@@ -1348,6 +1425,37 @@ const SCRIPTED_INSTRUMENT_RULES = {
     { label: 'spilled', identify: /\b(spill(?:ed|ing)?|milk)\b/, match: /\bspill(?:ed|ing)?\b/ },
     { label: 'peas and pod', identify: /\b(peas?|pod)\b/, match: /\b(peas?|pod)\b/ },
   ],
+  // Session 8 (Word Associations) word-pair and saying blanks - same mechanic,
+  // reveal-on-attempt via the shared namingSlots + phraseCards pipeline.
+  word_associations_pairs: [
+    { label: 'pepper', identify: /\b(salt|pepper)\b/, match: /\bpepper\b/ },
+    { label: 'jelly', identify: /\b(peanut ?butter|jelly|jam)\b/, match: /\b(jelly|jam)\b/ },
+    { label: 'key or load', identify: /\b(lock|key|load)\b/, match: /\b(key|load)\b/ },
+  ],
+  word_associations_famous_phrases: [
+    { label: 'perfect', identify: /\b(practice|perfect)\b/, match: /\bperfect\b/ },
+    { label: 'sorry', identify: /\b(safe|sorry)\b/, match: /\bsorry\b/ },
+    { label: 'thin', identify: /\b(thick|thin)\b/, match: /\bthin\b/ },
+  ],
+  word_associations_sayings: [
+    { label: 'free', identify: /\b(best|things|life|free)\b/, match: /\bfree\b/ },
+    { label: 'happiness', identify: /\b(money|buy|happ\w*)\b/, match: /\bhapp(?:y|iness)\b/ },
+    { label: 'beggars', identify: /\b(beggars?|choosers?)\b/, match: /\bbeggars?\b/ },
+  ],
+};
+
+// For an open-ended naming-slots step (no scripted correct answer, so no
+// entry in SCRIPTED_INSTRUMENT_RULES), the container noun itself ("a pair
+// of...") is still a safe, unambiguous routing signal - it's never the blank,
+// just the label already printed on the card. Kept separate from
+// SCRIPTED_INSTRUMENT_RULES so it only affects content-routing, not which
+// reveal/acknowledgement path a step takes.
+const OPEN_NAMING_SLOT_IDENTIFY_RULES = {
+  word_associations_missing_word: [
+    { identify: /\bcups?\b/ },
+    { identify: /\bpairs?\b/ },
+    { identify: /\bpints?\b/ },
+  ],
 };
 
 export const evaluateNamedInstrumentSlots = ({ step, content, slotIndices = [] }) => {
@@ -1361,10 +1469,16 @@ export const evaluateNamedInstrumentSlots = ({ step, content, slotIndices = [] }
 
   // When the person listed one fragment per slot, judge each slot against its
   // own fragment so a keyword elsewhere in the message cannot mark it correct.
-  const fragments = splitNamingFragments(normalized);
+  // A trailing descriptive clause ("...a bass, lower than a horn") can produce
+  // one extra fragment past the last slot - fold it into that last slot's text
+  // rather than losing per-slot isolation entirely.
+  const fragments = splitNamingFragments(content);
   const perSlotText =
-    fragments.length === consideredSlots.length
-      ? (position) => fragments[position]
+    fragments.length >= consideredSlots.length
+      ? (position) =>
+          position === consideredSlots.length - 1
+            ? fragments.slice(position).join(' ')
+            : fragments[position]
       : () => normalized;
 
   const outcomes = consideredSlots.map((index, position) => ({
@@ -1395,6 +1509,62 @@ export const evaluateNamedInstrumentSlots = ({ step, content, slotIndices = [] }
   }
 
   return { outcomes, response };
+};
+
+// The text shown on a phraseCards card once a slot has been attempted. For a
+// slot with a scripted answer (SCRIPTED_INSTRUMENT_RULES) this is always the
+// canonical answer, regardless of whether the guess was correct - matches the
+// "reveal on attempt" framing used throughout. For a slot with no scripted
+// answer (e.g. an open "what comes to mind" blank), it echoes back whatever
+// the person actually said for that slot instead.
+// The single most word-like token in a fragment - last word wins, since
+// blanks are almost always phrased "...of X" / "...is X". Strips connective
+// filler ("a", "the", "of") from the very end first so e.g. "a pint of lager"
+// reveals "lager", not "of".
+const NAMING_SLOT_FILLER_WORDS = new Set(['a', 'an', 'the', 'of', 'is', 'was', 'to', 'it', 's']);
+const lastMeaningfulWord = (text = '') => {
+  const words = text
+    .toLowerCase()
+    .replace(/[^a-z'\s]/g, ' ')
+    .split(/\s+/)
+    .filter(Boolean);
+  for (let i = words.length - 1; i >= 0; i -= 1) {
+    if (!NAMING_SLOT_FILLER_WORDS.has(words[i])) return words[i];
+  }
+  return words[words.length - 1] || '';
+};
+
+export const resolveNamingSlotReveal = ({ step, content = '', slotIndices = [] }) => {
+  if (!content || slotIndices.length === 0) return [];
+  const rules = SCRIPTED_INSTRUMENT_RULES[step?.id];
+  const normalized = normalizeAnswer(content);
+  const fragments = splitNamingFragments(content);
+  const perSlotText = fragments.length >= slotIndices.length
+    ? (position) =>
+        position === slotIndices.length - 1
+          ? fragments.slice(position).join(' ')
+          : fragments[position]
+    : () => normalized;
+  // When slots are routed by content (matchByContent), a fragment's position in
+  // the sentence need not match its slot's position in slotIndices - answering
+  // out of order would otherwise pair the wrong fragment with the wrong slot.
+  // Re-run the same identify/match rule used to route the answer to find the
+  // fragment that actually names this slot before falling back to position.
+  const contentRules = step?.namingSlots?.matchByContent
+    ? SCRIPTED_INSTRUMENT_RULES[step?.id] || OPEN_NAMING_SLOT_IDENTIFY_RULES[step?.id]
+    : null;
+  const textForSlot = (index, position) => {
+    const matcher = contentRules?.[index]?.identify || contentRules?.[index]?.match;
+    const matchedFragment = matcher && fragments.find((fragment) => matcher.test(fragment));
+    return matchedFragment || perSlotText(position);
+  };
+  return slotIndices.map((index, position) => ({
+    index,
+    // A scripted answer is already a short canonical label; an open blank's
+    // echo is capped to one word so it fits the card instead of dumping the
+    // whole (possibly rambling) message onto it.
+    text: rules?.[index]?.label || lastMeaningfulWord(textForSlot(index, position)),
+  }));
 };
 
 export const isRecordableSessionAnswer = ({ step, content, wheelEvent }) =>
@@ -1608,6 +1778,11 @@ export const buildTopicSessionSummary = (answers = [], { themeSong = null } = {}
   };
 
   for (const [pattern, topic] of [
+    [/^categorizing_objects_senses_/, 'exploring everyday things through the senses'],
+    [/^categorizing_objects_odd_one_out$/, 'sorting food and non-food items'],
+    [/^categorizing_objects_pairs$/, 'finding connections between everyday objects'],
+    [/^categorizing_objects_(category|letter|words)$/, 'exploring categories and words'],
+    [/^categorizing_objects_holiday$/, 'remembering childhood holiday belongings'],
     [/^faces_scenes_match_/, 'matching descriptions to famous people'],
     [/^faces_scenes_(celebrities|people)_/, 'comparing similarities and differences between people'],
     [/^faces_scenes_(scene_preference|landmarks|queen_street)$/, 'exploring scenes and how Queen Street has changed'],
@@ -1653,7 +1828,7 @@ export const buildTopicSessionSummary = (answers = [], { themeSong = null } = {}
   }
 
   for (const item of meaningful) {
-    if (item.stepId?.startsWith('faces_scenes_')) continue;
+    if (/^(faces_scenes|categorizing_objects)_/.test(item.stepId || '')) continue;
     if ([
       'introduce_yourself',
       'what_is_cst',
@@ -1751,6 +1926,39 @@ export const buildTopicSessionSummary = (answers = [], { themeSong = null } = {}
   if (meaningful.some((item) => item.stepId === 'food_spin_question')) {
     addTopic('reflecting on a food-related question from the wheel');
   }
+  if (meaningful.some((item) => item.stepId === 'word_associations_missing_word')) {
+    addTopic('filling in missing words for everyday phrases');
+  }
+  if (meaningful.some((item) => item.stepId === 'word_associations_pairs')) {
+    addTopic('completing familiar word pairs');
+  }
+  if (meaningful.some((item) => item.stepId === 'word_associations_famous_phrases')) {
+    addTopic('finishing well-known sayings');
+  }
+  if (meaningful.some((item) => item.stepId === 'word_associations_match_phrase')) {
+    addTopic('matching sayings to their endings');
+  }
+  if (meaningful.some((item) => ['word_associations_sayings', 'word_associations_category'].includes(item.stepId))) {
+    addTopic('finding the link between a set of sayings');
+  }
+  if (meaningful.some((item) => item.stepId === 'word_associations_connect_a_word')) {
+    addTopic('playing a word-association chain game');
+  }
+  if (meaningful.some((item) => item.stepId === 'word_associations_spin_question')) {
+    addTopic('reflecting on a question from the wheel');
+  }
+  if (meaningful.some((item) => item.stepId?.startsWith('orientation_landmark_'))) {
+    addTopic('exploring New Zealand landmarks');
+  }
+  if (meaningful.some((item) => item.stepId === 'orientation_favourite_place' || item.stepId?.startsWith('orientation_sensory_'))) {
+    addTopic('imagining a favourite place through your senses');
+  }
+  if (meaningful.some((item) => item.stepId?.startsWith('orientation_neighbour_'))) {
+    addTopic('remembering your neighbourhood');
+  }
+  if (meaningful.some((item) => ['orientation_grew_up', 'orientation_australia', 'orientation_pacific', 'orientation_europe', 'orientation_orienteering'].includes(item.stepId))) {
+    addTopic('talking about maps and familiar places');
+  }
   if (meaningful.some((item) => String(item.stepId || '').startsWith('money_trivia_'))) {
     addTopic('guessing how prices have changed over the years');
   }
@@ -1779,7 +1987,7 @@ export const buildTopicSessionSummary = (answers = [], { themeSong = null } = {}
   if (meaningful.some((item) => item.stepId === 'money_spin_question')) {
     addTopic('reflecting on a money-related question from the wheel');
   }
-  const wheelAnswer = meaningful.find((item) => ['current_affairs_spin_question', 'faces_scenes_spin_question'].includes(item.stepId));
+  const wheelAnswer = meaningful.find((item) => ['current_affairs_spin_question', 'faces_scenes_spin_question', 'categorizing_objects_spin_question', 'orientation_spin_question'].includes(item.stepId));
   let wheelTopic = '';
   if (wheelAnswer) {
     const wheelText = `${wheelAnswer.answer || ''} ${wheelAnswer.adaptiveFollowUp?.answer || ''}`;
@@ -2337,6 +2545,7 @@ export const getSessionTurnContext = async (sessionId, existingSession = null) =
     session.scriptStepIndex || 0
   );
   const slide = toSlide({ step, index: boundedIndex, total: totalSteps });
+  if (slide.interaction?.type === 'objectSelection') slide.interaction = { ...slide.interaction, state: session.interactionState?.categorizing || {} };
   const nextStepIndex = isFinalStep
     ? boundedIndex
     : getRoutedNextStepIndex({
@@ -2459,7 +2668,10 @@ const getSessionInactivityReminderWrite = async (sessionId, expectedActivityRevi
     const activeSafetySupport = session.interactionState?.safetySupport || null;
     const currentAffairs = session.interactionState?.currentAffairs || null;
     const scriptContext = {
+      categorizing: session.interactionState?.categorizing || {},
       name: getDisplayName(user),
+      orientationPractice: session.interactionState?.orientationPractice,
+      rememberedChildhoodPlace: session.interactionState?.orientationPractice?.rememberedChildhoodPlace,
       wheelQuestion: session.interactionState?.questionWheel?.question,
       mealChoice: session.interactionState?.mealBuilder?.labels?.join(', '),
       currentAffairs,
@@ -2782,6 +2994,8 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
     };
   }
 
+  const categorizingTurn = userContent && effectiveTurnIndex > 0
+    ? await personalizeCategorizingReply(evaluateCategorizingTurn({ step, content: userContent, stored: session.interactionState?.categorizing }), { provider: llmProvider }) : null;
   const matchingAnswer = parseMatchingAnswer(step, userContent || '');
   let userMessage = null;
   const hasAutomatedProtocol = /^\[\[[^\]]+\]\]$/.test(userContent || '');
@@ -2790,7 +3004,7 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
     !hasAutoAdvanceProtocol &&
     !(safetySupportTurn && hasAutomatedProtocol)
   ) {
-    const messageContent = matchingAnswer ? matchingAnswer.transcript : wheelEvent
+    const messageContent = categorizingTurn ? categorizingTurn.transcript : matchingAnswer ? matchingAnswer.transcript : wheelEvent
       ? `Question wheel landed on ${wheelEvent.label}.`
       : activityRevealEvent
       ? `Revealed ${activityRevealEvent.option.label}.`
@@ -2838,7 +3052,24 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
       })
     : null;
   let themeSong = getThemeSongForSession(session, user);
+  const orientationPractice = orientationPracticeContext(
+    session.interactionState?.orientationPractice,
+    step,
+    effectiveTurnIndex > 0 ? userContent : '',
+  );
+  if ([step, nextStep].some(candidate => candidate?.id === 'orientation_grew_up') &&
+      !Object.hasOwn(orientationPractice, 'rememberedChildhoodPlace')) {
+    try {
+      orientationPractice.rememberedChildhoodPlace = await recallChildhoodPlace({ userId: session.userId, sessionId: session._id, memoryEntries });
+    } catch {
+      // A failed memory lookup must never prevent the participant continuing.
+      orientationPractice.rememberedChildhoodPlace = null;
+    }
+  }
   const scriptContext = {
+    orientationPractice,
+    rememberedChildhoodPlace: orientationPractice.rememberedChildhoodPlace,
+    categorizing: categorizingTurn?.state || session.interactionState?.categorizing || {},
     previousAnswer: userContent,
     recentMessages,
     name: getDisplayName(user),
@@ -2847,6 +3078,13 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
     currentAffairs,
     themeSong,
   };
+  for (const [candidate, candidateSlide] of [[step, slide], [nextStep, nextSlide]]) {
+    if (!candidate?.contextualQuestion || !candidateSlide) continue;
+    candidateSlide.prompt = candidate.contextualQuestion(scriptContext);
+    if (candidateSlide.interaction?.type === 'focusedQuestion') {
+      candidateSlide.interaction = { ...candidateSlide.interaction, question: candidateSlide.prompt };
+    }
+  }
   const hasUserContent = Boolean(userContent);
   const hasDeliveredQuestion = effectiveTurnIndex > 0;
   const expectedQuestion =
@@ -2891,7 +3129,9 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
       ? parseNamingSlotAnswer(userContent, {
           count: currentNamingSlotState.count,
           filled: currentNamingSlotState.filled,
-          contentRules: step.namingSlots.matchByContent ? SCRIPTED_INSTRUMENT_RULES[step.id] : null,
+          contentRules: step.namingSlots.matchByContent
+            ? SCRIPTED_INSTRUMENT_RULES[step.id] || OPEN_NAMING_SLOT_IDENTIFY_RULES[step.id]
+            : null,
         })
       : null;
   const newlyFilledNamingSlots = namingSlotParse?.slots || [];
@@ -2919,6 +3159,15 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
           slotIndices: newlyFilledNamingSlots,
         })
       : null;
+  const namingSlotRevealUpdates =
+    namingSlotStep && newlyFilledNamingSlots.length > 0
+      ? resolveNamingSlotReveal({ step, content: userContent, slotIndices: newlyFilledNamingSlots })
+      : [];
+  const nextNamingSlotRevealed = namingSlotStep
+    ? currentNamingSlotState.revealed.map(
+        (existing, index) => namingSlotRevealUpdates.find((update) => update.index === index)?.text || existing
+      )
+    : [];
 
   const triviaChoiceNewlyResolved =
     triviaChoiceStep && userContent && hasDeliveredQuestion ? triviaChoiceEvent?.resolved || [] : [];
@@ -2961,9 +3210,10 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
           resolvedCount: triviaChoiceNewlyResolved.length,
           complete: triviaChoiceComplete,
         })
-      : null) || emotionalSupportTurn || orientationTurn || (matchingAnswer ? { answered: true, response: matchingAnswer.response } : null) || evaluateTriviaAnswer({
+      : null) || emotionalSupportTurn || categorizingTurn || orientationTurn || (matchingAnswer ? { answered: true, response: matchingAnswer.response } : null) || evaluateTriviaAnswer({
       step,
       content: userContent,
+      answers: storedAnswers,
     }) || evaluateMusicCompletionAnswer({
       step,
       content: userContent,
@@ -3132,21 +3382,24 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
     newlyFilledNamingSlots.length > 0
   ) {
     const rules = SCRIPTED_INSTRUMENT_RULES[step.id];
-    const isFoodPhraseStep = step.id === 'food_famous_phrases';
+    // Every naming-slots step with scripted rules is a "finish the phrase" step
+    // except the original sound-naming one - that is the only case that needs
+    // the instrument-guessing framing instead.
+    const isSoundNamingStep = step.id === 'sounds_naming_instruments';
     const namedItems = newlyFilledNamingSlots
       .filter((slotIndex) => rules[slotIndex])
       .map((slotIndex) =>
-        isFoodPhraseStep
-          ? `the "${step.namingSlots.labels?.[slotIndex] || `${slotIndex + 1}`}" saying is missing ${rules[slotIndex].label}`
-          : `the ${step.namingSlots.labels?.[slotIndex] || `${slotIndex + 1}`} sound is ${rules[slotIndex].label}`
+        isSoundNamingStep
+          ? `the ${step.namingSlots.labels?.[slotIndex] || `${slotIndex + 1}`} sound is ${rules[slotIndex].label}`
+          : `the "${step.namingSlots.labels?.[slotIndex] || `${slotIndex + 1}`}" saying is missing ${rules[slotIndex].label}`
       );
     adaptiveText = await generateResponse(
       [
         {
           role: 'system',
-          content: isFoodPhraseStep
-            ? buildCstFoodPhraseGuessInstructions({ recentMessages, namedPhrases: namedItems })
-            : buildCstInstrumentGuessInstructions({ recentMessages, namedSounds: namedItems }),
+          content: isSoundNamingStep
+            ? buildCstInstrumentGuessInstructions({ recentMessages, namedSounds: namedItems })
+            : buildCstFoodPhraseGuessInstructions({ recentMessages, namedPhrases: namedItems }),
         },
         { role: 'user', content: userContent },
       ],
@@ -3156,9 +3409,47 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
         maxTokens: 80,
         model: useFastScriptedTurn ? process.env.OPENAI_FAST_TEXT_MODEL : undefined,
       }
-    );
+    ).catch((error) => {
+      console.warn('[session] Naming-slot acknowledgement fallback:', error.message);
+      return '';
+    });
     if (!collapseRepeatedAdjacentSpeech(adaptiveText || '').trim()) {
       adaptiveText = namingSlotAcknowledgement?.response || '';
+    }
+  } else if (
+    namingSlotStep &&
+    !SCRIPTED_INSTRUMENT_RULES[step.id] &&
+    userContent &&
+    hasDeliveredQuestion &&
+    newlyFilledNamingSlots.length > 0
+  ) {
+    // No scripted answer for this slide (e.g. an open "whatever comes to
+    // mind" blank) - the reveal itself is their own word echoed back on the
+    // card, but the spoken acknowledgement should still vary and react to
+    // what they actually said, not a single fixed fallback line.
+    const namedItems = namingSlotRevealUpdates.map(
+      ({ index, text }) => `the ${step.namingSlots.labels?.[index] || `${index + 1}`} blank got the word "${text}"`
+    );
+    adaptiveText = await generateResponse(
+      [
+        {
+          role: 'system',
+          content: buildCstOpenBlankAcknowledgementInstructions({ recentMessages, namedItems }),
+        },
+        { role: 'user', content: userContent },
+      ],
+      {
+        provider: llmProvider,
+        temperature: 0.5,
+        maxTokens: 60,
+        model: useFastScriptedTurn ? process.env.OPENAI_FAST_TEXT_MODEL : undefined,
+      }
+    ).catch((error) => {
+      console.warn('[session] Open-blank acknowledgement fallback:', error.message);
+      return '';
+    });
+    if (!collapseRepeatedAdjacentSpeech(adaptiveText || '').trim()) {
+      adaptiveText = 'Lovely, thank you.';
     }
   }
 
@@ -3177,7 +3468,7 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
           question: activeAdaptiveFollowUp.question,
           content: userContent,
         })
-      : [...storedAnswers, toSessionAnswer({ step, content: matchingAnswer?.transcript || triviaChoiceEvent?.transcript || userContent })];
+      : [...storedAnswers, toSessionAnswer({ step, content: categorizingTurn?.transcript || matchingAnswer?.transcript || triviaChoiceEvent?.transcript || userContent })];
 
     if (step.id === 'theme_song_choice' && !activeAdaptiveFollowUp) {
       const themeSongSearchAnswer = resolveThemeSongSelectionAnswer(userContent, themeSong);
@@ -3262,7 +3553,9 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
     answeredCurrentQuestion &&
     newsElaborationRequested
   );
-  const shouldAdvance = isActivityInteractionEvent
+  const shouldAdvance = categorizingTurn && !emotionalSupportTurn
+    ? categorizingTurn.complete && !isFinalStep
+    : isActivityInteractionEvent
     ? completedAllActivities && !isFinalStep
     : namingSlotStep
     ? hasUserContent &&
@@ -3330,7 +3623,9 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
     triviaChoiceMissingRounds.length > 0
       ? triviaChoiceMissingRounds[0].question || 'What about the other one?'
       : '';
-  const scriptedNextLine = namingSlotPromptLine || triviaChoicePromptLine || activityInteractionReply || (themeSongFeedback
+  const scriptedNextLine = categorizingTurn && !categorizingTurn.complete && !emotionalSupportTurn
+    ? categorizingTurn.prompt
+    : namingSlotPromptLine || triviaChoicePromptLine || activityInteractionReply || (themeSongFeedback
     ? themeSongRequiresRetry
       ? themeSongFeedback
       : joinSpeechParts(
@@ -3372,6 +3667,7 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
   if (
     userContent &&
     !adaptiveText &&
+    !categorizingTurn &&
     !themeSongFeedback &&
     !isQuestionWheelEvent &&
     !isActivityInteractionEvent &&
@@ -3444,6 +3740,9 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
     : 0;
   session.scriptStepIndex = nextStepIndex;
   const displaySlide = shouldAdvance ? nextSlide : slide;
+  if (displaySlide.interaction?.type === 'objectSelection') {
+    displaySlide.interaction = { ...displaySlide.interaction, state: categorizingTurn?.state || session.interactionState?.categorizing || {} };
+  }
   session.presentationState = {
     slideIndex: displaySlide.index,
     deckSlide: displaySlide.deckSlide,
@@ -3460,6 +3759,8 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
   const nextInteractionState = {
     ...(session.interactionState || {}),
     sessionAnswers,
+    ...(session.scriptId === 'cst_orientation' ? { orientationPractice } : {}),
+    ...(categorizingTurn && !emotionalSupportTurn ? { categorizing: categorizingTurn.state } : {}),
   };
   if (themeSong) {
     nextInteractionState.themeSong = themeSong;
@@ -3497,8 +3798,12 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
   } else {
     delete nextInteractionState.activityReveal;
   }
-  if (namingSlotStep && displaySlide.id === step.id) {
-    nextInteractionState.namingSlots = { stepId: step.id, filled: nextNamingSlotFilled };
+  if (namingSlotStep) {
+    // Keyed by the step just answered, not displaySlide - on the completing
+    // turn displaySlide has already moved on to the next step, but the
+    // reveal still needs to reach the frontend so it can show on the old
+    // slide during the deferred transition before it flips over.
+    nextInteractionState.namingSlots = { stepId: step.id, filled: nextNamingSlotFilled, revealed: nextNamingSlotRevealed };
   } else if (nextInteractionState.namingSlots?.stepId !== displaySlide.id) {
     delete nextInteractionState.namingSlots;
   }
@@ -3607,6 +3912,7 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
     questionWheel: session.interactionState?.questionWheel || null,
     activityReveal: session.interactionState?.activityReveal || null,
     mealBuilder: session.interactionState?.mealBuilder || null,
+    namingSlots: session.interactionState?.namingSlots || null,
     // Reflects this turn's own step and selections, not the persisted state for
     // whatever comes next - when the last round resolves (especially from a
     // single message that answers every round at once), the app advances

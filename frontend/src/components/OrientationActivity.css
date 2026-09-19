@@ -1,0 +1,13 @@
+.orientation-activity { position:absolute; inset:0; overflow:auto; box-sizing:border-box; background:#fff; color:#193943; padding:clamp(42px,7cqh,64px) clamp(20px,5cqw,72px) 24px; display:flex; flex-direction:column; gap:clamp(10px,2cqh,22px); }
+.ppt-slide .orientation-activity h1 { color:#193943; font-size:clamp(24px,3cqw,40px); line-height:1.2; margin:0; }
+.orientation-activity p { margin:0; font-size:clamp(17px,1.8cqw,24px); line-height:1.45; }
+.orientation-activity .orientation-question { font-size:clamp(22px,2.5cqw,34px); max-width:36em; }
+.orientation-activity .orientation-progress { color:#47616b; font-weight:600; }
+.orientation-activity form { display:flex; flex-direction:column; align-items:flex-start; gap:12px; }
+.orientation-activity label { font-size:20px; font-weight:600; }
+.orientation-activity select { font:inherit; font-size:clamp(20px,2cqw,28px); color:#193943; background:#f3f7f8; border:2px solid #517785; border-radius:8px; padding:12px; min-height:52px; width:min(100%,640px); }
+.orientation-actions { display:flex; flex-wrap:wrap; gap:14px; margin-top:12px; }
+.orientation-actions button { min-height:48px; padding:12px 20px; border:2px solid #275f72; border-radius:8px; background:#fff; color:#193943; font:inherit; font-size:20px; cursor:pointer; }
+.orientation-actions button[type=submit] { background:#275f72; color:#fff; }
+.orientation-activity :is(button,select):focus-visible { outline:3px solid #bf8700; outline-offset:3px; }
+.orientation-activity :disabled { opacity:.55; cursor:default; }
