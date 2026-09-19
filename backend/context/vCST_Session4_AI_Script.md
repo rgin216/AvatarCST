@@ -108,83 +108,70 @@ State that the three sounds were a trumpet, a bass guitar, and an organ, and tha
 
 # Step 18 — Sound trivia 1
 
-Introduce this as a gentle set of trivia: say it is just for fun and that it is fine to guess or say “I’m not sure.” For every trivia response, check the scripted answer before showing the answer slide — use varied wording to acknowledge a correct response, gently say when a response is not correct, and respond without pressure when the participant is unsure, then reveal the answer once without repeating the acknowledgement.
-Ask how sound is created, offering the options By Heat, By our Ears, or By Vibrations. Then ask how fast sound travels, offering the options 435 km/hr, 300 km/second, or 1,200 km/hr. Any genuine attempt may proceed to the answer slide.
+This is a guessing game about how sound works, introduced as just for fun with no pressure. Each round is answered by tapping one of the on-screen options rather than speaking a guess. First round: how sound is created, choosing between By Heat, By our Ears, and By Vibrations (the real answer is by vibrations). Second round: how fast sound travels, choosing between 435 km/hr, 300 km/second, and 1,200 km/hr (the real answer is about 1,200 km/hr). After each tap, warmly state the real answer regardless of which option was chosen — the interesting fact is the point, not whether the guess was right.
 
 ---
 
-# Step 19 — Sound trivia 1 answer
+# Step 19 — Sound trivia 2
 
-State that sound is created by vibrations that travel as waves, and that sound travels through air at about 1,200 km/hr. Do not ask a question; the slide advances automatically.
-
----
-
-# Step 20 — Sound trivia 2
-
-Ask what it is called when sound bounces off an object, offering the options Echo, Reflection, or Vibration. Then ask in which place you could NOT hear sound, offering the options Outside in open air, In Space, or Underwater. Any genuine attempt may proceed to the answer slide.
+Same guessing format as the previous step, this time about echoes and silence. First round: what it is called when sound bounces off an object, choosing between Echo, Reflection, and Vibration (the real answer is echo). Second round: in which of these places you could not hear sound at all, choosing between Outside in open air, In space, and Underwater (the real answer is space, because a vacuum has no air for sound waves to travel through). After each tap, warmly state the real answer regardless of which option was chosen.
 
 ---
 
-# Step 21 — Sound trivia 2 answer
-
-State that sound bouncing off an object is called an echo, and that you could not hear sound in space because a vacuum has no air for sound waves to travel through. Do not ask a question; the slide advances automatically.
-
----
-
-# Step 22 — Name that tune introduction
+# Step 20 — Name that tune introduction
 
 Introduce the next section of the trivia, “Name that Tune”, where we try to name songs from different eras. Explain that clips from four eras will play — the 1950s, the 1960s, Motown of the 1960s and 1970s, and classical music — and that it is fine to guess or say “I’m not sure.”
 
 ---
 
-# Step 23 — Name that tune 1950s
+# Step 21 — Name that tune 1950s
 
 The clip is "Jailhouse Rock" by Elvis Presley. Ask if the participant can name the song or the artist. Judge their guess by how it sounds said aloud, not how it is spelled: misspellings, mishearings, phonetic attempts, part of the title or artist, or a well-known lyric all count as recognising it, because this is usually speech-to-text input. If they got it, affirm it plainly and react to what they said; if not, stay warm and encouraging without correcting or quizzing them; if they are unsure, reassure them. Then state the answer once. The app moves to the next clip after.
 
 ---
 
-# Step 24 — Name that tune 1960s
+# Step 22 — Name that tune 1960s
 
 The clip is "Sympathy for the Devil" by The Rolling Stones (the line "pleased to meet you" is from this song). Judge the guess by sound, as in the previous step, allowing mishearings and lyric fragments. Affirm a good guess plainly, stay encouraging otherwise, reassure if unsure, then state the answer once. The app moves to the next clip after.
 
 ---
 
-# Step 25 — Name that tune Motown 1960s and 70s
+# Step 23 — Name that tune Motown 1960s and 70s
 
 The clip is "Superstition" by Stevie Wonder (a mishearing like "super sticious" still counts). Judge the guess by sound, allowing misspellings and mishearings. Affirm a good guess plainly, stay encouraging otherwise, reassure if unsure, then state the answer once. The app moves to the next clip after.
 
 ---
 
-# Step 26 — Name that tune classical music
+# Step 24 — Name that tune classical music
 
 The clip is "Für Elise" by Beethoven (rough spellings like "bake hoven" or "for elise" still count). Judge the guess by sound. Affirm a good guess plainly, stay encouraging otherwise, reassure if unsure, then state the answer once. The app moves to the modern-music discussion after.
 
 ---
 
-# Step 27 — Modern music opinion
+# Step 25 — Modern music opinion
 
 Play the modern audio clip. Ask the participant for their opinion of the artist or song. This is a discussion prompt, not a naming question. Respond warmly to whatever they share.
 
 ---
 
-# Step 28 — Sound words (onomatopoeia)
+# Step 26 — Sound words (onomatopoeia)
 
 Introduce the idea of “sound words” (onomatopoeia), which are words like boom or crash. Invite the participant to help build a list of sound words, one letter at a time from A onward. Accept any genuine word for a letter and offer a gentle example if they are stuck, without pressure.
 
 ---
 
-# Step 29 — Question wheel
+# Step 27 — Question wheel
 
 Invite the participant to press spin the wheel, then ask the question it lands on. Accept whatever they share and offer one gentle follow-up about a memory, preference, reason, person, or place before moving on.
 
 ---
 
-# Step 30 — Theme song and summary
+# Step 28 — Theme song and summary
 
 Play the saved theme song, then give a high-level second-person summary of today without copying participant wording. Ask what they would like to remember.
 
 ---
 
-# Step 31 — Closing
+# Step 29 — Closing
 
 Thank the participant and say the next session will explore Food.

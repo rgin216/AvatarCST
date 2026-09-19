@@ -107,6 +107,7 @@ const TEST_SESSIONS = [
     const n = i + 9;
     if (n === 10) return { id: "cst_categorizing_objects", label: "Session 10", title: "Categorizing Objects", theme: "Categorizing Objects", icon: "🧩" };
     if (n === 11) return { id: "cst_orientation", label: "Session 11", title: "Orientation", theme: "Orientation", icon: "🧭" };
+    if (n === 12) return { id: "cst_using_money", label: "Session 12", title: "Using Money", theme: "Using Money", icon: "💰" };
     return {
       id: `placeholder_session_${n}`,
       label: `Session ${n}`,
