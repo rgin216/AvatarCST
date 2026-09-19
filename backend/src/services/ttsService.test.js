@@ -81,3 +81,22 @@ test('legacy OpenAI TTS models omit instructions while mini TTS retains delivery
     assert.equal(body.speed, 1);
   }
 });
+
+test('both speech providers receive pronunciation overrides without changing source text', async (t) => {
+  const original = 'Tāmaki Makaurau, and Makaurau again.';
+  const expected = 'Tāmaki Mah-koh-roh, and Mah-koh-roh again.';
+  const priorKey = process.env.OPENAI_API_KEY;
+  process.env.OPENAI_API_KEY = 'test-key';
+  t.after(() => { if (priorKey === undefined) delete process.env.OPENAI_API_KEY; else process.env.OPENAI_API_KEY = priorKey; });
+  t.mock.method(globalThis, 'fetch', async (url, request) => {
+    assert.equal(JSON.parse(request.body).input, expected);
+    return new Response(new Uint8Array([1, 2, 3]));
+  });
+  t.mock.method(MsEdgeTTS.prototype, 'setMetadata', async () => {});
+  t.mock.method(MsEdgeTTS.prototype, 'toStream', function(text) {
+    assert.equal(text, expected);
+    return {audioStream:Readable.from([Buffer.from('audio')])};
+  });
+  for (const provider of ['openai','edge']) await pipeSpeechStream(original, sink(), {provider});
+  assert.equal(original, 'Tāmaki Makaurau, and Makaurau again.');
+});

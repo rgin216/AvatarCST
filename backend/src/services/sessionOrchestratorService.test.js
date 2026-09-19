@@ -388,17 +388,17 @@ test('keeps Session 3 Olympic trivia answers precise and current through Paris 2
 
   assert.equal(
     renderScriptReply(nextOlympicsQuestion, {}),
-    'When is the next Summer Olympics, and who is hosting the next Summer Olympics?'
+    'When is the next Summer Olympics, and who is hosting the next Summer Olympics? A. 2028 New Zealand. B. 2028 Los Angeles. C. 2029 London. D. 2029 Sweden. You can say the letter or the answer.'
   );
   assert.match(renderScriptReply(nextOlympicsAnswer, {}), /Los Angeles in 2028/i);
   assert.equal(
     renderScriptReply(uniformQuestion, {}),
-    "What colour has traditionally formed the base of New Zealand's Olympic sporting uniform?"
+    "What colour has traditionally formed the base of New Zealand's Olympic sporting uniform? A. Black. B. Blue. C. White. D. Red. You can say the letter or the answer."
   );
   assert.match(renderScriptReply(uniformAnswer, {}), /answer is black/i);
   assert.equal(
     renderScriptReply(firstGoldQuestion, {}),
-    'Who was the first New Zealander to win an individual Olympic gold medal?'
+    'Who was the first New Zealander to win an individual Olympic gold medal? A. Valerie Adams. B. Lisa Carrington. C. Ted Morgan. D. Hamish Bond. You can say the letter or the answer.'
   );
   assert.match(renderScriptReply(firstGoldAnswer, {}), /Ted Morgan.*welterweight boxing.*1928/i);
   assert.match(renderScriptReply(runnerQuestion, {}), /800 metres in 1960/i);
@@ -2077,4 +2077,37 @@ test('rejects a duplicate meal-builder submission once the plate has already bee
     }),
     (error) => error.status === 409
   );
+});
+
+
+test('Session 3 accepts each displayed option by letter or text', () => {
+  const cases = [
+    [21, ['2028 New Zealand', '2028 Los Angeles', '2029 London', '2029 Sweden'], 1],
+    [23, ['Black', 'Blue', 'White', 'Red'], 0],
+    [25, ['Valerie Adams', 'Lisa Carrington', 'Ted Morgan', 'Hamish Bond'], 2],
+    [27, ['Peter Snell', 'Lisa Carrington'], 0],
+    [29, ['Rugby', 'Football', 'Badminton', 'Rowing'], 3],
+    [31, ['Two', 'Three', 'Four'], 1],
+  ];
+  for (const [index, options, correct] of cases) {
+    const step = getScriptStep('cst_physical_games', index).step;
+    for (const [i, option] of options.entries()) {
+      const letter = 'ABCD'[i];
+      for (const content of [letter, letter.toLowerCase(), letter + '.', 'option ' + letter, 'I think ' + letter, 'I will go with ' + letter, option, 'I think ' + option]) {
+        assert.equal(evaluateTriviaAnswer({ step, content }).outcome, i === correct ? 'correct' : 'incorrect', step.id + ': ' + content);
+      }
+      assert.ok(renderScriptReply(step, {}).includes(letter + '. ' + option));
+    }
+  }
+});
+
+test('letter matching handles speech spellings without matching articles or unavailable choices', () => {
+  const outcome = (index, content) => evaluateTriviaAnswer({ step: getScriptStep('cst_physical_games', index).step, content }).outcome;
+  assert.equal(outcome(21, 'bee'), 'correct');
+  assert.equal(outcome(25, 'see'), 'correct');
+  assert.equal(outcome(29, 'dee'), 'correct');
+  assert.equal(outcome(23, 'a blue uniform'), 'incorrect');
+  assert.equal(outcome(27, 'D'), 'incorrect');
+  assert.equal(outcome(31, 'D'), 'incorrect');
+  assert.equal(outcome(23, 'A or B'), 'incorrect');
 });

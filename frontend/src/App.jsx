@@ -105,7 +105,8 @@ const TEST_SESSIONS = [
   },
   ...Array.from({ length: 7 }, (_, i) => {
     const n = i + 9;
-    if (n === 10) return { id: "cst_categorizing_objects", label: "Session 10", title: "Categorizing Objects", theme: "Categorizing Objects" };
+    if (n === 10) return { id: "cst_categorizing_objects", label: "Session 10", title: "Categorizing Objects", theme: "Categorizing Objects", icon: "🧩" };
+    if (n === 11) return { id: "cst_orientation", label: "Session 11", title: "Orientation", theme: "Orientation", icon: "🧭" };
     return {
       id: `placeholder_session_${n}`,
       label: `Session ${n}`,

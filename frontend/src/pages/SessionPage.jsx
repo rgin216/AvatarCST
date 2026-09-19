@@ -5,6 +5,7 @@ import PhraseCardsActivity from "../components/PhraseCardsActivity.jsx";
 import { useEffect, useRef, useState } from "react";
 import AvatarViewer from "../components/avatar/AvatarViewer";
 import api from "../services/api.js";
+import OrientationActivity from "../components/OrientationActivity.jsx";
 import SessionInputBar from "../components/SessionInputBar.jsx";
 import {
   createEmptyLipSyncFrame,
@@ -320,6 +321,7 @@ export default function SessionPage({
   );
   const objectInteraction = slide.interaction?.type === "objectSelection";
   const matchingInteraction = slide.interaction?.type === "matching" ? slide.interaction : null;
+  const orientationInteraction = ["choiceQuestion", "focusedQuestion"].includes(slide.interaction?.type) ? slide.interaction : null;
   const mealBuilderInteraction = slide.interaction?.type === "mealBuilder" ? slide.interaction : null;
   const phraseCardsInteraction = slide.interaction?.type === "phraseCards" ? slide.interaction : null;
   // namingSlots state can briefly still belong to the previous phraseCards
@@ -328,7 +330,7 @@ export default function SessionPage({
   const namingSlotsForSlide = namingSlots?.stepId === slide.id ? namingSlots : null;
   const realOrAiInteraction = slide.interaction?.type === "realOrAi";
   const hasSlideInteraction =
-    hasWheelInteraction ||
+    Boolean(orientationInteraction) || hasWheelInteraction ||
     Boolean(exerciseVideo) ||
     hasPositiveNewsInteraction ||
     Boolean(musicInteraction) ||
@@ -493,11 +495,13 @@ export default function SessionPage({
       : null;
     const displayedSlide = deferredTransition?.from || slideData;
     commitSlide(displayedSlide);
-    // Applied immediately even when deferred, so state like a naming-slots
-    // reveal shows on the still-displayed (old) slide right away instead of
-    // waiting for the slide to flip over - it's re-applied for the new slide
-    // in commitPendingSlideTransition once the deferred transition commits.
-    applyInteractionState(turn, displayedSlide);
+    // The outgoing slide keeps its own song/news/media state until the
+    // acknowledgement ends. Only a reveal belonging to that slide updates now.
+    if (deferredTransition) {
+      if (turn.namingSlots?.stepId === displayedSlide.id) setNamingSlots(turn.namingSlots);
+    } else {
+      applyInteractionState(turn, displayedSlide);
+    }
     const audioSegments = Array.isArray(turn.avatar?.audio?.segments)
       ? turn.avatar.audio.segments.filter((segment) => segment?.url)
       : turn.avatar?.audio?.url
@@ -1573,6 +1577,7 @@ export default function SessionPage({
               {slide.deckSlide ? ` / Deck slide ${slide.deckSlide}` : ""}
             </div>
           )}
+          {orientationInteraction && <OrientationActivity key={slide.id || slide.index} interaction={orientationInteraction} title={slide.title} disabled={sessionInputDisabled || isRecording} onActivity={registerUserActivity} onComplete={sendMessage} />}
           {hasActivityRevealInteraction && (
             <div className="slide-activity-overlay">
               <header className="slide-activity-heading">

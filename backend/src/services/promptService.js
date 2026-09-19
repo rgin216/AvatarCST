@@ -18,6 +18,9 @@ const BASE_INSTRUCTIONS = readFileSync(
 //   3. The fallback is cst_intro_reminiscence if no match is found
 const SESSION_SCRIPTS = {
   cst_categorizing_objects: readFileSync(join(CONTEXT_ROOT, 'vCST_Session10_AI_Script.md'), 'utf8').split(/\r?\n---\r?\n/).map(s => s.trim()).filter(Boolean),
+  cst_orientation: readFileSync(
+    join(CONTEXT_ROOT, 'vCST_Session11_AI_Script.md'), 'utf8'
+  ).split(/\r?\n---\r?\n/).map((s) => s.trim()).filter(Boolean),
   cst_faces_scenes: readFileSync(
     join(CONTEXT_ROOT, 'vCST_Session7_AI_Script.md'), 'utf8'
   ).split(/\r?\n---\r?\n/).map((s) => s.trim()).filter(Boolean),

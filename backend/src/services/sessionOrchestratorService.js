@@ -1,6 +1,8 @@
 import { evaluateCategorizingTurn } from './categorizingObjectsService.js';
 import { personalizeCategorizingReply } from './categorizingAcknowledgementService.js';
 import { answerNewsQuestion, newsContext } from './newsConversationService.js';
+import { orientationPracticeContext } from './orientationContext.js';
+import { recallChildhoodPlace } from './childhoodRecallService.js';
 import { parseMatchingAnswer } from './matchingService.js';
 import Message from '../models/Message.js';
 import Session from '../models/Session.js';
@@ -651,32 +653,38 @@ export const evaluateOrientationAnswer = ({ step, content, retryCount }) => {
 
 const SCRIPTED_TRIVIA_RULES = {
   physical_games_trivia_next_olympics: {
+    choices: ['2028 New Zealand', '2028 Los Angeles', '2029 London', '2029 Sweden'],
     isCorrect: (answer) =>
       /\b2028\b/.test(answer) && /\b(?:los angeles|l a)\b/.test(answer),
     correctResponse: 'Exactly — you got both the year and host city right.',
     incorrectResponse: 'Good try. One or both parts are not quite right.',
   },
   physical_games_trivia_uniform: {
+    choices: ['Black', 'Blue', 'White', 'Red'],
     isCorrect: (answer) => /\bblack\b/.test(answer),
     correctResponse: 'That is right — you chose the correct colour.',
     incorrectResponse: 'Not quite, but that was a good guess.',
   },
   physical_games_trivia_first_gold: {
+    choices: ['Valerie Adams', 'Lisa Carrington', 'Ted Morgan', 'Hamish Bond'],
     isCorrect: (answer) => /\b(?:ted morgan|morgan)\b/.test(answer),
     correctResponse: 'Spot on — you named the right Olympian.',
     incorrectResponse: 'That is not the Olympian we are looking for, but good try.',
   },
   physical_games_trivia_runner: {
+    choices: ['Peter Snell', 'Lisa Carrington'],
     isCorrect: (answer) => /\b(?:peter snell|snell)\b/.test(answer),
     correctResponse: 'Correct — you identified the runner.',
     incorrectResponse: 'That is not quite right, but it was worth a try.',
   },
   physical_games_trivia_most_gold: {
+    choices: ['Rugby', 'Football', 'Badminton', 'Rowing'],
     isCorrect: (answer) => /\browing\b/.test(answer),
     correctResponse: 'You have got it — that is the right sport.',
     incorrectResponse: 'Close, but that is not the sport in the answer.',
   },
   physical_games_trivia_carrington: {
+    choices: ['Two', 'Three', 'Four'],
     isCorrect: (answer) => /\b(?:3|three)\b/.test(answer),
     correctResponse: 'Well done — that number is correct.',
     incorrectResponse: 'That number is not quite right, but good guess.',
@@ -693,21 +701,73 @@ const SCRIPTED_TRIVIA_RULES = {
   },
 };
 
-const isScriptedTriviaQuestion = (step) => Boolean(SCRIPTED_TRIVIA_RULES[step?.id]);
+const getTriviaRule = (step) => {
+  if (!step?.trivia) return SCRIPTED_TRIVIA_RULES[step?.id];
+  const { choices, answer, aliases } = step.trivia;
+  return {
+    choices,
+    isCorrect: (content) => aliases.some((alias) => (` ${content} `).includes(` ${normalizeAnswer(alias.normalize('NFD').replace(/[\u0300-\u036f]/g, ''))} `)),
+    correctResponse: `Yes, that is right — ${answer}.`,
+    incorrectResponse: `Thank you for having a go. The answer is ${answer}.`,
+    unsureResponse: `That is okay. The answer is ${answer}.`,
+  };
+};
 
-export const evaluateTriviaAnswer = ({ step, content }) => {
-  const rule = SCRIPTED_TRIVIA_RULES[step?.id];
+const isScriptedTriviaQuestion = (step) => Boolean(getTriviaRule(step));
+
+// Only expand complete letter selections: the article "a" in a sentence must
+// not become option A.
+const expandTriviaChoices = (content, choices) => {
+  if (!choices) return content;
+  const answer = normalizeAnswer(content);
+  const selection = answer.match(/^(?:(?:i think|i choose|i pick|i will go with|i ll go with|it is|it s|the answer is)\s+)?(?:(?:option|letter|answer)\s+)?([abcd]|ay|bee|be|see|sea|dee)(?:\s+please)?$/);
+  if (!selection) return content;
+  const letters = { ay: 'a', bee: 'b', be: 'b', see: 'c', sea: 'c', dee: 'd' };
+  const letter = letters[selection[1]] || selection[1];
+  return choices[letter.charCodeAt(0) - 97] || content;
+};
+
+export const evaluateTriviaAnswer = ({ step, content, answers = [] }) => {
+  const rule = getTriviaRule(step);
   if (!rule || !content) return null;
+
+  if (step?.id?.startsWith('orientation_landmark_')) {
+    const previous = answers.filter(item => item.stepId.startsWith('orientation_landmark_'));
+    let streak = 0;
+    for (const item of [...previous].reverse()) {
+      const index = getScriptStepIndex('cst_orientation', item.stepId);
+      if (index < 0 || evaluateTriviaAnswer({ step: getScriptStep('cst_orientation', index).step, content: item.answer })?.outcome !== 'correct') break;
+      streak += 1;
+    }
+    const answer = step.trivia.answer;
+    const variant = previous.length;
+    const praise = ['Well done!', 'You have got it!', 'Exactly right!', 'Lovely work!', 'That is correct!'];
+    const encouragement = streak === 1 ? ' Two in a row — you are on a roll!' : streak === 3 ? ' Four in a row — well done!' : '';
+    rule.correctResponse = `${praise[variant % praise.length]} ${answer}.${encouragement}`;
+    rule.incorrectResponse = [
+      `Good effort. This one is ${answer}. Let us try the next one.`,
+      `Thank you for giving it a go. The answer is ${answer}.`,
+      `This time it is ${answer}. There is no rush — take your time.`,
+      `The answer is ${answer}. It is all right to miss a few; we are just exploring together.`,
+    ][variant % 4];
+    rule.unsureResponse = [
+      `That is all right. This one is ${answer}.`,
+      `No problem at all. The answer is ${answer}. Let us keep exploring.`,
+      `We can discover it together — it is ${answer}.`,
+    ][variant % 3];
+  }
 
   if (isDontKnowAnswer(content)) {
     return {
       answered: true,
-      response: 'No problem. Let us reveal the answer.',
+      response: rule.unsureResponse || 'No problem. Let us reveal the answer.',
       outcome: 'unsure',
     };
   }
 
-  const correct = rule.isCorrect(normalizeAnswer(content));
+  const expanded = expandTriviaChoices(content, rule.choices);
+  const answer = step.trivia ? expanded.normalize('NFD').replace(/[\u0300-\u036f]/g, '') : expanded;
+  const correct = rule.isCorrect(normalizeAnswer(answer));
   return {
     answered: true,
     response: correct ? rule.correctResponse : rule.incorrectResponse,
@@ -1766,7 +1826,19 @@ export const buildTopicSessionSummary = (answers = [], { themeSong = null } = {}
   if (meaningful.some((item) => item.stepId === 'word_associations_spin_question')) {
     addTopic('reflecting on a question from the wheel');
   }
-  const wheelAnswer = meaningful.find((item) => ['current_affairs_spin_question', 'faces_scenes_spin_question', 'categorizing_objects_spin_question'].includes(item.stepId));
+  if (meaningful.some((item) => item.stepId?.startsWith('orientation_landmark_'))) {
+    addTopic('exploring New Zealand landmarks');
+  }
+  if (meaningful.some((item) => item.stepId === 'orientation_favourite_place' || item.stepId?.startsWith('orientation_sensory_'))) {
+    addTopic('imagining a favourite place through your senses');
+  }
+  if (meaningful.some((item) => item.stepId?.startsWith('orientation_neighbour_'))) {
+    addTopic('remembering your neighbourhood');
+  }
+  if (meaningful.some((item) => ['orientation_grew_up', 'orientation_australia', 'orientation_pacific', 'orientation_europe', 'orientation_orienteering'].includes(item.stepId))) {
+    addTopic('talking about maps and familiar places');
+  }
+  const wheelAnswer = meaningful.find((item) => ['current_affairs_spin_question', 'faces_scenes_spin_question', 'categorizing_objects_spin_question', 'orientation_spin_question'].includes(item.stepId));
   let wheelTopic = '';
   if (wheelAnswer) {
     const wheelText = `${wheelAnswer.answer || ''} ${wheelAnswer.adaptiveFollowUp?.answer || ''}`;
@@ -2449,6 +2521,8 @@ const getSessionInactivityReminderWrite = async (sessionId, expectedActivityRevi
     const scriptContext = {
       categorizing: session.interactionState?.categorizing || {},
       name: getDisplayName(user),
+      orientationPractice: session.interactionState?.orientationPractice,
+      rememberedChildhoodPlace: session.interactionState?.orientationPractice?.rememberedChildhoodPlace,
       wheelQuestion: session.interactionState?.questionWheel?.question,
       mealChoice: session.interactionState?.mealBuilder?.labels?.join(', '),
       currentAffairs,
@@ -2793,7 +2867,23 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
       })
     : null;
   let themeSong = getThemeSongForSession(session, user);
+  const orientationPractice = orientationPracticeContext(
+    session.interactionState?.orientationPractice,
+    step,
+    effectiveTurnIndex > 0 ? userContent : '',
+  );
+  if ([step, nextStep].some(candidate => candidate?.id === 'orientation_grew_up') &&
+      !Object.hasOwn(orientationPractice, 'rememberedChildhoodPlace')) {
+    try {
+      orientationPractice.rememberedChildhoodPlace = await recallChildhoodPlace({ userId: session.userId, sessionId: session._id, memoryEntries });
+    } catch {
+      // A failed memory lookup must never prevent the participant continuing.
+      orientationPractice.rememberedChildhoodPlace = null;
+    }
+  }
   const scriptContext = {
+    orientationPractice,
+    rememberedChildhoodPlace: orientationPractice.rememberedChildhoodPlace,
     categorizing: categorizingTurn?.state || session.interactionState?.categorizing || {},
     previousAnswer: userContent,
     recentMessages,
@@ -2803,6 +2893,13 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
     currentAffairs,
     themeSong,
   };
+  for (const [candidate, candidateSlide] of [[step, slide], [nextStep, nextSlide]]) {
+    if (!candidate?.contextualQuestion || !candidateSlide) continue;
+    candidateSlide.prompt = candidate.contextualQuestion(scriptContext);
+    if (candidateSlide.interaction?.type === 'focusedQuestion') {
+      candidateSlide.interaction = { ...candidateSlide.interaction, question: candidateSlide.prompt };
+    }
+  }
   const hasUserContent = Boolean(userContent);
   const hasDeliveredQuestion = effectiveTurnIndex > 0;
   const expectedQuestion =
@@ -2910,6 +3007,7 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
       : null) || emotionalSupportTurn || categorizingTurn || orientationTurn || (matchingAnswer ? { answered: true, response: matchingAnswer.response } : null) || evaluateTriviaAnswer({
       step,
       content: userContent,
+      answers: storedAnswers,
     }) || evaluateMusicCompletionAnswer({
       step,
       content: userContent,
@@ -3405,6 +3503,7 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
   const nextInteractionState = {
     ...(session.interactionState || {}),
     sessionAnswers,
+    ...(session.scriptId === 'cst_orientation' ? { orientationPractice } : {}),
     ...(categorizingTurn && !emotionalSupportTurn ? { categorizing: categorizingTurn.state } : {}),
   };
   if (themeSong) {
