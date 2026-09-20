@@ -588,6 +588,15 @@ test('matches a free-text/spoken trivia guess to the right round, like naming sl
   assert.equal(outOfOrder.find((entry) => entry.roundIndex === 0)?.option.id, 'a');
   assert.equal(outOfOrder.find((entry) => entry.roundIndex === 1)?.option.id, 'c');
 
+  // "<number> thousand" is a common way to say a round dollar figure aloud,
+  // both as a dictated digit ("40 thousand") and fully spelled out.
+  const digitThousand = matchTriviaChoiceRounds('40 thousand', incomeStep, []);
+  assert.equal(digitThousand.length, 1);
+  assert.equal(digitThousand[0].option.id, 'b');
+  const wordThousand = matchTriviaChoiceRounds('forty thousand', incomeStep, []);
+  assert.equal(wordThousand.length, 1);
+  assert.equal(wordThousand[0].option.id, 'b');
+
   // Already-answered rounds are skipped even if mentioned again.
   const onlySecond = matchTriviaChoiceRounds('120000 now', incomeStep, [0]);
   assert.equal(onlySecond.length, 1);

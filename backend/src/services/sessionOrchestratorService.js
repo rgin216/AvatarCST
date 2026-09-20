@@ -780,11 +780,35 @@ export const isTriviaChoiceStep = (step) => step?.interaction?.type === 'triviaC
 const normalizeGuessText = (text = '') =>
   String(text).toLowerCase().replace(/[$,]/g, '').replace(/\bdollars?\b/g, '').trim();
 
+const SMALL_NUMBER_WORDS = {
+  one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9,
+  ten: 10, eleven: 11, twelve: 12, thirteen: 13, fourteen: 14, fifteen: 15,
+  sixteen: 16, seventeen: 17, eighteen: 18, nineteen: 19,
+  twenty: 20, thirty: 30, forty: 40, fifty: 50, sixty: 60, seventy: 70, eighty: 80, ninety: 90,
+};
+
+// Expands "<number> thousand" into plain digits before the digit regex below
+// runs, so both a dictated "40 thousand" and a fully spelled-out "forty
+// thousand" resolve the same as "40000" would. Does not handle "hundred"
+// (e.g. "one hundred and twenty thousand"), since speech-to-text almost always
+// renders those as digits already.
+const expandThousands = (text) =>
+  text
+    .replace(/\b([a-z]+)([\s-]([a-z]+))?\s+thousand\b/g, (match, word, _sep, secondWord) => {
+      const value = SMALL_NUMBER_WORDS[word];
+      if (value === undefined) return match;
+      const tens = secondWord ? SMALL_NUMBER_WORDS[secondWord] : 0;
+      return String((value + (tens || 0)) * 1000);
+    })
+    .replace(/\b(\d+(?:\.\d+)?)\s*(?:k|thousand)\b/g, (match, digits) => String(parseFloat(digits) * 1000));
+
 // Extracts number-like mentions in the order they appear, e.g. "30 cents" -> 0.3,
-// "$105" -> 105. Good enough for digit-based speech-to-text output; does not
-// attempt to parse spelled-out numbers ("thirty thousand").
+// "$105" -> 105, "40 thousand" / "forty thousand" -> 40000. Good enough for
+// digit-based speech-to-text output plus the "<number> thousand" phrasing
+// people commonly use for round dollar figures; does not attempt fuller
+// spelled-out numbers ("one hundred and twenty thousand").
 const numericGuessesFromText = (text) => {
-  const normalized = normalizeGuessText(text);
+  const normalized = expandThousands(normalizeGuessText(text));
   const guesses = [];
   const regex = /(\d+(?:\.\d+)?)\s*(cents?)?/g;
   let match;
@@ -802,6 +826,14 @@ const optionNumericValue = (label = '') => {
   if (centsMatch) return parseFloat(centsMatch[1]) / 100;
   const value = parseFloat(normalized.replace(/[^\d.]/g, ''));
   return Number.isNaN(value) ? null : value;
+};
+
+// A sub-dollar button label like "$0.30" quoted straight into an LLM prompt
+// has produced garbled speech text (e.g. "$0. 30") - rephrasing it as "30
+// cents" avoids that without touching what is actually shown on the button.
+const spokenAmountLabel = (label = '') => {
+  const match = label.trim().match(/^\$0\.(\d\d)$/);
+  return match ? `${parseInt(match[1], 10)} cents` : label;
 };
 
 const STOPWORDS = new Set(['by', 'in', 'our', 'the', 'a', 'an', 'of', 'at', 'on', 'is', 'it']);
@@ -3350,7 +3382,7 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
     const resolvedForPrompt = triviaChoiceNewlyResolved.map((entry) => ({
       question: entry.round.question,
       fact: entry.round.fact,
-      guessedLabel: entry.option.label,
+      guessedLabel: spokenAmountLabel(entry.option.label),
       isCorrect: entry.option.id === entry.round.correctOptionId,
     }));
     const fallbackFacts = resolvedForPrompt.map((entry) => entry.fact).filter(Boolean).join(' ');
@@ -3627,7 +3659,9 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
     !triviaChoiceComplete &&
     !shouldForceProgress &&
     triviaChoiceMissingRounds.length > 0
-      ? triviaChoiceMissingRounds[0].question || 'What about the other one?'
+      ? triviaChoiceNewlyResolved.length === 0
+        ? `I did not catch one of the options there - it is ${triviaChoiceMissingRounds[0].options.map((option) => option.label).join(', ')}. ${triviaChoiceMissingRounds[0].question || ''}`.trim()
+        : triviaChoiceMissingRounds[0].question || 'What about the other one?'
       : '';
   const scriptedNextLine = categorizingTurn && !categorizingTurn.complete && !emotionalSupportTurn
     ? categorizingTurn.prompt
@@ -3678,7 +3712,8 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
     !isQuestionWheelEvent &&
     !isActivityInteractionEvent &&
     !hasAutoAdvanceProtocol &&
-    !nextSlideProvidesResponse
+    !nextSlideProvidesResponse &&
+    !triviaChoiceStep
   ) {
     promptedMemoryEntries = selectedMemoryEntries;
     const systemPrompt = buildCstAdaptiveResponseInstructions({
