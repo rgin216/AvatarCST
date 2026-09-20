@@ -68,8 +68,8 @@ export default function TriviaChoiceActivity({
             const isCorrectGuess = answered && selectedId === round.correctOptionId;
 
             return (
-              <div className="trivia-choice-round" key={roundIndex}>
-                {round.question && <p className="trivia-choice-question">{round.question}</p>}
+              <fieldset className="trivia-choice-round" key={roundIndex}>
+                {round.question && <legend className="trivia-choice-question">{round.question}</legend>}
                 <div className="trivia-choice-options">
                   {(round.options || []).map((option) => {
                     const isSelected = option.id === selectedId;
@@ -92,17 +92,19 @@ export default function TriviaChoiceActivity({
                   })}
                 </div>
                 {answered && (
-                  <p className={"trivia-choice-result" + (isCorrectGuess ? " is-correct" : " is-incorrect")}>
-                    <span className="trivia-choice-result-icon" aria-hidden="true">
-                      {isCorrectGuess ? "✓" : "✕"}
-                    </span>
-                    {isCorrectGuess
-                      ? "Correct!"
-                      : `You guessed ${(round.options || []).find((o) => o.id === selectedId)?.label ?? selectedId}.`}
-                  </p>
+                  <div role="status">
+                    <p className={"trivia-choice-result" + (isCorrectGuess ? " is-correct" : " is-incorrect")}>
+                      <span className="trivia-choice-result-icon" aria-hidden="true">
+                        {isCorrectGuess ? "✓" : "✕"}
+                      </span>
+                      {isCorrectGuess
+                        ? "Correct!"
+                        : `You guessed ${(round.options || []).find((o) => o.id === selectedId)?.label ?? selectedId}.`}
+                    </p>
+                    {round.fact && <p className="trivia-choice-fact">{round.fact}</p>}
+                  </div>
                 )}
-                {answered && round.fact && <p className="trivia-choice-fact">{round.fact}</p>}
-              </div>
+              </fieldset>
             );
           })}
         </div>

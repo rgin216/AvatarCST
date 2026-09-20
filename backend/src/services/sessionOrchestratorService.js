@@ -888,8 +888,11 @@ export const matchTriviaChoiceRounds = (content, step, answeredRoundIndices = []
     const options = round.options || [];
 
     if (!isNumericRound(round)) {
-      const match = options.find((option) => labelMatchesContent(option.label, normalizedContent));
-      if (match) resolved.push({ roundIndex, round, option: match });
+      // Only resolve when exactly one option's keywords appear in the message -
+      // if the phrasing could plausibly match more than one, leave it
+      // unresolved rather than guessing which one was meant.
+      const matches = options.filter((option) => labelMatchesContent(option.label, normalizedContent));
+      if (matches.length === 1) resolved.push({ roundIndex, round, option: matches[0] });
     }
   });
 
