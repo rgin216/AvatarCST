@@ -21,6 +21,7 @@ import {
   buildCstFoodPhraseGuessInstructions,
   buildCstInstrumentGuessInstructions,
   buildCstNameThatTuneInstructions,
+  buildCstTriviaChoiceInstructions,
   buildCstOpenBlankAcknowledgementInstructions,
 } from './promptService.js';
 import { generateResponse } from './llmService.js';
@@ -689,16 +690,6 @@ const SCRIPTED_TRIVIA_RULES = {
     correctResponse: 'Well done — that number is correct.',
     incorrectResponse: 'That number is not quite right, but good guess.',
   },
-  sounds_trivia_1: {
-    isCorrect: (answer) => /vibrat/.test(answer) && /1[ ,.]?200/.test(answer),
-    correctResponse: 'That is right on both counts — vibrations, and about 1,200 kilometres per hour.',
-    incorrectResponse: 'Good try. One or both parts are not quite right.',
-  },
-  sounds_trivia_2: {
-    isCorrect: (answer) => /\becho\b/.test(answer) && /\bspace\b/.test(answer),
-    correctResponse: 'Exactly — an echo, and space is the place with no sound.',
-    incorrectResponse: 'Good try. One or both parts are not quite right.',
-  },
 };
 
 const getTriviaRule = (step) => {
@@ -773,6 +764,177 @@ export const evaluateTriviaAnswer = ({ step, content, answers = [] }) => {
     response: correct ? rule.correctResponse : rule.incorrectResponse,
     outcome: correct ? 'correct' : 'incorrect',
   };
+};
+
+const isTriviaChoiceProtocol = (content = '') =>
+  /^\[\[trivia-choice:/i.test(content.trim());
+
+export const isTriviaChoiceStep = (step) => step?.interaction?.type === 'triviaChoice';
+
+// A tap-to-choose guessing game (e.g. Session 4's sound trivia, Session 12's price
+// guessing). Answered like namingSlots: each round can be resolved by a tap
+// (exact, via the protocol tag) or by free text/speech (fuzzy-matched below),
+// one round at a time or several from one message, re-prompting for whichever
+// round is still missing, and completing once every round has an answer.
+
+const normalizeGuessText = (text = '') =>
+  String(text).toLowerCase().replace(/[$,]/g, '').replace(/\bdollars?\b/g, '').trim();
+
+const SMALL_NUMBER_WORDS = {
+  one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9,
+  ten: 10, eleven: 11, twelve: 12, thirteen: 13, fourteen: 14, fifteen: 15,
+  sixteen: 16, seventeen: 17, eighteen: 18, nineteen: 19,
+  twenty: 20, thirty: 30, forty: 40, fifty: 50, sixty: 60, seventy: 70, eighty: 80, ninety: 90,
+};
+
+// Expands "<number> thousand" into plain digits before the digit regex below
+// runs, so both a dictated "40 thousand" and a fully spelled-out "forty
+// thousand" resolve the same as "40000" would. Does not handle "hundred"
+// (e.g. "one hundred and twenty thousand"), since speech-to-text almost always
+// renders those as digits already.
+const expandThousands = (text) =>
+  text
+    .replace(/\b([a-z]+)([\s-]([a-z]+))?\s+thousand\b/g, (match, word, _sep, secondWord) => {
+      const value = SMALL_NUMBER_WORDS[word];
+      if (value === undefined) return match;
+      const tens = secondWord ? SMALL_NUMBER_WORDS[secondWord] : 0;
+      return String((value + (tens || 0)) * 1000);
+    })
+    .replace(/\b(\d+(?:\.\d+)?)\s*(?:k|thousand)\b/g, (match, digits) => String(parseFloat(digits) * 1000));
+
+// Extracts number-like mentions in the order they appear, e.g. "30 cents" -> 0.3,
+// "$105" -> 105, "40 thousand" / "forty thousand" -> 40000. Good enough for
+// digit-based speech-to-text output plus the "<number> thousand" phrasing
+// people commonly use for round dollar figures; does not attempt fuller
+// spelled-out numbers ("one hundred and twenty thousand").
+const numericGuessesFromText = (text) => {
+  const normalized = expandThousands(normalizeGuessText(text));
+  const guesses = [];
+  const regex = /(\d+(?:\.\d+)?)\s*(cents?)?/g;
+  let match;
+  while ((match = regex.exec(normalized))) {
+    const value = parseFloat(match[1]);
+    if (Number.isNaN(value)) continue;
+    guesses.push(match[2] ? value / 100 : value);
+  }
+  return guesses;
+};
+
+const optionNumericValue = (label = '') => {
+  const normalized = normalizeGuessText(label);
+  const centsMatch = normalized.match(/(\d+(?:\.\d+)?)\s*cents?/);
+  if (centsMatch) return parseFloat(centsMatch[1]) / 100;
+  const value = parseFloat(normalized.replace(/[^\d.]/g, ''));
+  return Number.isNaN(value) ? null : value;
+};
+
+// A sub-dollar button label like "$0.30" quoted straight into an LLM prompt
+// has produced garbled speech text (e.g. "$0. 30") - rephrasing it as "30
+// cents" avoids that without touching what is actually shown on the button.
+const spokenAmountLabel = (label = '') => {
+  const match = label.trim().match(/^\$0\.(\d\d)$/);
+  return match ? `${parseInt(match[1], 10)} cents` : label;
+};
+
+const STOPWORDS = new Set(['by', 'in', 'our', 'the', 'a', 'an', 'of', 'at', 'on', 'is', 'it']);
+const stem = (word) => word.replace(/s$/, '');
+const labelKeywords = (label = '') =>
+  normalizeGuessText(label)
+    .split(/\s+/)
+    .filter((word) => word.length >= 3 && !STOPWORDS.has(word));
+const labelMatchesContent = (label, normalizedContent) =>
+  labelKeywords(label).some((word) => normalizedContent.includes(stem(word)));
+
+const isNumericRound = (round) =>
+  (round.options || []).every((option) => optionNumericValue(option.label) !== null);
+
+// Resolves as many still-unanswered rounds as it confidently can from one
+// message. Numeric rounds only match a mentioned number to a round that
+// actually lists that value (within a small tolerance for representation,
+// e.g. rounding) - not merely the closest one - and are matched against every
+// unresolved numeric round regardless of mention order, since a later round's
+// answer can be spoken before an earlier one's. Word-answer rounds (e.g. "By
+// Vibrations") match by keyword.
+export const matchTriviaChoiceRounds = (content, step, answeredRoundIndices = []) => {
+  if (!isTriviaChoiceStep(step) || !content) return [];
+  const rounds = step.interaction.rounds || [];
+  const normalizedContent = normalizeGuessText(content);
+  const numericGuesses = numericGuessesFromText(content);
+  const resolved = [];
+  const unresolvedNumericRounds = new Set(
+    rounds
+      .map((round, roundIndex) => roundIndex)
+      .filter((roundIndex) => !answeredRoundIndices.includes(roundIndex) && isNumericRound(rounds[roundIndex]))
+  );
+
+  for (const guess of numericGuesses) {
+    if (unresolvedNumericRounds.size === 0) break;
+    for (const roundIndex of unresolvedNumericRounds) {
+      const round = rounds[roundIndex];
+      const match = (round.options || []).find((option) => {
+        const value = optionNumericValue(option.label);
+        return value !== null && Math.abs(value - guess) <= Math.max(Math.abs(value), 1e-6) * 0.01;
+      });
+      if (match) {
+        resolved.push({ roundIndex, round, option: match });
+        unresolvedNumericRounds.delete(roundIndex);
+        break;
+      }
+    }
+  }
+
+  rounds.forEach((round, roundIndex) => {
+    if (answeredRoundIndices.includes(roundIndex) || resolved.some((entry) => entry.roundIndex === roundIndex)) return;
+    const options = round.options || [];
+
+    if (!isNumericRound(round)) {
+      // Only resolve when exactly one option's keywords appear in the message -
+      // if the phrasing could plausibly match more than one, leave it
+      // unresolved rather than guessing which one was meant.
+      const matches = options.filter((option) => labelMatchesContent(option.label, normalizedContent));
+      if (matches.length === 1) resolved.push({ roundIndex, round, option: matches[0] });
+    }
+  });
+
+  return resolved;
+};
+
+const triviaChoiceTranscript = (resolved) =>
+  `Guessed ${resolved.map((entry) => entry.option.label).join(', then ')}.`;
+
+// Exact match for a tap: `{"roundIndex":N,"optionId":"x"}`.
+export const parseTriviaChoiceEvent = (content = '', step = null) => {
+  const match = content.trim().match(/^\[\[trivia-choice:(.+)\]\]$/s);
+  if (!match || !isTriviaChoiceStep(step)) return null;
+
+  try {
+    const parsed = JSON.parse(match[1]);
+    const rounds = step.interaction.rounds || [];
+    const roundIndex = Number(parsed?.roundIndex);
+    if (!Number.isInteger(roundIndex) || roundIndex < 0 || roundIndex >= rounds.length) return null;
+    const round = rounds[roundIndex];
+    const option = (round.options || []).find((o) => String(o.id) === String(parsed?.optionId ?? ''));
+    if (!option) return null;
+
+    const resolved = [{ roundIndex, round, option }];
+    return { resolved, transcript: triviaChoiceTranscript(resolved) };
+  } catch {
+    return null;
+  }
+};
+
+// Marks the turn answered without supplying the spoken response - a dedicated
+// adaptive pass (mirroring Name That Tune) generates the actual acknowledgement
+// so it reacts naturally to a tapped choice or a free-text/spoken guess alike,
+// instead of repeating the same fixed fact sentence every time.
+// Always returns an object (never null) for a trivia-choice step, exactly like
+// the namingSlotStep branch below it - this short-circuits the deterministic
+// chain even when nothing new was resolved (e.g. "I'm not sure"), so the app
+// re-prompts for the missing round instead of falling through to the generic
+// adaptive LLM path, which has no idea this is a guessing game.
+export const evaluateTriviaChoiceAnswer = ({ step, resolvedCount = 0, complete = false }) => {
+  if (!isTriviaChoiceStep(step)) return null;
+  return { answered: resolvedCount > 0 || complete, response: '' };
 };
 
 // Name That Tune is a gentle guessing game, not a scored quiz. The guess turn is
@@ -1838,6 +2000,34 @@ export const buildTopicSessionSummary = (answers = [], { themeSong = null } = {}
   if (meaningful.some((item) => ['orientation_grew_up', 'orientation_australia', 'orientation_pacific', 'orientation_europe', 'orientation_orienteering'].includes(item.stepId))) {
     addTopic('talking about maps and familiar places');
   }
+  if (meaningful.some((item) => String(item.stepId || '').startsWith('money_trivia_'))) {
+    addTopic('guessing how prices have changed over the years');
+  }
+  if (meaningful.some((item) => item.stepId === 'money_world_currencies')) {
+    addTopic('comparing world currencies');
+  }
+  if (meaningful.some((item) => [
+    'money_payment_house',
+    'money_payment_petrol',
+    'money_payment_doctor',
+  ].includes(item.stepId))) {
+    addTopic('thinking through everyday ways to pay for things');
+  }
+  if (meaningful.some((item) => [
+    'money_windfall_300',
+    'money_windfall_300000',
+  ].includes(item.stepId))) {
+    addTopic('imagining what you would do with a windfall');
+  }
+  if (meaningful.some((item) => item.stepId === 'money_habits')) {
+    addTopic('discussing everyday money habits');
+  }
+  if (meaningful.some((item) => item.stepId === 'money_quote')) {
+    addTopic('reflecting on what money means to you');
+  }
+  if (meaningful.some((item) => item.stepId === 'money_spin_question')) {
+    addTopic('reflecting on a money-related question from the wheel');
+  }
   const wheelAnswer = meaningful.find((item) => ['current_affairs_spin_question', 'faces_scenes_spin_question', 'categorizing_objects_spin_question', 'orientation_spin_question'].includes(item.stepId));
   let wheelTopic = '';
   if (wheelAnswer) {
@@ -2595,9 +2785,43 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
   const hasActivityRevealProtocol = isActivityRevealProtocol(userContent || '');
   const hasActivityCompletionProtocol = isActivityCompletionProtocol(userContent || '');
   const hasMealBuilderProtocol = isMealBuilderProtocol(userContent || '');
+  const hasTriviaChoiceProtocol = isTriviaChoiceProtocol(userContent || '');
   const wheelEvent = parseQuestionWheelEvent(userContent || '', step);
   const activityRevealEvent = parseActivityRevealEvent(userContent || '', step);
   const mealBuilderEvent = parseMealBuilderEvent(userContent || '', step);
+  const triviaChoiceStep = isTriviaChoiceStep(step) ? step : null;
+  const persistedTriviaChoiceSelections =
+    triviaChoiceStep && session.interactionState?.triviaChoice?.stepId === step.id
+      ? session.interactionState.triviaChoice.selections || {}
+      : {};
+  const answeredTriviaChoiceRoundIndices = Object.keys(persistedTriviaChoiceSelections).map(Number);
+  const triviaChoiceTapEvent = parseTriviaChoiceEvent(userContent || '', step);
+  if (!safetySupportTurn && hasTriviaChoiceProtocol && !triviaChoiceTapEvent) {
+    const err = new Error('Invalid trivia choice selection');
+    err.status = 400;
+    throw err;
+  }
+  if (
+    !safetySupportTurn &&
+    triviaChoiceTapEvent &&
+    answeredTriviaChoiceRoundIndices.includes(triviaChoiceTapEvent.resolved[0].roundIndex)
+  ) {
+    const err = new Error('That round has already been answered');
+    err.status = 409;
+    throw err;
+  }
+  // A tapped selection is exact; free text/speech is only attempted when there is
+  // no (or an already-answered) tap event, so a malformed tap never falls through
+  // to a fuzzy guess at the wrong round.
+  const triviaChoiceSpeechMatches =
+    !hasTriviaChoiceProtocol && triviaChoiceStep && userContent
+      ? matchTriviaChoiceRounds(userContent, step, answeredTriviaChoiceRoundIndices)
+      : [];
+  const triviaChoiceEvent = triviaChoiceTapEvent
+    ? triviaChoiceTapEvent
+    : triviaChoiceSpeechMatches.length > 0
+    ? { resolved: triviaChoiceSpeechMatches, transcript: triviaChoiceTranscript(triviaChoiceSpeechMatches) }
+    : null;
   if (!safetySupportTurn && hasWheelProtocol && !wheelEvent) {
     const err = new Error('Invalid question wheel option');
     err.status = 400;
@@ -2827,6 +3051,8 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
       ? `Revealed ${activityRevealEvent.option.label}.`
       : mealBuilderEvent
       ? `Chose ${mealBuilderEvent.labels.join(', ')} for the meal.`
+      : triviaChoiceEvent
+      ? triviaChoiceEvent.transcript
       : hasActivityCompletionProtocol
       ? `Finished reenacting ${currentActivityOption.label}.`
       : hasMusicCompletionProtocol
@@ -2984,6 +3210,21 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
       )
     : [];
 
+  const triviaChoiceNewlyResolved =
+    triviaChoiceStep && userContent && hasDeliveredQuestion ? triviaChoiceEvent?.resolved || [] : [];
+  const nextTriviaChoiceSelections = triviaChoiceStep
+    ? {
+        ...persistedTriviaChoiceSelections,
+        ...Object.fromEntries(triviaChoiceNewlyResolved.map((entry) => [entry.roundIndex, entry.option.id])),
+      }
+    : {};
+  const triviaChoiceComplete = triviaChoiceStep
+    ? (step.interaction.rounds || []).every((_, index) => nextTriviaChoiceSelections[index] !== undefined)
+    : false;
+  const triviaChoiceMissingRounds = triviaChoiceStep
+    ? (step.interaction.rounds || []).filter((_, index) => nextTriviaChoiceSelections[index] === undefined)
+    : [];
+
   let answeredCurrentQuestion = true;
   let adaptiveText = '';
   let adaptiveFollowUpQuestion = null;
@@ -3004,6 +3245,12 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
           answered: newlyFilledNamingSlots.length > 0 || namingSlotsComplete,
           response: '',
         }
+      : triviaChoiceStep
+      ? evaluateTriviaChoiceAnswer({
+          step,
+          resolvedCount: triviaChoiceNewlyResolved.length,
+          complete: triviaChoiceComplete,
+        })
       : null) || emotionalSupportTurn || categorizingTurn || orientationTurn || (matchingAnswer ? { answered: true, response: matchingAnswer.response } : null) || evaluateTriviaAnswer({
       step,
       content: userContent,
@@ -3129,6 +3376,42 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
     }
   }
 
+  // A tap-to-choose trivia round is a guess either way it arrives - tapped
+  // (already resolved client-side) or typed/spoken (no protocol event at all).
+  // One dedicated adaptive pass handles both so a spoken guess gets the same
+  // fact-reveal treatment as pressing the buttons, and neither path repeats the
+  // exact same fixed sentence every time.
+  if (triviaChoiceStep && triviaChoiceNewlyResolved.length > 0 && hasDeliveredQuestion && answeredCurrentQuestion) {
+    const resolvedForPrompt = triviaChoiceNewlyResolved.map((entry) => ({
+      question: entry.round.question,
+      fact: entry.round.fact,
+      guessedLabel: spokenAmountLabel(entry.option.label),
+      isCorrect: entry.option.id === entry.round.correctOptionId,
+    }));
+    const fallbackFacts = resolvedForPrompt.map((entry) => entry.fact).filter(Boolean).join(' ');
+    adaptiveText = await generateResponse(
+      [
+        {
+          role: 'system',
+          content: buildCstTriviaChoiceInstructions({ recentMessages, resolved: resolvedForPrompt }),
+        },
+        { role: 'user', content: triviaChoiceEvent?.transcript || userContent },
+      ],
+      {
+        provider: llmProvider,
+        temperature: 0.4,
+        maxTokens: 150,
+        model: useFastScriptedTurn ? process.env.OPENAI_FAST_TEXT_MODEL : undefined,
+      }
+    ).catch((error) => {
+      console.warn('[session] Using trivia choice fallback:', error.message);
+      return fallbackFacts;
+    });
+    if (!collapseRepeatedAdjacentSpeech(adaptiveText || '').trim()) {
+      adaptiveText = fallbackFacts;
+    }
+  }
+
   // The instrument-naming slide acknowledges each guessed sound with an adaptive
   // line so speech-to-text near-misses still land; the deterministic per-slot
   // acknowledgement is the fallback when the model returns nothing.
@@ -3226,7 +3509,7 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
           question: activeAdaptiveFollowUp.question,
           content: userContent,
         })
-      : [...storedAnswers, toSessionAnswer({ step, content: categorizingTurn?.transcript || matchingAnswer?.transcript || userContent })];
+      : [...storedAnswers, toSessionAnswer({ step, content: categorizingTurn?.transcript || matchingAnswer?.transcript || triviaChoiceEvent?.transcript || userContent })];
 
     if (step.id === 'theme_song_choice' && !activeAdaptiveFollowUp) {
       const themeSongSearchAnswer = resolveThemeSongSelectionAnswer(userContent, themeSong);
@@ -3320,6 +3603,11 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
       hasDeliveredQuestion &&
       (namingSlotsComplete || shouldForceProgress) &&
       !isFinalStep
+    : triviaChoiceStep
+    ? hasUserContent &&
+      hasDeliveredQuestion &&
+      (triviaChoiceComplete || shouldForceProgress) &&
+      !isFinalStep
     : canProgress &&
       !shouldAskAdaptiveFollowUp &&
       !shouldElaborateNews &&
@@ -3367,9 +3655,20 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
           step.namingSlots.singlePrompt
         )
       : '';
+  const triviaChoicePromptLine =
+    triviaChoiceStep &&
+    hasUserContent &&
+    hasDeliveredQuestion &&
+    !triviaChoiceComplete &&
+    !shouldForceProgress &&
+    triviaChoiceMissingRounds.length > 0
+      ? triviaChoiceNewlyResolved.length === 0
+        ? `I did not catch one of the options there - it is ${triviaChoiceMissingRounds[0].options.map((option) => option.label).join(', ')}. ${triviaChoiceMissingRounds[0].question || ''}`.trim()
+        : triviaChoiceMissingRounds[0].question || 'What about the other one?'
+      : '';
   const scriptedNextLine = categorizingTurn && !categorizingTurn.complete && !emotionalSupportTurn
     ? categorizingTurn.prompt
-    : namingSlotPromptLine || activityInteractionReply || (themeSongFeedback
+    : namingSlotPromptLine || triviaChoicePromptLine || activityInteractionReply || (themeSongFeedback
     ? themeSongRequiresRetry
       ? themeSongFeedback
       : joinSpeechParts(
@@ -3416,7 +3715,8 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
     !isQuestionWheelEvent &&
     !isActivityInteractionEvent &&
     !hasAutoAdvanceProtocol &&
-    !nextSlideProvidesResponse
+    !nextSlideProvidesResponse &&
+    !triviaChoiceStep
   ) {
     promptedMemoryEntries = selectedMemoryEntries;
     const systemPrompt = buildCstAdaptiveResponseInstructions({
@@ -3447,7 +3747,7 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
   if (userContent && !hasAutoAdvanceProtocol) {
     adaptiveText = collapseRepeatedAdjacentSpeech(adaptiveText);
     if (
-      (nextSlideProvidesResponse && !isScriptedTriviaQuestion(step) && !namingSlotStep) ||
+      (nextSlideProvidesResponse && !isScriptedTriviaQuestion(step) && !namingSlotStep && !isTriviaChoiceStep(step)) ||
       hasSubstantialSpeechOverlap(adaptiveText, scriptedNextLine)
     ) {
       adaptiveText = '';
@@ -3551,6 +3851,11 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
   } else if (nextInteractionState.namingSlots?.stepId !== displaySlide.id) {
     delete nextInteractionState.namingSlots;
   }
+  if (triviaChoiceStep && displaySlide.id === step.id) {
+    nextInteractionState.triviaChoice = { stepId: step.id, selections: nextTriviaChoiceSelections };
+  } else if (nextInteractionState.triviaChoice?.stepId !== displaySlide.id) {
+    delete nextInteractionState.triviaChoice;
+  }
   if (displaySlide.interaction?.type === 'positiveNews') {
     nextInteractionState.currentAffairs = currentAffairs;
     const newsUrl = currentAffairs?.status === 'available' ? currentAffairs.article?.url : null;
@@ -3600,6 +3905,7 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
       suggestions:
         wheelEvent ||
         mealBuilderEvent ||
+        isTriviaChoiceStep(step) ||
         isActivityInteractionEvent ||
         isNameThatTuneStep(step) ||
         hasMusicCompletionProtocol ||
@@ -3651,6 +3957,13 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
     activityReveal: session.interactionState?.activityReveal || null,
     mealBuilder: session.interactionState?.mealBuilder || null,
     namingSlots: session.interactionState?.namingSlots || null,
+    // Reflects this turn's own step and selections, not the persisted state for
+    // whatever comes next - when the last round resolves (especially from a
+    // single message that answers every round at once), the app advances
+    // immediately, and by then session.interactionState.triviaChoice has
+    // already moved on. The frontend still needs this turn's reveal to show
+    // against the outgoing slide while the deferred transition plays out.
+    triviaChoice: triviaChoiceStep ? { stepId: step.id, selections: nextTriviaChoiceSelections } : null,
     assistantText,
     speechSegments,
     sessionCompleteAfterResponse,

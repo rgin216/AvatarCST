@@ -2,6 +2,7 @@ import ObjectSelectionActivity from "../components/ObjectSelectionActivity.jsx";
 import MatchingActivity from "../components/MatchingActivity.jsx";
 import MealBuilderActivity from "../components/MealBuilderActivity.jsx";
 import PhraseCardsActivity from "../components/PhraseCardsActivity.jsx";
+import TriviaChoiceActivity from "../components/TriviaChoiceActivity.jsx";
 import { useEffect, useRef, useState } from "react";
 import AvatarViewer from "../components/avatar/AvatarViewer";
 import api from "../services/api.js";
@@ -224,6 +225,7 @@ export default function SessionPage({
   const [musicPlaybackState, setMusicPlaybackState] = useState("idle");
   const [questionWheel, setQuestionWheel] = useState(null);
   const [activityReveal, setActivityReveal] = useState(null);
+  const [triviaChoice, setTriviaChoice] = useState(null);
   const [namingSlots, setNamingSlots] = useState(null);
   const [playingAudioClipId, setPlayingAudioClipId] = useState(null);
   const audioClipElsRef = useRef({});
@@ -324,6 +326,7 @@ export default function SessionPage({
   const orientationInteraction = ["choiceQuestion", "focusedQuestion"].includes(slide.interaction?.type) ? slide.interaction : null;
   const mealBuilderInteraction = slide.interaction?.type === "mealBuilder" ? slide.interaction : null;
   const phraseCardsInteraction = slide.interaction?.type === "phraseCards" ? slide.interaction : null;
+  const triviaChoiceInteraction = slide.interaction?.type === "triviaChoice" ? slide.interaction : null;
   // namingSlots state can briefly still belong to the previous phraseCards
   // step (it persists until the next turn's response overwrites it) - guard
   // by stepId so a fresh phraseCards slide never shows the old one's reveals.
@@ -334,7 +337,7 @@ export default function SessionPage({
     Boolean(exerciseVideo) ||
     hasPositiveNewsInteraction ||
     Boolean(musicInteraction) ||
-    hasActivityRevealInteraction || Boolean(matchingInteraction) || objectInteraction || Boolean(mealBuilderInteraction) || Boolean(phraseCardsInteraction) || isSingleAudioClip;
+    hasActivityRevealInteraction || Boolean(matchingInteraction) || objectInteraction || Boolean(mealBuilderInteraction) || Boolean(phraseCardsInteraction) || Boolean(triviaChoiceInteraction) || isSingleAudioClip;
   const landedWheelResult = questionWheel?.status === "landed" ? questionWheel : null;
   const sessionInputDisabled =
     typing ||
@@ -468,6 +471,7 @@ export default function SessionPage({
     setQuestionWheel(turn.questionWheel || null);
     setActivityReveal(turn.activityReveal || null);
     setNamingSlots(turn.namingSlots || null);
+    setTriviaChoice(turn.triviaChoice || null);
     spotifyAutoplayPendingRef.current = shouldAutoplayThemeSong;
     videoAutoplayPendingRef.current = shouldAutoplayExercise;
   }
@@ -499,6 +503,7 @@ export default function SessionPage({
     // acknowledgement ends. Only a reveal belonging to that slide updates now.
     if (deferredTransition) {
       if (turn.namingSlots?.stepId === displayedSlide.id) setNamingSlots(turn.namingSlots);
+      if (turn.triviaChoice?.stepId === displayedSlide.id) setTriviaChoice(turn.triviaChoice);
     } else {
       applyInteractionState(turn, displayedSlide);
     }
@@ -1560,7 +1565,7 @@ export default function SessionPage({
 
       <main className="session-slide-shell">
         <section
-          className={`ppt-slide${slide.imageUrl && !hasSlideInteraction ? " has-slide-image" : ""}${hasSlideInteraction ? " has-slide-interaction" : ""}${exerciseVideo ? " has-video-interaction" : ""}${hasPositiveNewsInteraction ? " has-news-interaction" : ""}${musicInteraction ? " has-music-interaction" : ""}${hasActivityRevealInteraction ? " has-activity-reveal-interaction" : ""}${objectInteraction ? " has-object-interaction" : ""}${matchingInteraction ? " has-matching-interaction" : ""}${mealBuilderInteraction ? " has-meal-builder-interaction" : ""}${phraseCardsInteraction ? " has-phrase-cards-interaction" : ""}${isSingleAudioClip ? " has-audioclips-interaction" : ""}`}
+          className={`ppt-slide${slide.imageUrl && !hasSlideInteraction ? " has-slide-image" : ""}${hasSlideInteraction ? " has-slide-interaction" : ""}${exerciseVideo ? " has-video-interaction" : ""}${hasPositiveNewsInteraction ? " has-news-interaction" : ""}${musicInteraction ? " has-music-interaction" : ""}${hasActivityRevealInteraction ? " has-activity-reveal-interaction" : ""}${objectInteraction ? " has-object-interaction" : ""}${matchingInteraction ? " has-matching-interaction" : ""}${mealBuilderInteraction ? " has-meal-builder-interaction" : ""}${phraseCardsInteraction ? " has-phrase-cards-interaction" : ""}${triviaChoiceInteraction ? " has-trivia-choice-interaction" : ""}${isSingleAudioClip ? " has-audioclips-interaction" : ""}`}
           style={{
             "--slide-accent": slide.accent || theme.blush,
             backgroundImage: slide.imageUrl && !hasSlideInteraction ? `url(${slide.imageUrl})` : undefined,
@@ -1639,6 +1644,7 @@ export default function SessionPage({
           {matchingInteraction && <MatchingActivity key={slide.id || slide.index} interaction={matchingInteraction} title={slide.title} disabled={typing || wheelResultPending} submitDisabled={sessionInputDisabled} onActivity={registerUserActivity} onComplete={(content) => sendMessage(content, "My matches are ready.")} />}
           {mealBuilderInteraction && <MealBuilderActivity key={slide.id || slide.index} interaction={mealBuilderInteraction} title={slide.title} disabled={typing || wheelResultPending || isRecording} submitDisabled={sessionInputDisabled || isRecording} onActivity={registerUserActivity} onComplete={(content) => sendMessage(content, "My plate is ready.")} />}
           {phraseCardsInteraction && <PhraseCardsActivity key={slide.id || slide.index} interaction={phraseCardsInteraction} title={slide.title} namingSlots={namingSlotsForSlide} />}
+          {triviaChoiceInteraction && <TriviaChoiceActivity key={slide.id || slide.index} interaction={triviaChoiceInteraction} title={slide.title} persistedSelections={triviaChoice?.stepId === slide.id ? triviaChoice.selections : null} disabled={typing || wheelResultPending || isRecording} submitDisabled={sessionInputDisabled || isRecording} onActivity={registerUserActivity} onComplete={(content) => sendMessage(content, "Here is my guess.")} />}
           {realOrAiInteraction && <div className="real-ai-choices" aria-label="Choose your guess">
             {['Real person', 'AI generated', 'Not sure'].map((answer) => <button type="button" key={answer} disabled={sessionInputDisabled} onClick={() => sendMessage(answer)}>{answer}</button>)}
           </div>}
