@@ -1,0 +1,57 @@
+.word-games-activity { position:absolute; inset:0; overflow:auto; box-sizing:border-box; padding:clamp(42px,7cqh,64px) clamp(20px,4cqw,60px) 24px; background:#fff; color:#193943; display:flex; flex-direction:column; gap:14px; }
+.ppt-slide .word-games-activity h1 { margin:0; color:#193943; font-size:clamp(24px,3cqw,40px); }
+.word-games-activity p { margin:0; font-size:clamp(17px,1.7cqw,23px); line-height:1.4; }
+.word-games-activity button { min-height:48px; padding:10px 18px; border:2px solid #275f72; border-radius:8px; background:#fff; color:#193943; font:inherit; font-size:20px; cursor:pointer; align-self:flex-start; }
+.word-games-activity :disabled { opacity:.55; cursor:default; }
+.word-games-activity :is(button,input):focus-visible { outline:3px solid #bf8700; outline-offset:3px; }
+.pronunciation-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; }
+.pronunciation-grid .pronunciation-word { width:100%; height:100%; display:flex; flex-direction:column; gap:5px; text-align:left; }
+.pronunciation-word strong { font-size:clamp(23px,2.5cqw,32px); }
+.pronunciation-word.is-heard { background:#e5f3e9; border-color:#2a6942; }
+.word-games-activity form { display:flex; align-items:center; flex-wrap:wrap; gap:12px; }
+.word-games-activity input { width:8em; padding:10px; font-size:24px; text-transform:uppercase; border:2px solid #275f72; border-radius:6px; }
+.word-guess-board { display:flex; flex-direction:column; gap:5px; }
+.word-guess-row { display:flex; gap:5px; }
+.word-tile { width:44px; min-height:46px; display:flex; flex-direction:column; align-items:center; justify-content:center; font-size:23px; font-weight:bold; border-radius:4px; }
+.word-tile small { font-size:12px; }
+.word-games-activity .green { background:#246b3b; color:#fff; }
+.word-games-activity .yellow { background:#f3cf57; color:#30280a; }
+.word-games-activity .grey { background:#626b70; color:#fff; }
+.word-hint { display:flex; gap:12px; flex-wrap:wrap; font-size:20px; }
+.word-hint span { padding:10px; border-radius:6px; }
+@media(max-width:650px) { .pronunciation-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+
+.wordle-activity { container-type:inline-size; padding:clamp(30px,5cqh,48px) clamp(16px,3cqw,40px) 20px; gap:16px; }
+.wordle-heading p { margin-top:8px; }
+.wordle-layout { display:grid; grid-template-columns:minmax(270px,1.15fr) minmax(210px,1fr); gap:clamp(20px,3cqw,40px); align-items:start; }
+.wordle-play { min-width:0; display:flex; flex-direction:column; align-items:center; gap:12px; }
+.wordle-activity .word-guess-board { gap:6px; }
+.wordle-activity .word-guess-row { gap:6px; justify-content:center; }
+.wordle-activity .word-tile { box-sizing:border-box; width:clamp(38px,5.7cqw,54px); height:clamp(42px,6cqw,56px); min-height:0; border:2px solid transparent; border-radius:3px; font-size:26px; line-height:1; flex-shrink:0; }
+.wordle-activity .word-tile.empty { border-color:#d2d8dc; background:#fff; }
+.wordle-activity input.letter-input { width:clamp(38px,5.7cqw,54px); padding:0; text-align:center; font-family:inherit; font-weight:800; color:#193943; background:#fff; border:2px solid #81949b; border-radius:3px; caret-color:transparent; }
+.wordle-activity input.letter-input.is-selected { border-color:#275f72; box-shadow:inset 0 -4px #275f72; background:#f1f7f8; }
+.wordle-activity .word-tile small { line-height:1; font-size:12px; margin-top:3px; }
+.wordle-activity .wordle-status { text-align:center; font-size:17px; }
+.wordle-keyboard { width:100%; max-width:460px; display:flex; flex-direction:column; gap:5px; }
+.wordle-key-row { display:flex; justify-content:center; gap:4px; }
+.wordle-activity button.wordle-key { min-width:0; min-height:46px; height:46px; padding:0; flex:1; max-width:40px; border:0; border-radius:4px; background:#e0e5e7; color:#193943; font-size:17px; font-weight:800; align-self:auto; }
+.wordle-activity button.wordle-key-wide { flex:1.7; max-width:65px; font-size:14px; }
+.wordle-activity button.green { background:#246b3b; color:#fff; }
+.wordle-activity button.yellow { background:#f3cf57; color:#30280a; }
+.wordle-activity button.grey { background:#626b70; color:#fff; }
+.wordle-help { display:flex; flex-direction:column; align-items:flex-start; gap:12px; }
+.wordle-help h2 { font-size:20px; margin:0; }
+.wordle-help p { font-size:17px; line-height:1.4; }
+.wordle-swatch { display:inline-flex; width:26px; height:26px; align-items:center; justify-content:center; margin-right:6px; border-radius:3px; }
+.wordle-help .wordle-practice-note { color:#526870; font-size:15px; }
+.wordle-hint { display:flex; flex-direction:column; gap:10px; width:100%; padding:14px 0; border-top:1px solid #d2d8dc; }
+.wordle-hint .word-guess-row { justify-content:flex-start; }
+.wordle-hint .word-tile { width:clamp(30px,4.5cqw,44px); height:46px; }
+.wordle-activity .wordle-error { color:#8b3027; font-size:16px; text-align:center; }
+.wordle-help .wordle-finish { margin-top:8px; }
+@container (max-width:580px) {
+  .wordle-layout { grid-template-columns:1fr; gap:24px; }
+  .wordle-activity .word-tile,.wordle-activity input.letter-input { width:44px; height:48px; }
+  .wordle-help { width:100%; max-width:460px; margin:auto; }
+}

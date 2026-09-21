@@ -1,6 +1,7 @@
 import { readFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join, resolve } from 'path';
+import { getScriptStep } from './cstScriptService.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const BACKEND_ROOT = resolve(__dirname, '../..');
@@ -149,6 +150,15 @@ ${JSON.stringify(slide.imageGuidance)}
     : '';
 
 const getCurrentStepScript = (scriptId, slide) => {
+  if (scriptId === 'cst_word_games') {
+    const { step } = getScriptStep(scriptId, slide.index);
+    const guidance = step.wordAssociation
+      ? `Ask only the current association: ${step.prompt}. Accept any plausible everyday connection, not just ${step.wordAssociation.example}. Cup OF tea or coffee works. Acknowledge their particular connection. If unsure, offer ${step.wordAssociation.example} as an example. One attempt is enough; answered=true even for uncertainty. Do not ask another question.`
+      : step.rhymeWord
+      ? `Ask for words that rhyme with ${step.rhymeWord}. Judge ending sounds, not spelling; accept regional accents and speech transcription approximations. One valid rhyme is enough. If a list mixes rhymes and non-rhymes, affirm the valid ones and gently explain the others. If unsure, supply an example. Set answered=true after one attempt, including a pass; never demand a fixed number. Vary acknowledgement from recent replies. Do not ask another question.`
+      : `Current activity: ${step.title}. Prompt: ${step.prompt}. Follow the scripted flow. It is fine to be unsure. Do not reveal brain-teaser answers before a guess. Pronunciation practice does not test or grade the person's speech.`;
+    return `Session 14: Word Games. ${guidance}`;
+  }
   const scriptSections = SESSION_SCRIPTS[scriptId] || SESSION_SCRIPTS.cst_intro_reminiscence;
   // +1 skips the header section, which is the preamble rather than a step.
   return scriptSections[slide.index + 1] || scriptSections[slide.index] || '';
