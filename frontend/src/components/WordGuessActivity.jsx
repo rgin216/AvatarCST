@@ -115,7 +115,7 @@ export default function WordGuessActivity({ sessionId, disabled, onActivity, onC
         <p><span className="wordle-swatch green">✓</span> Green: right letter, right box.</p>
         <p><span className="wordle-swatch yellow">↔</span> Yellow: right letter, move it to another box.</p>
         <p><span className="wordle-swatch grey">–</span> Grey: that copy of the letter is not needed.</p>
-        <p className="wordle-practice-note">Try an everyday word. Any five letters are welcome in this practice game.</p>
+        <p className="wordle-practice-note">Try an everyday five-letter word. Unrecognised words do not use a guess.</p>
         <button disabled={disabled || finished || game.hint} onClick={() => save({ ...game, hint: true })}>Give me a hint</button>
         {game.hint && <section className="wordle-hint" aria-label="Letter hint">
           <h2>Your hint</h2>

@@ -40,7 +40,7 @@ export default function PronunciationActivity({ interaction, sessionId, disabled
           <strong>{clip.label}</strong><span>{clip.meaning}</span>
           <small>{playing === clip.id ? '▶ Playing…' : heard.includes(clip.id) ? '✓ Heard — play again' : '▶ Listen'}</small>
         </button>
-        <audio ref={el => { if (el) players.current[clip.id] = el; }} src={clip.src} preload="none" onPlay={() => setPlaying(clip.id)} onEnded={() => finish(clip.id)} onError={() => { setPlaying(null); setError(`Unable to load ${clip.label}. Please click it to retry.`); }} />
+        <audio ref={el => { if (el) players.current[clip.id] = el; }} src={clip.src} preload="none" onPlay={() => setPlaying(clip.id)} onPause={() => setPlaying(current => current === clip.id ? null : current)} onEnded={() => finish(clip.id)} onError={() => { setPlaying(null); setError(`Unable to load ${clip.label}. Please click it to retry.`); }} />
       </div>)}
     </div>
     <p role="status">{heard.length} of 6 words heard. {complete ? 'Well done. Continue when you are ready.' : 'Listen to all six to continue.'}</p>

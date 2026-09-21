@@ -41,7 +41,7 @@ Explain “cat → hat, bat, mat.” Ask for one or more rhymes with sun, bee, r
 
 The interface presents a six-row, five-column board. Each letter is entered in a separate box, with physical typing, arrow keys, deletion, paste, and an on-screen QWERTY keyboard. Guesses must be recognised five-letter words; an invalid entry is explained and does not use a turn. Submitted boxes and keyboard keys show letter feedback. The hint uses its own five-box row: green in its confirmed position, yellow in a position where it does not belong, with a written explanation.
 
-A local React practice game replaces an external embed. It needs no API, account, or third-party service. The fixed practice word is PLANT, with six guesses. Accept any five letters so dictionary restrictions do not interrupt this gentle activity. Explain green (correct position), yellow (different position), and grey (no remaining copy). Score repeated letters correctly. A hint supplies a green P at position 1 and a yellow A excluded from position 2. Include visible symbols and accessible text in addition to colour. Preserve guesses and the hint through refresh. Allow finishing at any time.
+A local React practice game replaces an external embed. It needs no API, account, or third-party service. The fixed practice word is PLANT, with six guesses. Encourage an everyday five-letter word; unrecognised words do not use a guess. Explain green (correct position), yellow (different position), and grey (no remaining copy). Score repeated letters correctly. A hint supplies a green P at position 1 and a yellow A excluded from position 2. Include visible symbols and accessible text in addition to colour. Preserve guesses and the hint through refresh. Allow finishing at any time.
 
 ## Slides 35–37: Closing
 
