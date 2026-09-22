@@ -1,6 +1,7 @@
 import { createCategorizingObjectsScript } from './categorizingObjectsScript.js';
 import { createFacesScenesScript } from './facesScenesScript.js';
 import { createOrientationScript } from './orientationScript.js';
+import { createWordGamesScript } from './wordGamesScript.js';
 ﻿import {
   adaptiveConversation,
   adaptiveReminiscence,
@@ -21,6 +22,7 @@ const scriptSlideFolders = {
   cst_word_associations: 'session8',
   cst_orientation: 'session11',
   cst_using_money: 'session12',
+  cst_word_games: 'session14',
 };
 
 const physicalGamesWheelOptions = [
@@ -2645,6 +2647,7 @@ const scripts = {
 
 scripts.cst_faces_scenes = createFacesScenesScript(scripts.cst_current_affairs);
 scripts.cst_orientation = createOrientationScript(scripts.cst_faces_scenes);
+scripts.cst_word_games = createWordGamesScript(scripts.cst_faces_scenes);
 scripts.cst_categorizing_objects = createCategorizingObjectsScript(scripts.cst_current_affairs);
 
 export const getScript = (scriptId = 'cst_intro_reminiscence') =>

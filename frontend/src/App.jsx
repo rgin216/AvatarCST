@@ -108,6 +108,7 @@ const TEST_SESSIONS = [
     if (n === 10) return { id: "cst_categorizing_objects", label: "Session 10", title: "Categorizing Objects", theme: "Categorizing Objects", icon: "🧩" };
     if (n === 11) return { id: "cst_orientation", label: "Session 11", title: "Orientation", theme: "Orientation", icon: "🧭" };
     if (n === 12) return { id: "cst_using_money", label: "Session 12", title: "Using Money", theme: "Using Money", icon: "💰" };
+    if (n === 14) return { id: "cst_word_games", label: "Session 14", title: "Word Games", theme: "Word Games", icon: "🔤" };
     return {
       id: `placeholder_session_${n}`,
       label: `Session ${n}`,

@@ -1,4 +1,5 @@
 import { evaluateCategorizingTurn } from './categorizingObjectsService.js';
+import { hasCompletedPronunciation, matchesWordGameAnswer, wordGameTriviaFeedback } from './wordGamesService.js';
 import { personalizeCategorizingReply } from './categorizingAcknowledgementService.js';
 import { answerNewsQuestion, newsContext } from './newsConversationService.js';
 import { orientationPracticeContext } from './orientationContext.js';
@@ -697,7 +698,7 @@ const getTriviaRule = (step) => {
   const { choices, answer, aliases } = step.trivia;
   return {
     choices,
-    isCorrect: (content) => aliases.some((alias) => (` ${content} `).includes(` ${normalizeAnswer(alias.normalize('NFD').replace(/[\u0300-\u036f]/g, ''))} `)),
+    isCorrect: (content) => step.id.startsWith('word_games_teaser_') ? matchesWordGameAnswer(content, aliases) : aliases.some((alias) => (` ${content} `).includes(` ${normalizeAnswer(alias.normalize('NFD').replace(/[\u0300-\u036f]/g, ''))} `)),
     correctResponse: `Yes, that is right — ${answer}.`,
     incorrectResponse: `Thank you for having a go. The answer is ${answer}.`,
     unsureResponse: `That is okay. The answer is ${answer}.`,
@@ -721,6 +722,7 @@ const expandTriviaChoices = (content, choices) => {
 export const evaluateTriviaAnswer = ({ step, content, answers = [] }) => {
   const rule = getTriviaRule(step);
   if (!rule || !content) return null;
+  if (step.id.startsWith('word_games_teaser_')) Object.assign(rule, wordGameTriviaFeedback(step, answers));
 
   if (step?.id?.startsWith('orientation_landmark_')) {
     const previous = answers.filter(item => item.stepId.startsWith('orientation_landmark_'));
@@ -758,7 +760,7 @@ export const evaluateTriviaAnswer = ({ step, content, answers = [] }) => {
 
   const expanded = expandTriviaChoices(content, rule.choices);
   const answer = step.trivia ? expanded.normalize('NFD').replace(/[\u0300-\u036f]/g, '') : expanded;
-  const correct = rule.isCorrect(normalizeAnswer(answer));
+  const correct = rule.isCorrect(step.id.startsWith('word_games_teaser_') ? answer : normalizeAnswer(answer));
   return {
     answered: true,
     response: correct ? rule.correctResponse : rule.incorrectResponse,
@@ -1970,6 +1972,10 @@ export const buildTopicSessionSummary = (answers = [], { themeSong = null } = {}
   if (meaningful.some((item) => item.stepId === 'word_associations_missing_word')) {
     addTopic('filling in missing words for everyday phrases');
   }
+  if (meaningful.some(item => item.stepId?.startsWith('word_games_teaser_'))) addTopic('solving word brain teasers');
+  if (meaningful.some(item => item.stepId?.startsWith('word_games_association_'))) addTopic('exploring words that go together');
+  if (meaningful.some(item => item.stepId?.startsWith('word_games_rhyme_'))) addTopic('finding words that rhyme');
+  if (meaningful.some(item => item.stepId === 'word_games_five_letter')) addTopic('trying a five-letter word game');
   if (meaningful.some((item) => item.stepId === 'word_associations_pairs')) {
     addTopic('completing familiar word pairs');
   }
@@ -2851,6 +2857,11 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
   const isActivityInteractionEvent = Boolean(
     activityRevealEvent || hasActivityCompletionProtocol
   );
+  if (!safetySupportTurn && userContent && effectiveTurnIndex > 0 && !hasCompletedPronunciation(step, userContent)) {
+    const err = new Error('Please listen to all six Māori words, then press Continue.');
+    err.status = 409;
+    throw err;
+  }
   if (
     !safetySupportTurn &&
     isActivityInteractionEvent &&

@@ -7,6 +7,8 @@ import { useEffect, useRef, useState } from "react";
 import AvatarViewer from "../components/avatar/AvatarViewer";
 import api from "../services/api.js";
 import OrientationActivity from "../components/OrientationActivity.jsx";
+import PronunciationActivity from "../components/PronunciationActivity.jsx";
+import WordGuessActivity from "../components/WordGuessActivity.jsx";
 import SessionInputBar from "../components/SessionInputBar.jsx";
 import {
   createEmptyLipSyncFrame,
@@ -324,6 +326,8 @@ export default function SessionPage({
   const objectInteraction = slide.interaction?.type === "objectSelection";
   const matchingInteraction = slide.interaction?.type === "matching" ? slide.interaction : null;
   const orientationInteraction = ["choiceQuestion", "focusedQuestion"].includes(slide.interaction?.type) ? slide.interaction : null;
+  const pronunciationInteraction = slide.interaction?.type === "pronunciation" ? slide.interaction : null;
+  const wordGuessInteraction = slide.interaction?.type === "wordGuess";
   const mealBuilderInteraction = slide.interaction?.type === "mealBuilder" ? slide.interaction : null;
   const phraseCardsInteraction = slide.interaction?.type === "phraseCards" ? slide.interaction : null;
   const triviaChoiceInteraction = slide.interaction?.type === "triviaChoice" ? slide.interaction : null;
@@ -333,7 +337,7 @@ export default function SessionPage({
   const namingSlotsForSlide = namingSlots?.stepId === slide.id ? namingSlots : null;
   const realOrAiInteraction = slide.interaction?.type === "realOrAi";
   const hasSlideInteraction =
-    Boolean(orientationInteraction) || hasWheelInteraction ||
+    Boolean(pronunciationInteraction) || wordGuessInteraction || Boolean(orientationInteraction) || hasWheelInteraction ||
     Boolean(exerciseVideo) ||
     hasPositiveNewsInteraction ||
     Boolean(musicInteraction) ||
@@ -344,10 +348,15 @@ export default function SessionPage({
     wheelResultPending ||
     autoAdvanceInteraction ||
     hasActivityRevealInteraction ||
+    Boolean(pronunciationInteraction) || wordGuessInteraction ||
     avatarNarrationActive ||
     pendingPlay;
   const activityControlsDisabled =
     typing || isRecording || avatarNarrationActive || pendingPlay;
+  // Wordle is a quiet, self-paced activity. Keep its boxes and keyboard usable
+  // while Aria's narration is playing; only block them during an active submit
+  // or another interaction that would make input unsafe to handle.
+  const wordGuessControlsDisabled = typing || isRecording || pendingPlay;
   const wheelSliceDegrees = wheelOptions.length ? 360 / wheelOptions.length : 0;
   const wheelGradient = wheelOptions.length
     ? wheelOptions
@@ -1583,6 +1592,8 @@ export default function SessionPage({
             </div>
           )}
           {orientationInteraction && <OrientationActivity key={slide.id || slide.index} interaction={orientationInteraction} title={slide.title} disabled={sessionInputDisabled || isRecording} onActivity={registerUserActivity} onComplete={sendMessage} />}
+          {pronunciationInteraction && <PronunciationActivity key={slide.id} interaction={pronunciationInteraction} sessionId={sessionId} disabled={activityControlsDisabled} onActivity={registerUserActivity} onComplete={sendMessage} />}
+          {wordGuessInteraction && <WordGuessActivity key={slide.id} sessionId={sessionId} disabled={wordGuessControlsDisabled} onActivity={registerUserActivity} onComplete={sendMessage} />}
           {hasActivityRevealInteraction && (
             <div className="slide-activity-overlay">
               <header className="slide-activity-heading">
