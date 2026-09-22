@@ -44,6 +44,12 @@ avatarcst/
 └── CLAUDE.md          # Architecture & phases
 ```
 
+## LLM evaluation
+
+An offline facilitator/critic rotation benchmark is available. From `backend`, run
+`npm run eval:llm` for a dry run. See [the evaluation guide](backend/evaluation/README.md)
+for models, live runs, output files, and methodological limitations.
+
 ## Getting Started
 
 ### Prerequisites

@@ -8,7 +8,8 @@
     "install:rhubarb": "node scripts/install-rhubarb.js",
     "dev": "nodemon src/server.js",
     "start": "node src/server.js",
-    "test": "node --test src/"
+    "test": "node --test src/",
+    "eval:llm": "node scripts/evaluate-llms.js"
   },
   "keywords": [],
   "author": "",
