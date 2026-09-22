@@ -29,6 +29,8 @@ const getGroqGenerationOptions = (model) =>
         reasoning_effort: 'low',
         include_reasoning: false,
       }
+    : model === 'qwen/qwen3.8-27b'
+    ? { reasoning_effort: 'none', reasoning_format: 'hidden' }
     : {};
 
 const getResponsesInstructions = (messages = []) =>
@@ -57,9 +59,10 @@ const extractResponsesText = (data = {}) => {
 };
 
 const generateGroqResponse = async (messages, options = {}) => {
+  const model = options.model || GROQ_MODEL;
   const temperature = options.temperature ?? 0.7;
   // GPT-OSS shares its completion allowance between reasoning and visible text.
-  const maxTokens = Math.max(options.maxTokens ?? 140, /^openai\/gpt-oss-/.test(GROQ_MODEL) ? 512 : 0);
+  const maxTokens = Math.max(options.maxTokens ?? 140, /^openai\/gpt-oss-/.test(model) ? 512 : 0);
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), GROQ_TIMEOUT_MS);
 
@@ -73,11 +76,12 @@ const generateGroqResponse = async (messages, options = {}) => {
         Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
       },
       body: JSON.stringify({
-        model: GROQ_MODEL,
+        model,
         messages,
         temperature,
         max_completion_tokens: maxTokens,
-        ...getGroqGenerationOptions(GROQ_MODEL),
+        ...getGroqGenerationOptions(model),
+        ...(options.json ? { response_format: { type: 'json_object' } } : {}),
       }),
     });
   } catch (err) {
@@ -97,10 +101,10 @@ const generateGroqResponse = async (messages, options = {}) => {
   const raw = choice?.message?.content?.trim() || '';
   if (choice?.finish_reason === 'length' || !raw) {
     console.warn(`[llm] Groq ${choice?.finish_reason || 'empty'} output at ${maxTokens} tokens; ${options.completionRetry ? 'using caller fallback' : 'retrying once'}.`);
-    if (!options.completionRetry) return generateGroqResponse(messages, { ...options, maxTokens: Math.min(maxTokens * 2, 2048), completionRetry: true });
+    if (!options.completionRetry) return generateGroqResponse(messages, { ...options, maxTokens: Math.max(maxTokens, Math.min(maxTokens * 2, 8192)), completionRetry: true });
     throw new Error('Groq did not produce a complete response');
   }
-  return stripAssistantPrefix(raw);
+  return options.json ? raw : stripAssistantPrefix(raw);
 };
 
 const generateOpenAIResponse = async (messages, options = {}) => {
@@ -127,7 +131,7 @@ const generateOpenAIResponse = async (messages, options = {}) => {
         instructions: getResponsesInstructions(messages),
         input: chatMessagesToResponsesInput(messages),
         max_output_tokens: maxTokens,
-        ...(options.textFormat ? { text: { format: options.textFormat } } : {}),
+        ...(options.textFormat || options.json ? { text: { format: options.textFormat || { type: 'json_object' } } } : {}),
       }),
     });
   } catch (err) {
@@ -143,10 +147,15 @@ const generateOpenAIResponse = async (messages, options = {}) => {
   }
 
   const data = await response.json();
-  return stripAssistantPrefix(extractResponsesText(data));
+  const raw = extractResponsesText(data);
+  if (data.status === 'incomplete' || !raw.trim()) throw new Error('OpenAI did not produce a complete response');
+  return options.json ? raw : stripAssistantPrefix(raw);
 };
 
 export const generateResponse = async (messages, options = {}) => {
+  if (options.provider && !['groq', 'openai'].includes(options.provider)) {
+    throw new Error(`Unsupported LLM provider: ${options.provider}`);
+  }
   if (options.provider === 'openai') return generateOpenAIResponse(messages, options);
   return generateGroqResponse(messages, options);
 };
