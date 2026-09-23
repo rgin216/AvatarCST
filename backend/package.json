@@ -9,7 +9,8 @@
     "dev": "nodemon src/server.js",
     "start": "node src/server.js",
     "test": "node --test src/",
-    "eval:llm": "node scripts/evaluate-llms.js"
+    "eval:llm": "node scripts/evaluate-llms.js",
+    "eval:calibrate": "node scripts/compare-human-review.js"
   },
   "keywords": [],
   "author": "",

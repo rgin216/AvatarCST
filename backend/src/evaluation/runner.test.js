@@ -82,3 +82,18 @@ test('repetitions preserve pairing and local word/question checks', async () => 
   assert.equal(report.summary[0].byJudge.b.count, 2);
   assert.equal(report.summary[0].localCheckFailures, 2);
 });
+
+test('four-model roster rotates Claude through generation and schema-constrained critique', async () => {
+  const roster = [...models, { id: 'claude', provider: 'anthropic', model: 'claude-sonnet-5' }];
+  const calls = [];
+  const report = await runEvaluation({ models: roster, scenarios: scenarios.slice(0, 1), generate: async (_, options) => {
+    calls.push(options);
+    return options.json ? verdict : 'Thank you.';
+  } });
+  assert.equal(report.rows.length, 4);
+  assert.equal(calls.filter(c => c.json).length, 12);
+  const claudeCritiques = calls.filter(c => c.provider === 'anthropic' && c.json);
+  assert.equal(claudeCritiques.length, 3);
+  assert.deepEqual(claudeCritiques[0].jsonSchema.properties.scores.required, Object.keys(RUBRIC));
+  assert.ok(report.rows.find(r => r.facilitator === 'claude').judgments.every(j => j.judge !== 'claude'));
+});

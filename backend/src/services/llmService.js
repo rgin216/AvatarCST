@@ -1,3 +1,6 @@
+import { generateAnthropicResponse } from './anthropicService.js';
+import { isSupportedProvider } from './llmProviders.js';
+
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
 const OPENAI_RESPONSES_URL = 'https://api.openai.com/v1/responses';
 
@@ -153,9 +156,13 @@ const generateOpenAIResponse = async (messages, options = {}) => {
 };
 
 export const generateResponse = async (messages, options = {}) => {
-  if (options.provider && !['groq', 'openai'].includes(options.provider)) {
+  if (options.provider && !isSupportedProvider(options.provider)) {
     throw new Error(`Unsupported LLM provider: ${options.provider}`);
   }
   if (options.provider === 'openai') return generateOpenAIResponse(messages, options);
+  if (options.provider === 'anthropic') {
+    const raw = await generateAnthropicResponse(messages, options);
+    return options.json ? raw : stripAssistantPrefix(raw);
+  }
   return generateGroqResponse(messages, options);
 };

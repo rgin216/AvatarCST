@@ -5,6 +5,7 @@ import { parseArgs } from 'node:util';
 import { randomUUID, createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import dotenv from 'dotenv';
+import { assertProviderCredentials } from '../src/services/llmProviders.js';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const { values } = parseArgs({ options: {
@@ -18,6 +19,7 @@ const { values } = parseArgs({ options: {
 try {
   dotenv.config({ path: resolve(root, '.env'), quiet: true });
   const { runEvaluation, validateInputs, RUBRIC } = await import('../src/evaluation/runner.js');
+  const { findDisagreements } = await import('../src/evaluation/analysis.js');
   const models = JSON.parse(await readFile(values.models, 'utf8'));
   let scenarios = JSON.parse(await readFile(values.scenarios, 'utf8'));
   if (values.limit !== undefined) {
@@ -32,9 +34,7 @@ try {
     generationCalls: generations, judgeCalls: generations * (models.length - 1),
     note: 'Generation truncation may cause one additional API call. Live calls incur provider usage.' }, null, 2));
   if (values.live) {
-    for (const provider of new Set(models.map(m => m.provider))) {
-      if (!process.env[provider === 'groq' ? 'GROQ_API_KEY' : 'OPENAI_API_KEY']) throw new Error('Missing API key for ' + provider);
-    }
+    assertProviderCredentials(models);
     const out = resolve(values.out, new Date().toISOString().replace(/[:.]/g, '-') + '-' + randomUUID().slice(0, 8));
     await mkdir(out, { recursive: true });
     let revision = 'unknown';
@@ -49,6 +49,7 @@ try {
       console.log(row.scenario + ' / ' + row.facilitator + ': ' + row.status);
     } });
     await writeFile(resolve(out, 'report.json'), JSON.stringify(result, null, 2));
+    await writeFile(resolve(out, 'disagreements.json'), JSON.stringify(findDisagreements(result.rows), null, 2));
     // Blinded rows contain neither model IDs nor automated scores.
     const review = result.rows.filter(r => r.status === 'ok').map(r => ({
       id: r.id, scenario: r.scenario, input: r.input, context: r.context,

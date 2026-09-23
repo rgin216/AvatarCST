@@ -33,6 +33,25 @@ Groq lists the two GPT-OSS models as production models and Qwen as preview. Llam
 
 The existing OpenAI route can also participate through an explicit `{"id":"...","provider":"openai","model":"..."}` roster entry and OPENAI_API_KEY. Explicit model IDs keep experiments independent of the application's environment defaults. Duplicate provider/model pairs are rejected. `judgeMaxTokens` optionally controls a critic's output budget; Qwen defaults to 900 here after a live account-limit failure with the larger budget.
 
+### Adding Claude (23 September 2026)
+
+The supplied `models-with-claude.json` roster adds Anthropic Claude Sonnet 5 as a fourth facilitator/critic, providing a third model family and a second provider. Set `ANTHROPIC_API_KEY` in `backend/.env` locally; do not commit it. The ordinary Groq-only roster still works without that key. The command checks all required keys before making any generation calls; a missing key never silently removes a candidate.
+
+From `backend`:
+
+```powershell
+npm run eval:llm -- --models evaluation/models-with-claude.json --limit 1
+npm run eval:llm -- --models evaluation/models-with-claude.json --live --limit 1
+```
+
+One four-model scenario makes four generation calls and twelve critiques. All 30 scenarios make 120 generations and 360 critiques per repetition, before any Groq truncation retries. Each remaining model judges the facilitator independently.
+
+The adapter uses Anthropic's Messages API, separates system instructions, disables extended thinking, and omits sampling controls because Sonnet 5 rejects custom temperature settings. Critiques use `output_config.format` with a JSON schema plus local score/evidence validation. Refusals, truncated responses and non-text completions become visible failures. The timeout covers both response headers and body. These settings differ from Groq's low-reasoning GPT-OSS configuration and should be reported in comparisons.
+
+`claude-sonnet-5` was selected from Anthropic's current documentation. The roster explicitly pins the model ID; `ANTHROPIC_TEXT_MODEL` controls only calls without an explicit model. Another supported Claude model can be tested by editing a copied roster, subject to account availability and structured-output support.
+
+Sources: [model lineup](https://platform.claude.com/docs/en/models/overview), [Messages API](https://platform.claude.com/docs/en/api/messages/create), [structured outputs](https://platform.claude.com/docs/en/build-with-claude/structured-outputs), [Sonnet 5 configuration changes](https://platform.claude.com/docs/en/models/sonnet-5/migration-guide).
+
 ## What is measured
 
 Seven criteria use integer scores from 1 (clear failure) through 5 (fully satisfies): script adherence, relevance, accessibility, respect, grounding, handling difficulty and continuity. Critics must supply evidence. Serious failures are counted separately. Local checks flag acknowledgement word limits and question marks.
@@ -50,8 +69,17 @@ Each run gets a unique directory under ignored `evaluation/results/`:
 - `rows.jsonl`: checkpoint after each candidate and its critiques, including failures.
 - `report.json`: exact prompts and hashes, raw critic output, per-response generation latency, local checks, failure counts and scores broken down by judge.
 - `human-review.json`: shuffled, anonymous candidate IDs with blank human score fields and no model scores. Join completed reviews to report rows by ID.
+- `disagreements.json`: rows where valid critics differ by at least two score points on a criterion, or disagree on whether any critical failure exists. Failed critics are excluded. Keep this file hidden from reviewers until their independent scoring is complete.
 
-Have a CST-informed reviewer score a sample without consulting report.json. Include ordinary cases as well as flagged/disputed cases; do not review only failures. Compare criterion-level human/model agreement and inspect disagreements before trusting automated scores. The export supports manual calibration; automated agreement statistics and review ingestion are not implemented yet.
+Have a CST-informed reviewer score a sample without consulting report.json. Include ordinary cases as well as flagged/disputed cases; do not review only failures. Compare criterion-level human/model agreement and inspect disagreements before trusting automated scores.
+
+Fill `humanScores` with integers 1–5; leave unreviewed criteria as null. Preserve the exported IDs, input and acknowledgement text. Then run:
+
+```powershell
+npm run eval:calibrate -- --report evaluation/results/RUN/report.json --review evaluation/results/RUN/human-review.json --out evaluation/results/RUN/calibration.json
+```
+
+Replace RUN with the generated directory name. This command makes no API calls. It reports exact agreement, agreement within one point, mean absolute error and mean signed error for each judge/criterion, with sample counts. Positive signed error means the judge scores more generously than the reviewer. Blank ratings and failed judgments are excluded; duplicate IDs, mismatched source text and invalid ratings fail validation. The output path must be new to prevent overwriting a report/review. These are descriptive comparisons with one reviewer, not reliability estimates or clinical validation. Human critical-failure annotations remain for manual review; the comparison currently measures numeric rubric scores only.
 
 An API failure or invalid critique makes the command exit nonzero after saving completed results. Runs are sequential to reduce bursts. Rate-limit errors remain visible; there is no automatic throttling/resume or provider substitution. The underlying Groq client may retry a truncated generation once. A process interruption retains completed rows, but may lose the current row. Treat incomplete panels as incomplete experiments.
 
@@ -64,7 +92,7 @@ It does not yet rotate models in the live UI, evaluate complete sessions, measur
 Next implementation stages:
 1. Replay complete application sessions with isolated state and record delivered text, progression and fallback provenance.
 2. Expand beyond Session 1 to image-grounded activities, orientation and summaries.
-3. Add human-review ingestion/agreement metrics, confidence intervals, judge-disagreement reports and held-out scenarios.
+3. Extend human-review comparisons with multiple reviewers, confidence intervals and held-out scenarios.
 4. Add opt-in session-level live assignments and asynchronous critiques after offline calibration.
 
 Use the synthetic starter set for development, then separate development cases from a held-out test set. Do not infer therapeutic effectiveness from judge scores; participant usability and outcome studies answer different questions.
@@ -72,3 +100,5 @@ Use the synthetic starter set for development, then separate development cases f
 ## Initial verification
 
 The backend regression suite passed 234 tests during implementation. After the final evaluation-only changes, all seven runner tests passed again. A one-scenario live smoke test completed all three generations and six validated critiques after reducing Qwen's critic budget. This verifies connectivity and output handling, not comparative model quality. Full benchmark results have not yet been collected.
+
+Claude integration has mocked API coverage for headers, system instructions, schema preservation, refusals, truncation, credential checks, HTTP errors and aborted body reads. Live Claude verification requires an Anthropic API key; no key was configured during implementation, so the four-model live command stopped in preflight without API calls.
