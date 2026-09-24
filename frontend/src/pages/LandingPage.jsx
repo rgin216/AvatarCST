@@ -28,7 +28,7 @@ export default function LandingPage({
   userName,
   userId,
   sessionOptions = [],
-  pipelineMode = "free",
+  pipelineMode = "openai-fast-scripted",
   onPipelineModeChange = () => {},
   evaluationSelection = 'off',
   onEvaluationSelectionChange = () => {},

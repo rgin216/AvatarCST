@@ -143,12 +143,12 @@ function loadYouTubeIframeApi() {
   return youtubeIframeApiPromise;
 }
 
-function getInitialAvatarMode(defaultAvatarMode = "male") {
+function getInitialAvatarMode(defaultAvatarMode = "visualizer") {
   if (import.meta.env.DEV) {
     const requestedMode = new URLSearchParams(window.location.search).get("avatar");
     if (avatarModeIds.has(requestedMode)) return requestedMode;
   }
-  return avatarModeIds.has(defaultAvatarMode) ? defaultAvatarMode : "male";
+  return avatarModeIds.has(defaultAvatarMode) ? defaultAvatarMode : "visualizer";
 }
 
 function formatPlaybackDuration(seconds) {
@@ -200,9 +200,9 @@ export default function SessionPage({
   sessionId,
   onEnd,
   userName,
-  pipelineMode: initialPipelineMode = "free",
+  pipelineMode: initialPipelineMode = "openai-fast-scripted",
   evaluationFacilitator,
-  defaultAvatarMode = "male",
+  defaultAvatarMode = "visualizer",
 }) {
   const [sessionReady, setSessionReady] = useState(false);
   const [messages, setMessages] = useState([]);
@@ -234,7 +234,7 @@ export default function SessionPage({
   const [wheelResultPending, setWheelResultPending] = useState(false);
   const [wheelRotation, setWheelRotation] = useState(0);
   const [skipSlideInput, setSkipSlideInput] = useState("");
-  const pipelineMode = initialPipelineMode || "free";
+  const pipelineMode = initialPipelineMode || "openai-fast-scripted";
   const showDevSkip = import.meta.env.DEV;
   const timelineRef = useRef(null);
   const avatarModeRef = useRef(avatarMode);

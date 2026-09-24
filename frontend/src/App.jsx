@@ -12,14 +12,14 @@ import SettingsPage from "./pages/SettingsPage";
 import { toTitleCase } from "./utils/formatName";
 import { LanguageProvider } from "./language/LanguageContext.jsx";
 
-const DEFAULT_USER_SETTINGS = { personality: "default", language: "en", avatarMode: "male" };
+const DEFAULT_USER_SETTINGS = { personality: "default", language: "en", avatarMode: "visualizer" };
 
 const devParams = new URLSearchParams(window.location.search);
 const devSessionEnabled = import.meta.env.DEV && devParams.get("devSession") === "1";
 const pipelineModes = new Set(["free", "openai-fast-scripted"]);
 const getInitialPipelineMode = () => {
   const requestedMode = devParams.get("pipeline");
-  return pipelineModes.has(requestedMode) ? requestedMode : "free";
+  return pipelineModes.has(requestedMode) ? requestedMode : "openai-fast-scripted";
 };
 
 const AUTH_STORAGE_KEY = "avatarcst.auth";
