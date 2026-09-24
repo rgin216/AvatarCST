@@ -4,13 +4,22 @@ import theme from "../utils/theme";
 import useIsDesktop from "../hooks/useIsDesktop";
 import { useLanguage } from "../language/useLanguage.js";
 import { SUPPORTED_LANGUAGES } from "../language/translations.js";
+import {
+  clampSpeechRate,
+  formatSpeechRate,
+  SPEECH_RATE_MAX,
+  SPEECH_RATE_MIN,
+  SPEECH_RATE_STEP,
+} from "../utils/speechRate.js";
 
 export default function SettingsPage({ userId, userName, settings, onBack, onSettingsChange }) {
   const isDesktop = useIsDesktop();
   const { t } = useLanguage();
   const [savingFields, setSavingFields] = useState(() => new Set());
   const [error, setError] = useState(null);
+  const [speechRateDraft, setSpeechRateDraft] = useState(null);
   const isSaving = savingFields.size > 0;
+  const speechRateValue = speechRateDraft ?? clampSpeechRate(settings.speechRate);
 
   const personalityOptions = [
     { id: "default", label: t("settings.personality.default") },
@@ -75,7 +84,38 @@ export default function SettingsPage({ userId, userName, settings, onBack, onSet
     </div>
   );
 
-  const section = (titleKey, field, options) => (
+  // Saved only when the slider is released, not on every step while dragging.
+  const commitSpeechRate = () => {
+    if (speechRateDraft !== null) applySetting("speechRate", speechRateDraft);
+    setSpeechRateDraft(null);
+  };
+
+  const speechRateControl = () => (
+    <div style={{ display: "grid", gap: 8 }}>
+      <div style={{ fontSize: 22, fontWeight: 700, color: theme.text }}>{formatSpeechRate(speechRateValue)}</div>
+      <input
+        type="range"
+        min={SPEECH_RATE_MIN}
+        max={SPEECH_RATE_MAX}
+        step={SPEECH_RATE_STEP}
+        value={speechRateValue}
+        disabled={isSaving}
+        onChange={(event) => setSpeechRateDraft(clampSpeechRate(event.target.value))}
+        onPointerUp={commitSpeechRate}
+        onKeyUp={commitSpeechRate}
+        onBlur={commitSpeechRate}
+        aria-label={t("settings.speechRate")}
+        aria-valuetext={formatSpeechRate(speechRateValue)}
+        style={{ width: "100%", accentColor: "#7AAB72", cursor: isSaving ? "default" : "pointer" }}
+      />
+      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: theme.textLight }}>
+        <span>{t("settings.speechRate.slower")}</span>
+        <span>{t("settings.speechRate.faster")}</span>
+      </div>
+    </div>
+  );
+
+  const section = (titleKey, field, content) => (
     <div style={{ background: theme.white, borderRadius: 20, padding: "20px 22px", marginBottom: 16, boxShadow: "0 4px 20px rgba(0,0,0,0.05)" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
         <div style={{ fontSize: 13, fontWeight: 700, color: theme.textLight, textTransform: "uppercase", letterSpacing: "0.07em" }}>
@@ -84,7 +124,7 @@ export default function SettingsPage({ userId, userName, settings, onBack, onSet
         {savingFields.has(field) && <div style={{ fontSize: 12, color: theme.textLight }}>{t("caregiver.loading")}</div>}
         {error === field && <div style={{ fontSize: 12, color: "#C0504D" }}>⚠</div>}
       </div>
-      {segmentedControl(field, options)}
+      {Array.isArray(content) ? segmentedControl(field, content) : content}
     </div>
   );
 
@@ -119,6 +159,7 @@ export default function SettingsPage({ userId, userName, settings, onBack, onSet
           {section("settings.personality", "personality", personalityOptions)}
           {section("settings.language", "language", SUPPORTED_LANGUAGES)}
           {section("settings.avatar", "avatarMode", avatarOptions)}
+          {section("settings.speechRate", "speechRate", speechRateControl())}
         </div>
       </div>
     </div>

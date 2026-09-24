@@ -16,6 +16,13 @@ import {
   rhubarbJsonToTimeline,
 } from "../utils/lipSync.js";
 import theme from "../utils/theme";
+import {
+  clampSpeechRate,
+  formatSpeechRate,
+  SPEECH_RATE_MAX,
+  SPEECH_RATE_MIN,
+  SPEECH_RATE_STEP,
+} from "../utils/speechRate.js";
 
 // Placeholder shown only until the real opening slide for this session loads -
 // intentionally has no imageUrl/title/bullets from any specific session, so the
@@ -202,10 +209,13 @@ export default function SessionPage({
   sessionId,
   onEnd,
   userName,
+  sessionTitle = "",
   pipelineMode: initialPipelineMode = "openai-fast-scripted",
   evaluationFacilitator,
   introductionRequired = false,
   defaultAvatarMode = "visualizer",
+  defaultSpeechRate = 1,
+  onSpeechRateChange,
 }) {
   const [sessionReady, setSessionReady] = useState(false);
   const [messages, setMessages] = useState([]);
@@ -217,6 +227,9 @@ export default function SessionPage({
   const [slide, setSlide] = useState(defaultSlide);
   const [avatarMode, setAvatarMode] = useState(() => getInitialAvatarMode(defaultAvatarMode));
   const [lipSyncMode, setLipSyncMode] = useState("rhubarb");
+  const [speechRate, setSpeechRate] = useState(() => clampSpeechRate(defaultSpeechRate));
+  const [avatarSettingsOpen, setAvatarSettingsOpen] = useState(false);
+  const avatarSettingsRef = useRef(null);
   const [pendingPlay, setPendingPlay] = useState(false);
   const [avatarNarrationActive, setAvatarNarrationActive] = useState(false);
   const [autoAdvanceFailedSlideId, setAutoAdvanceFailedSlideId] = useState(null);
@@ -374,6 +387,33 @@ export default function SessionPage({
     avatarModeRef.current = avatarMode;
     if (avatarMode === "visualizer") timelineRef.current = null;
   }, [avatarMode]);
+
+  // Rate-shift playback in the browser rather than re-synthesising: pitch is
+  // preserved, the change applies mid-sentence, and Rhubarb cues stay aligned
+  // because lip sync samples audio.currentTime. defaultPlaybackRate carries the
+  // rate across the src swaps between narration segments.
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    audio.defaultPlaybackRate = speechRate;
+    audio.playbackRate = speechRate;
+  }, [speechRate]);
+
+  useEffect(() => {
+    if (!avatarSettingsOpen) return undefined;
+    const closeOnOutsidePointer = (event) => {
+      if (!avatarSettingsRef.current?.contains(event.target)) setAvatarSettingsOpen(false);
+    };
+    const closeOnEscape = (event) => {
+      if (event.key === "Escape") setAvatarSettingsOpen(false);
+    };
+    document.addEventListener("pointerdown", closeOnOutsidePointer);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("pointerdown", closeOnOutsidePointer);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [avatarSettingsOpen]);
 
   useEffect(() => {
     startTime.current = Date.now();
@@ -697,6 +737,18 @@ export default function SessionPage({
       commitPendingSlideTransition();
     }
     finishNarrationSequence();
+  }
+
+  // Dev-only: finish Aria's speech now, exactly as if the audio had ended, so
+  // any slide change waiting on her narration still happens.
+  function skipNarration() {
+    if (!avatarNarrationActiveRef.current) return;
+    if (narrationPauseRef.current) window.clearTimeout(narrationPauseRef.current);
+    narrationPauseRef.current = null;
+    narrationQueueRef.current = [];
+    audioRef.current?.pause();
+    setPendingPlay(false);
+    continueNarrationSequence();
   }
 
   function finishNarrationSequence() {
@@ -1547,32 +1599,48 @@ export default function SessionPage({
     <div className="session-stage">
       {evaluationFacilitator && <div role="status" style={{ position: 'absolute', bottom: 8, left: 12, zIndex: 20, background: 'white', padding: '4px 10px', borderRadius: 8, fontSize: 12 }}>Research facilitator: {evaluationFacilitator}</div>}
       <header className="session-topbar">
-        <div className="session-status">
-          <span className="pulse-dot" />
-          <span>Session in progress</span>
-        </div>
-        <div className="session-meta">
-          {sessionMetaLabel ? `${sessionMetaLabel} / ` : ""}{formatElapsed(elapsed)}
-        </div>
-        {showDevSkip && !evaluationFacilitator && (
-          <div className="session-skip-control" aria-label="Skip to slide for testing">
-            <span>Skip</span>
-            <input
-              type="number"
-              min="1"
-              max={slide.total || 1}
-              value={skipSlideInput}
-              onChange={(event) => setSkipSlideInput(event.target.value)}
-              onKeyDown={(event) => event.key === "Enter" && handleSkipToSlide()}
-              placeholder="Slide"
-              disabled={sessionInputDisabled}
-            />
-            <button type="button" onClick={handleSkipToSlide} disabled={sessionInputDisabled}>
-              Go
-            </button>
+        <div className="session-heading">
+          <div className="session-status">
+            <span className="pulse-dot" />
+            <span className="session-status-label">Session in progress</span>
           </div>
-        )}
-        <button onClick={onEnd} className="session-end-button">End</button>
+          {(sessionTitle || sessionMetaLabel) && (
+            <span className="session-title">{sessionTitle || sessionMetaLabel}</span>
+          )}
+          <div className="session-meta">
+            {slide.total > 0 && (
+              <span
+                className="session-meta-chip"
+                title={import.meta.env.DEV && slide.deckSlide ? `Deck slide ${slide.deckSlide}` : undefined}
+              >
+                Step {slide.index + 1} of {slide.total}
+              </span>
+            )}
+            <span className="session-meta-chip" aria-label="Time elapsed">{formatElapsed(elapsed)}</span>
+          </div>
+        </div>
+        <div className="session-actions">
+          {showDevSkip && !evaluationFacilitator && (
+            <div className="session-skip-control" aria-label="Skip to slide for testing">
+              <span>Skip</span>
+              <input
+                type="number"
+                min="1"
+                max={slide.total || 1}
+                value={skipSlideInput}
+                onChange={(event) => setSkipSlideInput(event.target.value)}
+                onKeyDown={(event) => event.key === "Enter" && handleSkipToSlide()}
+                placeholder="#"
+                aria-label="Slide number"
+                disabled={sessionInputDisabled}
+              />
+              <button type="button" onClick={handleSkipToSlide} disabled={sessionInputDisabled}>
+                Go
+              </button>
+            </div>
+          )}
+          <button onClick={onEnd} className="session-end-button">End session</button>
+        </div>
       </header>
 
       <main className="session-slide-shell">
@@ -1586,12 +1654,6 @@ export default function SessionPage({
           {!sessionReady && (
             <div className="slide-loading-overlay" aria-label="Preparing your session">
               <div className="session-loading-spinner" />
-            </div>
-          )}
-          {slide.total > 0 && (
-            <div className="ppt-slide-progress">
-              Session step {slide.index + 1} / {slide.total}
-              {slide.deckSlide ? ` / Deck slide ${slide.deckSlide}` : ""}
             </div>
           )}
           {orientationInteraction && <OrientationActivity key={slide.id || slide.index} interaction={orientationInteraction} title={slide.title} disabled={sessionInputDisabled || isRecording} onActivity={registerUserActivity} onComplete={sendMessage} />}
@@ -1957,6 +2019,98 @@ export default function SessionPage({
           </div>
         </section>
 
+        <section className="avatar-dock" aria-label="Aria avatar">
+          <div className="avatar-figure real-avatar">
+            <AvatarViewer avatarMode={avatarMode} lipSyncFrameRef={lipSyncFrameRef} />
+          </div>
+          <span className="avatar-name">Aria</span>
+          <div className="avatar-settings" ref={avatarSettingsRef}>
+            <button
+              type="button"
+              className="avatar-settings-toggle"
+              aria-expanded={avatarSettingsOpen}
+              aria-controls="avatar-settings-panel"
+              onClick={() => setAvatarSettingsOpen((open) => !open)}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+                <line x1="4" y1="7" x2="20" y2="7" /><line x1="4" y1="17" x2="20" y2="17" />
+                <circle cx="9" cy="7" r="2.5" fill="currentColor" /><circle cx="15" cy="17" r="2.5" fill="currentColor" />
+              </svg>
+              Voice
+            </button>
+            {avatarSettingsOpen && (
+              <div id="avatar-settings-panel" className="avatar-audio-controls" role="group" aria-label="Voice and avatar settings">
+                <label className="speech-rate-control">
+                  <span>Speech speed <strong>{formatSpeechRate(speechRate)}</strong></span>
+                  <input
+                    type="range"
+                    min={SPEECH_RATE_MIN}
+                    max={SPEECH_RATE_MAX}
+                    step={SPEECH_RATE_STEP}
+                    value={speechRate}
+                    onChange={(event) => {
+                      const rate = clampSpeechRate(event.target.value);
+                      setSpeechRate(rate);
+                      onSpeechRateChange?.(rate);
+                    }}
+                    aria-valuetext={formatSpeechRate(speechRate)}
+                  />
+                </label>
+                <label className="avatar-select-control">
+                  <span>Avatar</span>
+                  <select value={avatarMode} onChange={(event) => setAvatarMode(event.target.value)}>
+                    {avatarModes.map((mode) => (
+                      <option key={mode.id} value={mode.id}>{mode.label}</option>
+                    ))}
+                  </select>
+                </label>
+                <label className="avatar-select-control">
+                  <span>Lip sync</span>
+                  <select
+                    value={lipSyncMode}
+                    onChange={(event) => setLipSyncMode(event.target.value)}
+                    disabled={avatarMode === "visualizer"}
+                  >
+                    {lipSyncModes.map((mode) => (
+                      <option key={mode.id} value={mode.id}>{mode.label}</option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+            )}
+          </div>
+          {pendingPlay && (
+            <button
+              type="button"
+              className="avatar-play-button"
+              onClick={() => {
+                audioRef.current?.play().then(() => {
+                  setPendingPlay(false);
+                  startLipSyncPlayback();
+                });
+              }}
+            >
+              ▶ Play response
+            </button>
+          )}
+          {showDevSkip && !evaluationFacilitator && avatarNarrationActive && !pendingPlay && (
+            <button type="button" className="avatar-skip-speech" onClick={skipNarration}>
+              Skip ⏭
+            </button>
+          )}
+          <audio
+            ref={audioRef}
+            crossOrigin="anonymous"
+            onPlay={handleAudioPlay}
+            onPause={handleAudioPause}
+            onEnded={handleAvatarAudioEnded}
+            onError={handleAvatarAudioUnavailable}
+            onSeeked={() => publishLipSyncFrame(Boolean(audioRef.current && !audioRef.current.paused))}
+            preload="auto"
+            hidden
+          />
+        </section>
+
         <aside className="session-side-panel" aria-label="Session conversation">
           <div className="session-focus-panel">
             <span>Now discussing</span>
@@ -1993,57 +2147,6 @@ export default function SessionPage({
             )}
           </div>
         </aside>
-
-        <section className="avatar-dock" aria-label="Aria avatar">
-          <div className="avatar-figure real-avatar">
-            <AvatarViewer avatarMode={avatarMode} lipSyncFrameRef={lipSyncFrameRef} />
-          </div>
-          <div className="avatar-audio-controls">
-            <select
-              value={avatarMode}
-              onChange={(event) => setAvatarMode(event.target.value)}
-              aria-label="Avatar mode"
-            >
-              {avatarModes.map((mode) => (
-                <option key={mode.id} value={mode.id}>{mode.label}</option>
-              ))}
-            </select>
-            <select
-              value={lipSyncMode}
-              onChange={(event) => setLipSyncMode(event.target.value)}
-              aria-label="Lip-sync mode"
-              disabled={avatarMode === "visualizer"}
-            >
-              {lipSyncModes.map((mode) => (
-                <option key={mode.id} value={mode.id}>{mode.label}</option>
-              ))}
-            </select>
-            {pendingPlay && (
-              <button
-                type="button"
-                onClick={() => {
-                  audioRef.current?.play().then(() => {
-                    setPendingPlay(false);
-                    startLipSyncPlayback();
-                  });
-                }}
-              >
-                ▶ Play response
-              </button>
-            )}
-          </div>
-          <audio
-            ref={audioRef}
-            crossOrigin="anonymous"
-            onPlay={handleAudioPlay}
-            onPause={handleAudioPause}
-            onEnded={handleAvatarAudioEnded}
-            onError={handleAvatarAudioUnavailable}
-            onSeeked={() => publishLipSyncFrame(Boolean(audioRef.current && !audioRef.current.paused))}
-            preload="auto"
-            hidden
-          />
-        </section>
       </main>
 
       <SessionInputBar

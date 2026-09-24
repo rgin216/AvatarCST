@@ -23,6 +23,8 @@ const userSettingsSchema = new Schema({
   personality: { type: String, enum: ['default', 'optimistic'], default: 'default' },
   language: { type: String, enum: ['en', 'zh', 'es', 'fr', 'mi'], default: 'en' },
   avatarMode: { type: String, enum: ['male', 'female', 'visualizer'], default: 'visualizer' },
+  // Browser playback multiplier for Aria's speech; 1 is the synthesised pace.
+  speechRate: { type: Number, min: 0.75, max: 1.25, default: 1 },
 }, { _id: false });
 
 const userSchema = new Schema({
@@ -30,6 +32,9 @@ const userSchema = new Schema({
   // Only registration opts in; older accounts retain their existing access.
   introductionRequired: { type: Boolean, default: false },
   introductionCompletedAt: Date,
+  // Same opt-in as above: only new registrations are shown the landing tour.
+  landingTourRequired: { type: Boolean, default: false },
+  landingTourCompletedAt: Date,
   preferredName: { type: String },
   dateOfBirth: { type: Date },
   culturalBackground: { type: String },

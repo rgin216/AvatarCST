@@ -1,6 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import api from "../services/api.js";
 import EvaluationControls from '../components/EvaluationControls.jsx';
+import LandingTour from "../components/LandingTour.jsx";
 import theme from "../utils/theme";
 import useIsDesktop from "../hooks/useIsDesktop";
 import { useLanguage } from "../language/useLanguage.js";
@@ -33,10 +34,17 @@ export default function LandingPage({
   evaluationSelection = 'off',
   onEvaluationSelectionChange = () => {},
   startError = '',
+  landingTourPending = false,
+  onLandingTourComplete = () => {},
 }) {
   const isDesktop = useIsDesktop();
   const { t, language } = useLanguage();
   const [lastSession, setLastSession] = useState(null);
+  const [tourReplayOpen, setTourReplayOpen] = useState(false);
+  const settingsButtonRef = useRef(null);
+  const caregiverButtonRef = useRef(null);
+  const sessionsRef = useRef(null);
+  const tourTargets = { sessions: sessionsRef, settings: settingsButtonRef, caregiver: caregiverButtonRef };
   const [access, setAccess] = useState(null);
   const [accessAttempt, setAccessAttempt] = useState(0);
   const [pageIndex, setPageIndex] = useState(0);
@@ -127,6 +135,7 @@ export default function LandingPage({
         }}>
           <div className="fade-up" style={{
             display: "flex", justifyContent: "space-between", alignItems: "center",
+            flexWrap: "wrap", gap: 16,
             marginBottom: isDesktop ? 40 : 32,
           }}>
             <div>
@@ -134,8 +143,17 @@ export default function LandingPage({
               <div style={{ fontSize: 13, color: theme.textLight, marginTop: 2 }}>Your therapy companion</div>
             </div>
             <div style={{ display: "flex", gap: 10 }}>
-              <button onClick={onSettings} className="btn-outline">⚙️ {t("landing.settings")}</button>
-              <button onClick={onCaregiver} className="btn-outline">👨‍👩‍👧 {t("landing.caregiver")}</button>
+              <button
+                type="button"
+                onClick={() => setTourReplayOpen(true)}
+                className="btn-outline"
+                aria-label={isDesktop ? undefined : t("tour.replay")}
+                title={t("tour.replay")}
+              >
+                ❓{isDesktop && ` ${t("tour.replay")}`}
+              </button>
+              <button ref={settingsButtonRef} onClick={onSettings} className="btn-outline">⚙️ {t("landing.settings")}</button>
+              <button ref={caregiverButtonRef} onClick={onCaregiver} className="btn-outline">👨‍👩‍👧 {t("landing.caregiver")}</button>
             </div>
           </div>
 
@@ -244,7 +262,7 @@ export default function LandingPage({
           {currentAccess?.introductionRequired && <p role="status">Complete Session 1 fully to unlock all other sessions.</p>}
           {!currentAccess && <p role="status">Checking available sessions…</p>}
           {currentAccess?.error && <p role="alert">Could not check session access. <button type="button" onClick={() => setAccessAttempt(value => value + 1)}>Try again</button></p>}
-          <div className="fade-up delay-4" style={{ display: "flex", alignItems: "center", gap: isDesktop ? 14 : 8 }}>
+          <div ref={sessionsRef} className="fade-up delay-4" style={{ display: "flex", alignItems: "center", gap: isDesktop ? 14 : 8 }}>
             {totalPages > 1 && (
               <button
                 type="button"
@@ -333,6 +351,18 @@ export default function LandingPage({
           )}
         </div>
       </div>
+
+      {(landingTourPending || tourReplayOpen) && (
+        <LandingTour
+          userName={userName}
+          targets={tourTargets}
+          introductionLocked={Boolean(currentAccess?.introductionRequired)}
+          onClose={() => {
+            setTourReplayOpen(false);
+            if (landingTourPending) onLandingTourComplete();
+          }}
+        />
+      )}
     </div>
   );
 }

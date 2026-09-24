@@ -5,7 +5,7 @@ export const createUser = async (req, res, next) => {
   try {
     const { name, preferredName, dateOfBirth, culturalBackground, role, caregivers, patients, settings } = req.body || {};
     const user = await User.create({ name, preferredName, dateOfBirth, culturalBackground,
-      role, caregivers, patients, settings, introductionRequired: true });
+      role, caregivers, patients, settings, introductionRequired: true, landingTourRequired: true });
     await Memory.create({ userId: user._id, entries: [] });
     res.status(201).json(user);
   } catch (err) {
@@ -25,11 +25,12 @@ export const getUser = async (req, res, next) => {
 
 export const updateUserSettings = async (req, res, next) => {
   try {
-    const { personality, language, avatarMode } = req.body || {};
+    const { personality, language, avatarMode, speechRate } = req.body || {};
     const update = {};
     if (personality !== undefined) update['settings.personality'] = personality;
     if (language !== undefined) update['settings.language'] = language;
     if (avatarMode !== undefined) update['settings.avatarMode'] = avatarMode;
+    if (speechRate !== undefined) update['settings.speechRate'] = speechRate;
 
     if (Object.keys(update).length === 0) {
       return res.status(400).json({ error: 'No supported settings provided' });
@@ -47,13 +48,30 @@ export const updateUserSettings = async (req, res, next) => {
   }
 };
 
+// Idempotent: only the first completion is recorded.
+export const completeLandingTour = async (req, res, next) => {
+  try {
+    const user = await User.findById(req.params.id).select('_id').lean();
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    await User.updateOne(
+      { _id: req.params.id, landingTourCompletedAt: null },
+      { $set: { landingTourCompletedAt: new Date() } }
+    );
+    res.status(204).end();
+  } catch (err) {
+    next(err);
+  }
+};
+
 export const findOrCreateByName = async (req, res, next) => {
   try {
     const name = req.params.name.trim();
     let user = await User.findOne({ name: { $regex: new RegExp(`^${name}$`, 'i') } });
     if (user) return res.json({ user, created: false });
 
-    user = await User.create({ name, preferredName: name, role: 'patient', introductionRequired: true });
+    user = await User.create({
+      name, preferredName: name, role: 'patient', introductionRequired: true, landingTourRequired: true,
+    });
     await Memory.create({ userId: user._id, entries: [] });
     res.status(201).json({ user, created: true });
   } catch (err) {

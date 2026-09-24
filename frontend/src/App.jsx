@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Navigate, Route, Routes, useNavigate, useParams } from "react-router-dom";
 import api from "./services/api.js";
 import LoginPage from "./pages/LoginPage";
@@ -12,7 +12,7 @@ import SettingsPage from "./pages/SettingsPage";
 import { toTitleCase } from "./utils/formatName";
 import { LanguageProvider } from "./language/LanguageContext.jsx";
 
-const DEFAULT_USER_SETTINGS = { personality: "default", language: "en", avatarMode: "visualizer" };
+const DEFAULT_USER_SETTINGS = { personality: "default", language: "en", avatarMode: "visualizer", speechRate: 1 };
 
 const devParams = new URLSearchParams(window.location.search);
 const devSessionEnabled = import.meta.env.DEV && devParams.get("devSession") === "1";
@@ -122,7 +122,7 @@ const TEST_SESSIONS = [
 
 // Rehydrates the pipeline mode a session actually started with, since a page
 // refresh loses the in-memory value chosen on the landing page.
-function SessionRoute({ userName, fallbackPipelineMode, defaultAvatarMode, onSessionEnd }) {
+function SessionRoute({ userName, fallbackPipelineMode, defaultAvatarMode, defaultSpeechRate, onSpeechRateChange, onSessionEnd }) {
   const { sessionId } = useParams();
   const [pipelineMode, setPipelineMode] = useState(fallbackPipelineMode);
   const [invalid, setInvalid] = useState(false);
@@ -177,7 +177,10 @@ function SessionRoute({ userName, fallbackPipelineMode, defaultAvatarMode, onSes
       onEnd={() => onSessionEnd(sessionId)}
       userName={userName}
       pipelineMode={pipelineMode}
+      sessionTitle={sessionInfo.data.title}
       defaultAvatarMode={defaultAvatarMode}
+      defaultSpeechRate={defaultSpeechRate}
+      onSpeechRateChange={onSpeechRateChange}
       evaluationFacilitator={sessionInfo.data.evaluation?.facilitator?.id}
     />
   );
@@ -205,15 +208,16 @@ export default function App() {
   const [evaluationSelection, setEvaluationSelection] = useState('off');
   const [startError, setStartError] = useState('');
   const [userSettings, setUserSettings] = useState(DEFAULT_USER_SETTINGS);
+  const [landingTourPending, setLandingTourPending] = useState(false);
 
   useEffect(() => {
     if (!userId || devSessionEnabled) return;
     let cancelled = false;
     api.get(`/users/${userId}`)
       .then(({ data }) => {
-        if (!cancelled && data.settings) {
-          setUserSettings({ ...DEFAULT_USER_SETTINGS, ...data.settings });
-        }
+        if (cancelled) return;
+        if (data.settings) setUserSettings({ ...DEFAULT_USER_SETTINGS, ...data.settings });
+        setLandingTourPending(Boolean(data.landingTourRequired && !data.landingTourCompletedAt));
       })
       .catch(() => {});
     return () => { cancelled = true; };
@@ -223,11 +227,32 @@ export default function App() {
     setUserSettings((prev) => ({ ...prev, ...partial }));
   };
 
+  // The in-session slider fires on every step while dragging, so only save
+  // the value the participant settles on.
+  const speechRateSaveTimeoutRef = useRef(null);
+  useEffect(() => () => window.clearTimeout(speechRateSaveTimeoutRef.current), []);
+  const handleSessionSpeechRateChange = (speechRate) => {
+    handleSettingsChange({ speechRate });
+    window.clearTimeout(speechRateSaveTimeoutRef.current);
+    if (!userId || devSessionEnabled) return;
+    speechRateSaveTimeoutRef.current = window.setTimeout(() => {
+      api.patch(`/users/${userId}/settings`, { speechRate })
+        .catch((err) => console.error("Failed to save speechRate", err));
+    }, 600);
+  };
+
+  const handleLandingTourComplete = () => {
+    setLandingTourPending(false);
+    api.post(`/users/${userId}/landing-tour/complete`)
+      .catch((err) => console.error("Failed to save landing tour completion", err));
+  };
+
   const handleLogin = (id, name) => {
     const titled = toTitleCase(name);
     setUserId(id);
     setUserName(titled);
     setUserSettings(DEFAULT_USER_SETTINGS);
+    setLandingTourPending(false);
     storeAuth(id, titled);
     navigate("/landing");
   };
@@ -265,6 +290,7 @@ export default function App() {
     setUserId(null);
     setUserName("");
     setUserSettings(DEFAULT_USER_SETTINGS);
+    setLandingTourPending(false);
     navigate("/login", { replace: true });
   };
 
@@ -304,6 +330,8 @@ export default function App() {
                 evaluationSelection={evaluationSelection}
                 onEvaluationSelectionChange={setEvaluationSelection}
                 startError={startError}
+                landingTourPending={landingTourPending}
+                onLandingTourComplete={handleLandingTourComplete}
               />
             ) : (
               <Navigate to="/login" replace />
@@ -318,6 +346,8 @@ export default function App() {
                 userName={userName}
                 fallbackPipelineMode={selectedPipelineMode}
                 defaultAvatarMode={userSettings.avatarMode}
+                defaultSpeechRate={userSettings.speechRate}
+                onSpeechRateChange={handleSessionSpeechRateChange}
                 onSessionEnd={handleEndSession}
               />
             ) : (
