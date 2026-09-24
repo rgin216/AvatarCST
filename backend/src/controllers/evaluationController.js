@@ -26,7 +26,7 @@ export const retryEvaluation = async (req, res, next) => {
     const session = await Session.findById(req.params.id).lean();
     if (!session?.evaluation) return res.status(404).json({ error: 'Evaluation session not found' });
     const retried = await SessionEvaluation.findOneAndUpdate({ sessionId: session._id, status: 'failed' },
-      { $set: { status: 'queued', attempts: 0, error: null } }, { returnDocument: 'after' });
+      { $set: { status: 'queued', attempts: 0, error: null }, $unset: { report: 1 } }, { returnDocument: 'after' });
     if (!retried && session.status !== 'completed') return res.status(409).json({ error: 'Finish the session before evaluating' });
     if (!retried) {
       const existing = await SessionEvaluation.findOne({ sessionId: session._id }).lean();

@@ -98,6 +98,6 @@ Use the synthetic starter set for development, then separate development cases f
 
 ## Initial verification
 
-The backend regression suite passed 234 tests during implementation. After the final evaluation-only changes, all seven runner tests passed again. A one-scenario live smoke test completed all three generations and six validated critiques after reducing Qwen's critic budget. This verifies connectivity and output handling, not comparative model quality. Full benchmark results have not yet been collected.
+The backend regression suite and evaluation runner tests passed during implementation. A one-scenario live smoke test completed all three generations and six validated critiques after reducing Qwen's critic budget. This verifies connectivity and output handling, not comparative model quality. Full benchmark results have not yet been collected.
 
 Claude integration has mocked API coverage for headers, system instructions, schema preservation, refusals, truncation, credential checks, HTTP errors and aborted body reads. Live Claude verification requires an Anthropic API key; no key was configured during implementation, so the four-model live command stopped in preflight without API calls.

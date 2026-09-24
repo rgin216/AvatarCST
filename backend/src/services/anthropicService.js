@@ -31,10 +31,15 @@ export async function generateAnthropicResponse(messages, options = {}) {
       }),
     });
     // Include body consumption in the timeout, not just receipt of headers.
-    const data = await response.json();
+    let data;
+    try { data = await response.json(); }
+    catch (error) {
+      if (error.name === 'AbortError') throw error;
+      throw new Error(response.ok ? 'Anthropic returned invalid JSON' : `Anthropic HTTP ${response.status}`);
+    }
     if (!response.ok) {
       // Do not persist provider messages that might echo input or account details.
-      throw new Error(`Anthropic HTTP ${response.status} (${data.error?.type || 'request_failed'})`);
+      throw new Error(`Anthropic HTTP ${response.status}`);
     }
     if (data.stop_reason !== 'end_turn') {
       throw new Error(`Anthropic did not complete response (${data.stop_reason || 'unknown'})`);

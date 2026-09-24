@@ -120,9 +120,11 @@ const generateOpenAIResponse = async (messages, options = {}) => {
   const maxTokens = options.maxTokens ?? 140;
   const model = options.model || OPENAI_TEXT_MODEL;
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), OPENAI_TIMEOUT_MS);
+  const timeoutMs = options.timeoutMs ?? OPENAI_TIMEOUT_MS;
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
 
   let response;
+  let data;
   try {
     response = await fetch(OPENAI_RESPONSES_URL, {
       method: 'POST',
@@ -139,19 +141,18 @@ const generateOpenAIResponse = async (messages, options = {}) => {
         ...(options.textFormat || options.json ? { text: { format: options.textFormat || { type: 'json_object' } } } : {}),
       }),
     });
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(`OpenAI error ${response.status}: ${text}`);
+    }
+    data = await response.json();
   } catch (err) {
-    if (err.name === 'AbortError') throw new Error('OpenAI request timed out after 15s');
+    if (err.name === 'AbortError') throw new Error(`OpenAI request timed out after ${timeoutMs / 1000}s`);
     throw err;
   } finally {
     clearTimeout(timer);
   }
 
-  if (!response.ok) {
-    const text = await response.text();
-    throw new Error(`OpenAI error ${response.status}: ${text}`);
-  }
-
-  const data = await response.json();
   const raw = extractResponsesText(data);
   if (data.status === 'incomplete' || !raw.trim()) throw new Error('OpenAI did not produce a complete response');
   return options.json ? raw : stripAssistantPrefix(raw);

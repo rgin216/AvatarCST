@@ -58,7 +58,28 @@ test('Claude surfaces HTTP failures without echoing sensitive provider detail', 
   key(t);
   t.mock.method(globalThis, 'fetch', async () => Response.json({ error: { type: 'rate_limit_error', message: 'private-account-detail' } }, { status: 429 }));
   await assert.rejects(generateResponse(messages, { provider: 'anthropic' }), error =>
-    /429.*rate_limit_error/.test(error.message) && !error.message.includes('private-account-detail'));
+    error.message === 'Anthropic HTTP 429');
+});
+
+test('Claude non-JSON bodies retain HTTP status without leaking parse excerpts', async t => {
+  key(t);
+  for (const status of [200, 502, 429]) {
+    const mock = t.mock.method(globalThis, 'fetch', async () => new Response('<html>private-body-detail</html>', { status }));
+    await assert.rejects(generateResponse(messages, { provider: 'anthropic' }), error =>
+      error.message === (status === 200 ? 'Anthropic returned invalid JSON' : `Anthropic HTTP ${status}`));
+    mock.mock.restore();
+  }
+});
+
+test('Claude preserves abort handling for both successful and failed response bodies', async t => {
+  key(t);
+  for (const ok of [true, false]) {
+    const mock = t.mock.method(globalThis, 'fetch', async () => ({ ok, status: ok ? 200 : 503,
+      json: async () => { throw new DOMException('private-abort-detail', 'AbortError'); },
+    }));
+    await assert.rejects(generateResponse(messages, { provider: 'anthropic' }), { message: 'Anthropic request timed out after 60s' });
+    mock.mock.restore();
+  }
 });
 test('Claude timeout applies while reading the response body', async t => {
   key(t);
