@@ -18,7 +18,7 @@ The project has moved beyond the old "basic backend foundation" phase. The main 
 
 - React/Vite frontend and Express/Mongo backend.
 - Login flow that creates or loads a patient user by name.
-- Landing flow with eleven test sessions (Sessions 9, 13, 14, and 15 are placeholder "coming soon" entries):
+- Landing flow with thirteen test sessions (Sessions 9 and 15 are placeholder "coming soon" entries):
   - `cst_intro_reminiscence` - Session 1: Introduction and Welcome.
   - `cst_childhood` - Session 2: Getting to Know You: Childhood.
   - `cst_physical_games` - Session 3: Physical Games.
@@ -30,9 +30,11 @@ The project has moved beyond the old "basic backend foundation" phase. The main 
   - `cst_categorizing_objects` - Session 10: Categorizing Objects.
   - `cst_orientation` - Session 11: Orientation.
   - `cst_using_money` - Session 12: Using Money.
+  - `cst_number_games` - Session 13: Number Games.
+  - `cst_word_games` - Session 14: Word Games.
 - Scripted session orchestration through `POST /api/sessions/:id/respond`.
 - Microphone input path through `POST /api/sessions/:id/respond-audio`.
-- Slide-backed session UI using exported slide images under `frontend/public/slides/session1/` through `session8/`, `session10/`, `session11/`, and `session12/`.
+- Slide-backed session UI using exported slide images under `frontend/public/slides/session1/` through `session8/`, and `session10/` through `session14/`.
 - Session 4 adds an `audioClips` slide interaction: local `.mp3` clips in `frontend/public/audio/session4/` for the instrument-sounds slide and the Name That Tune slides, with a per-slot naming tracker and lenient right/wrong acknowledgement.
 - Session 5 adds a `mealBuilder` slide interaction (drag-or-tap food cards onto a plate, mobile/desktop via Pointer Events) and a `phraseCards` slide interaction (blanked food sayings, judged the same way as Session 4's instrument naming but by content rather than turn order, so an out-of-order answer still lands on the right saying).
 - Session 4 and Session 12 use a `triviaChoice` slide interaction for guessing games: tap-to-choose answer buttons, or a typed/spoken guess, resolve one round at a time. Each tap emits one `[[trivia-choice:...]]` event, which the backend validates and persists before the next selection.
@@ -133,12 +135,12 @@ The session state fields that matter most are:
 Script data is currently split across two layers:
 
 - `backend/src/services/cstScriptService.js` contains executable session steps used by the app.
-- `backend/context/vCST_Session1_AI_Script.md` through `vCST_Session8_AI_Script.md`, `vCST_Session10_AI_Script.md`, `vCST_Session11_AI_Script.md`, and `vCST_Session12_AI_Script.md` hold fuller source script text and adaptation guidance. Each markdown file has one `---`-separated section per executable step, in order, after a preamble section.
+- `backend/context/vCST_Session1_AI_Script.md` through `vCST_Session8_AI_Script.md`, and `vCST_Session10_AI_Script.md` through `vCST_Session14_AI_Script.md`, hold fuller source script text and adaptation guidance. Each markdown file has one `---`-separated section per executable step, in order, after a preamble section. Session 14 is the exception: its prompt context is generated per step in `promptService.js`.
 - `backend/context/vCST_Initial_Prompt.md` defines Aria's tone and CST facilitation principles.
 
 Slide images live in:
 
-- `frontend/public/slides/session1/` through `session8/`, `session10/`, `session11/`, and `session12/`
+- `frontend/public/slides/session1/` through `session8/`, and `session10/` through `session14/`
 
 When adding a session:
 

@@ -11,14 +11,14 @@ import './PhraseCardsActivity.css';
 // mind" blank - the participant's own word echoed back). We splice it in wherever
 // the card text has a run of underscores.
 export default function PhraseCardsActivity({ interaction, title, namingSlots }) {
-  const { cards = [], icon } = interaction;
+  const { cards = [], icon, instruction = 'See if you can finish each saying — it is fine to guess.' } = interaction;
   const revealed = namingSlots?.revealed || [];
 
   return (
     <div className="phrase-cards-activity">
       <header className="phrase-cards-heading">
         <h1>{title}</h1>
-        <p>See if you can finish each saying — it is fine to guess.</p>
+        <p>{instruction}</p>
       </header>
       <div className="phrase-cards-board" style={icon ? { '--phrase-card-icon': `"${icon}"` } : undefined}>
         {cards.map((card, index) => {
