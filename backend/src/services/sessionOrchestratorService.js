@@ -493,7 +493,14 @@ const getExpectedOrientationAnswer = (type) => {
   return '';
 };
 
-const getRoutedNextStepIndex = ({ scriptId, step, boundedIndex, totalSteps }) => {
+const getRoutedNextStepIndex = ({ scriptId, step, boundedIndex, totalSteps, user }) => {
+  if (
+    scriptId === 'cst_childhood' &&
+    step?.id === 'childhood_check_in' &&
+    user?.savedThemeSong?.status === 'available'
+  ) {
+    return getScriptStepIndex(scriptId, 'childhood_orientation_day');
+  }
   let nextStepId = step?.nextStepId;
   if (step?.seasonBranches) {
     const expectedSeason = getExpectedOrientationAnswer('season')?.toLowerCase();
@@ -2695,6 +2702,7 @@ export const getSessionTurnContext = async (sessionId, existingSession = null) =
         step,
         boundedIndex,
         totalSteps,
+        user,
       });
   const nextStep = isFinalStep ? null : getScriptStep(session.scriptId, nextStepIndex).step;
   const nextSlide = nextStep

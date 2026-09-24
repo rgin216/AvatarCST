@@ -191,6 +191,18 @@ const scripts = {
         `My role is to keep you company, try some interesting questions with you, and enjoy some fun conversation together. There are no tests here and no right or wrong answers. I know your name is ${name}, but do you have a nickname or another name you would prefer me to call you?`,
     },
     {
+      id: 'theme_song_choice',
+      turns: 1,
+      deckSlide: null,
+      title: 'Your Favourite Song',
+      subtitle: 'A song for our sessions',
+      prompt: 'What is your favourite song?',
+      bullets: ['Favourite song', 'Artist if you know it', 'We can play it later'],
+      accent: '#F47C20',
+      reply: () =>
+        'Before we get to know each other, what is your favourite song? If you know the artist, please tell me their name too. I can keep the song ready to play near the end of our session. You can also say skip.',
+    },
+    {
       id: 'introduce_yourself',
       turns: 3,
       acceptAnyAnswer: true,
@@ -275,6 +287,22 @@ const scripts = {
       accent: '#F47C20',
       reply: () =>
         'Across the sessions, we will explore a range of themes, including childhood, physical games, sounds, food and kai, current affairs, word association, being creative, orientation, money, number games, word games, and a team quiz. Which theme sounds most interesting to you?',
+    },
+    {
+      id: 'intro_summary_song',
+      turns: 1,
+      deckSlide: null,
+      title: 'Your Favourite Song',
+      subtitle: 'A moment to listen',
+      prompt: 'Listen to your song',
+      bullets: ['Your song', 'Listen for up to 30 seconds', 'Press Done when ready'],
+      accent: '#F47C20',
+      interaction: spotifySongInteraction(),
+      recordAnswer: false,
+      reply: ({ themeSong }) =>
+        themeSong?.status === 'available'
+          ? `Before our last slide, here is your favourite song, ${themeSong.track.name} by ${themeSong.track.artistLabel}. It can play for up to 30 seconds. When you have finished listening, press Done, or say or type done.`
+          : 'Before our last slide, I could not prepare the song this time. Press Done, or say or type done, when you are ready to continue.',
     },
     {
       id: 'next_session',
@@ -606,7 +634,7 @@ const scripts = {
       recordAnswer: false,
       reply: ({ themeSong }) =>
         themeSong?.status === 'available'
-          ? `Before we look back over today, your song, ${themeSong.track.name} by ${themeSong.track.artistLabel}, is ready. It can play for up to one minute. When you have finished listening, press Done, or say or type done.`
+          ? `Before we look back over today, your song, ${themeSong.track.name} by ${themeSong.track.artistLabel}, is ready. It can play for up to 30 seconds. When you have finished listening, press Done, or say or type done.`
           : 'Before we look back over today, I was not able to prepare the song this time. Press Done, or say or type done, when you are ready to continue.',
       followUps: [
         ({ sessionSummary }) =>
@@ -646,7 +674,7 @@ const scripts = {
         bullets: ['Welcome back', 'Theme song'],
         reply: ({ themeSong }) =>
           themeSong?.status === 'available'
-            ? `Let us begin with your theme song, ${themeSong.track.name} by ${themeSong.track.artistLabel}. It can play for up to one minute. When you have finished listening, press Done, or say or type done.`
+            ? `Let us begin with your theme song, ${themeSong.track.name} by ${themeSong.track.artistLabel}. It can play for up to 30 seconds. When you have finished listening, press Done, or say or type done.`
             : 'I could not find a saved theme song this time. Press Done, or say or type done, when you are ready to continue.',
       },
       checkIn: {
@@ -1015,7 +1043,7 @@ const scripts = {
         bullets: ['Theme song', 'Listen together'],
         reply: ({ themeSong }) =>
           themeSong?.status === 'available'
-            ? `Let us begin with the theme song you chose last time, ${themeSong.track.name} by ${themeSong.track.artistLabel}. It can play for up to one minute. When you have finished listening, press Done, or say or type done.`
+            ? `Let us begin with the theme song you chose last time, ${themeSong.track.name} by ${themeSong.track.artistLabel}. It can play for up to 30 seconds. When you have finished listening, press Done, or say or type done.`
             : 'I could not find a saved theme song from last time. Press Done, or say or type done, when you are ready to continue.',
       },
       currentAffairsSlide: {
@@ -1420,7 +1448,7 @@ const scripts = {
         bullets: ['Theme song', 'Listen together'],
         reply: ({ themeSong }) =>
           themeSong?.status === 'available'
-            ? `Let us begin with the theme song you chose earlier, ${themeSong.track.name} by ${themeSong.track.artistLabel}. It can play for up to one minute. When you have finished listening, press Done, or say or type done.`
+            ? `Let us begin with the theme song you chose earlier, ${themeSong.track.name} by ${themeSong.track.artistLabel}. It can play for up to 30 seconds. When you have finished listening, press Done, or say or type done.`
             : 'I could not find a saved theme song from an earlier session. Press Done, or say or type done, when you are ready to continue.',
       },
       currentAffairsSlide: {
@@ -1759,7 +1787,7 @@ const scripts = {
         bullets: ['Theme song', 'Listen together'],
         reply: ({ themeSong }) =>
           themeSong?.status === 'available'
-            ? `Let us begin with the theme song you chose earlier, ${themeSong.track.name} by ${themeSong.track.artistLabel}. It can play for up to one minute. When you have finished listening, press Done, or say or type done.`
+            ? `Let us begin with the theme song you chose earlier, ${themeSong.track.name} by ${themeSong.track.artistLabel}. It can play for up to 30 seconds. When you have finished listening, press Done, or say or type done.`
             : 'I could not find a saved theme song from an earlier session. Press Done, or say or type done, when you are ready to continue.',
       },
       currentAffairsSlide: {
@@ -2004,7 +2032,7 @@ const scripts = {
         bullets: ['Theme song', 'Listen together'],
         reply: ({ themeSong }) =>
           themeSong?.status === 'available'
-            ? `Let us begin with the theme song you chose earlier, ${themeSong.track.name} by ${themeSong.track.artistLabel}. It can play for up to one minute. When you have finished listening, press Done, or say or type done.`
+            ? `Let us begin with the theme song you chose earlier, ${themeSong.track.name} by ${themeSong.track.artistLabel}. It can play for up to 30 seconds. When you have finished listening, press Done, or say or type done.`
             : 'I could not find a saved theme song from an earlier session. Press Done, or say or type done, when you are ready to continue.',
       },
       currentAffairsSlide: {
@@ -2282,7 +2310,7 @@ const scripts = {
         bullets: ['Theme song', 'Listen together'],
         reply: ({ themeSong }) =>
           themeSong?.status === 'available'
-            ? `Let us begin with the theme song you chose earlier, ${themeSong.track.name} by ${themeSong.track.artistLabel}. It can play for up to one minute. When you have finished listening, press Done, or say or type done.`
+            ? `Let us begin with the theme song you chose earlier, ${themeSong.track.name} by ${themeSong.track.artistLabel}. It can play for up to 30 seconds. When you have finished listening, press Done, or say or type done.`
             : 'I could not find a saved theme song from an earlier session. Press Done, or say or type done, when you are ready to continue.',
       },
       // This deck has no dedicated theme-song slide - it goes straight from the

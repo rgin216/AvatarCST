@@ -161,7 +161,7 @@ function getInitialAvatarMode(defaultAvatarMode = "visualizer") {
 }
 
 function formatPlaybackDuration(seconds) {
-  if (seconds === 60) return "one minute";
+  if (seconds === 60) return "30 seconds";
   if (seconds > 60 && seconds % 60 === 0) return `${seconds / 60} minutes`;
   return `${seconds} seconds`;
 }

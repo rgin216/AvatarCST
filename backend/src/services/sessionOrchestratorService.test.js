@@ -925,12 +925,16 @@ test('lists clean artist suggestions and resolves ordinal or title choices', () 
   );
 });
 
-test('asks for a preferred name on Session 1 slide 2 and then moves to location', () => {
+test('asks for a preferred name and favourite song before Session 1 introductions', () => {
   const nicknameStep = getScriptStep('cst_intro_reminiscence', 1).step;
-  const introductionStep = getScriptStep('cst_intro_reminiscence', 2).step;
+  const songStep = getScriptStep('cst_intro_reminiscence', 2).step;
+  const introductionStep = getScriptStep('cst_intro_reminiscence', 3).step;
 
   assert.match(renderScriptReply(nicknameStep, { name: 'Ryan' }), /I know your name is Ryan/i);
   assert.match(renderScriptReply(nicknameStep, { name: 'Ryan' }), /nickname or another name/i);
+  assert.equal(songStep.id, 'theme_song_choice');
+  assert.match(renderScriptReply(songStep, {}), /favourite song/i);
+  assert.equal(songStep.deckSlide, null);
   assert.equal(introductionStep.turns, 3);
   assert.match(renderScriptReply(introductionStep, {}), /Where do you live/i);
   assert.doesNotMatch(renderScriptReply(introductionStep, {}), /what is your name/i);
@@ -1031,7 +1035,7 @@ test('distinguishes a tentative orientation question from a second incorrect ans
 });
 
 test('Session 1 closing slide includes the discussion recap', () => {
-  const closingStep = getScriptStep('cst_intro_reminiscence', 7).step;
+  const closingStep = getScriptStep('cst_intro_reminiscence', 9).step;
   const reply = renderScriptReply(closingStep, {
     sessionSummary: 'Today, you spent time sharing a little about your home and daily life.',
   });
@@ -1039,6 +1043,21 @@ test('Session 1 closing slide includes the discussion recap', () => {
   assert.match(reply, /Today, you spent time sharing a little about your home and daily life/i);
   assert.match(reply, /what is one part of today/i);
   assert.doesNotMatch(reply, /^Ryan,/i);
+});
+
+test('Session 1 plays the selected song immediately before its final slide', () => {
+  const { totalSteps } = getScriptStep('cst_intro_reminiscence', 0);
+  const songStep = getScriptStep('cst_intro_reminiscence', totalSteps - 2).step;
+  const closingStep = getScriptStep('cst_intro_reminiscence', totalSteps - 1).step;
+
+  assert.equal(totalSteps, 10);
+  assert.equal(songStep.id, 'intro_summary_song');
+  assert.equal(songStep.interaction.type, 'spotifySong');
+  assert.equal(closingStep.id, 'next_session');
+  assert.match(renderScriptReply(songStep, { themeSong: {
+    status: 'available',
+    track: { name: 'Here Comes the Sun', artistLabel: 'The Beatles' },
+  } }), /Here Comes the Sun by The Beatles/);
 });
 
 test('does not mistake using a working computer for a work-life discussion', () => {
@@ -1418,17 +1437,17 @@ test('enables useful Session 1 adaptive follow-ups without deepening every slide
     'cst_interests',
     'cst_nutshell',
   ];
-  const directProgressStepIds = ['facilitator_role', 'session_themes', 'next_session'];
+  const directProgressStepIds = ['facilitator_role', 'theme_song_choice', 'session_themes', 'intro_summary_song', 'next_session'];
 
   for (const stepId of adaptiveStepIds) {
-    const step = Array.from({ length: 8 }, (_, index) =>
+    const step = Array.from({ length: 10 }, (_, index) =>
       getScriptStep('cst_intro_reminiscence', index).step
     ).find((candidate) => candidate.id === stepId);
     assert.equal(step?.adaptiveFollowUp?.enabled, true, stepId);
   }
 
   for (const stepId of directProgressStepIds) {
-    const step = Array.from({ length: 8 }, (_, index) =>
+    const step = Array.from({ length: 10 }, (_, index) =>
       getScriptStep('cst_intro_reminiscence', index).step
     ).find((candidate) => candidate.id === stepId);
     assert.ok(step, `${stepId} should exist`);
@@ -1486,7 +1505,7 @@ test('does not treat punctuation alone as an accept-any answer or recap detail',
 });
 
 test('describes the AI-supported Session 1 format as a research prototype', () => {
-  const step = getScriptStep('cst_intro_reminiscence', 3).step;
+  const step = getScriptStep('cst_intro_reminiscence', 4).step;
   const reply = renderScriptReply(step, {});
 
   assert.match(reply, /traditional group cognitive stimulation therapy/i);

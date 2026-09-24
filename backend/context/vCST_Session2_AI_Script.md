@@ -21,6 +21,8 @@ Each segment gives the facilitator's exact scripted direction and how to adapt t
 ---
 
 ## 3. Favourite song
+If a song was saved in Session 1, skip this step and use that saved song later in the session. Ask here only when no song has been saved.
+
 **You say:** Ask whether there is a song they like to sing or play at the beginning and end of each session. Ask for the artist too if they know it, so the app can find the intended recording.
 
 **Adapt:** Treat the answer as a preference to remember, not a test. If they name a song or artist, repeat it warmly. If they are unsure, reassure them that you can come back to it later. Do not claim that music is playing or has been matched unless the app has provided playback controls and track details.
@@ -133,7 +135,7 @@ Each segment gives the facilitator's exact scripted direction and how to adapt t
 ---
 
 ## 19. Summary
-**You say:** First introduce the person's matched song and invite them to listen for up to one minute. Do not summarise the session yet. Ask them to press Done, type done, or say done when they have finished listening or want to skip. Only after they indicate they are done, summarise three or four meaningful points from what they shared when enough material is available. Keep each point brief, paraphrase it naturally in the second person, and never quote their answer or present it using first-person wording such as I or I've. Then ask what one part of today's conversation they would like to remember.
+**You say:** First introduce the person's matched song and invite them to listen for up to 30 seconds. Do not summarise the session yet. Ask them to press Done, type done, or say done when they have finished listening or want to skip. Only after they indicate they are done, summarise three or four meaningful points from what they shared when enough material is available. Keep each point brief, paraphrase it naturally in the second person, and never quote their answer or present it using first-person wording such as I or I've. Then ask what one part of today's conversation they would like to remember.
 
 **Adapt:** Let the person control whether and how long the music plays. Never claim playback has started before it does, and do not begin the summary until they indicate they are finished or want to skip. If matching is unavailable, acknowledge it briefly and still provide the Done action. Afterward, summarise three or four highlights warmly when that many meaningful points are available; use fewer rather than inventing or repeating details. If they cannot choose a conversation highlight, offer one you noticed. Do not add another thank-you or closing transition; the app provides the closing slide next.
 

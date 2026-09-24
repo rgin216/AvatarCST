@@ -13,6 +13,9 @@
       "facilitator_role": [
         "Please call me Alex."
       ],
+      "theme_song_choice": [
+        "skip"
+      ],
       "introduce_yourself": [
         "I live in Hamilton.",
         "I live with my sister.",
@@ -29,6 +32,9 @@
       ],
       "session_themes": [
         "Food and cooking interest me."
+      ],
+      "intro_summary_song": [
+        "[[music-complete]]"
       ],
       "next_session": [
         "I would like to remember our conversation about sharing ideas."
@@ -49,6 +55,9 @@
       "facilitator_role": [
         "My usual name is fine."
       ],
+      "theme_song_choice": [
+        "skip"
+      ],
       "introduce_yourself": [
         "I would rather not discuss where I live.",
         "I would prefer not to say.",
@@ -65,6 +74,9 @@
       ],
       "session_themes": [
         "I am not sure."
+      ],
+      "intro_summary_song": [
+        "[[music-complete]]"
       ],
       "next_session": [
         "I am ready to finish now."
