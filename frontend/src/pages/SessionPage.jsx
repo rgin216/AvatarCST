@@ -201,6 +201,7 @@ export default function SessionPage({
   onEnd,
   userName,
   pipelineMode: initialPipelineMode = "free",
+  evaluationFacilitator,
   defaultAvatarMode = "male",
 }) {
   const [sessionReady, setSessionReady] = useState(false);
@@ -1534,6 +1535,7 @@ export default function SessionPage({
 
   return (
     <div className="session-stage">
+      {evaluationFacilitator && <div role="status" style={{ position: 'absolute', bottom: 8, left: 12, zIndex: 20, background: 'white', padding: '4px 10px', borderRadius: 8, fontSize: 12 }}>Research facilitator: {evaluationFacilitator}</div>}
       <header className="session-topbar">
         <div className="session-status">
           <span className="pulse-dot" />
@@ -1542,7 +1544,7 @@ export default function SessionPage({
         <div className="session-meta">
           {sessionMetaLabel ? `${sessionMetaLabel} / ` : ""}{formatElapsed(elapsed)}
         </div>
-        {showDevSkip && (
+        {showDevSkip && !evaluationFacilitator && (
           <div className="session-skip-control" aria-label="Skip to slide for testing">
             <span>Skip</span>
             <input

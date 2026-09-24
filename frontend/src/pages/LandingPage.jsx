@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import api from "../services/api.js";
+import EvaluationControls from '../components/EvaluationControls.jsx';
 import theme from "../utils/theme";
 import useIsDesktop from "../hooks/useIsDesktop";
 import { useLanguage } from "../language/useLanguage.js";
@@ -29,6 +30,9 @@ export default function LandingPage({
   sessionOptions = [],
   pipelineMode = "free",
   onPipelineModeChange = () => {},
+  evaluationSelection = 'off',
+  onEvaluationSelectionChange = () => {},
+  startError = '',
 }) {
   const isDesktop = useIsDesktop();
   const { t, language } = useLanguage();
@@ -222,6 +226,8 @@ export default function LandingPage({
             </div>
           </div>
 
+          <EvaluationControls value={evaluationSelection} onChange={onEvaluationSelectionChange} />
+          {startError && <p role="alert">{startError}</p>}
           <div className="fade-up delay-4" style={{ display: "flex", alignItems: "center", gap: isDesktop ? 14 : 8 }}>
             {totalPages > 1 && (
               <button

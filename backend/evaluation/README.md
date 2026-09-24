@@ -87,13 +87,12 @@ An API failure or invalid critique makes the command exit nonzero after saving c
 
 This is a component benchmark for adaptive acknowledgements. `responsePreview` concatenates the acknowledgement and fixture's scripted continuation to help assess their fit. It is explicitly a preview: the full orchestrator's overlap filtering, progression decisions, fallback handling, special activities and persisted state are not executed. Generation failures are exposed, not replaced with a scripted fallback. The provided fixtures preselect answer state, so they do not evaluate the model's answer-state decision.
 
-It does not yet rotate models in the live UI, evaluate complete sessions, measure speech/avatars, estimate API cost, or establish cognitive/clinical benefit. Generation latency includes client/network time and any retry; no provider token-usage or cost totals are claimed. Additional repetitions are stochastic, not deterministic replication; prompts and fixtures are saved to make differences inspectable.
+Full-session replay and opt-in live UI rotation are now available separately: see [the session evaluation guide](SESSIONS.md). Neither benchmark measures speech/avatars, estimates API cost, or establishes cognitive/clinical benefit. Generation latency includes client/network time and any retry; no provider token-usage or cost totals are claimed. Additional repetitions are stochastic, not deterministic replication; prompts and fixtures are saved to make differences inspectable.
 
 Next implementation stages:
-1. Replay complete application sessions with isolated state and record delivered text, progression and fallback provenance.
-2. Expand beyond Session 1 to image-grounded activities, orientation and summaries.
-3. Extend human-review comparisons with multiple reviewers, confidence intervals and held-out scenarios.
-4. Add opt-in session-level live assignments and asynchronous critiques after offline calibration.
+1. Expand replay fixtures beyond Session 1 to image-grounded activities, orientation and summaries.
+2. Extend human-review comparisons to full sessions, multiple reviewers, confidence intervals and held-out scenarios.
+3. Calibrate live-session critiques against independent human review.
 
 Use the synthetic starter set for development, then separate development cases from a held-out test set. Do not infer therapeutic effectiveness from judge scores; participant usability and outcome studies answer different questions.
 

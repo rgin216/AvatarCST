@@ -50,6 +50,9 @@ An offline facilitator/critic rotation benchmark is available. From `backend`, r
 `npm run eval:llm` for a dry run. See [the evaluation guide](backend/evaluation/README.md)
 for models, live runs, output files, and methodological limitations.
 
+Full-session replay and opt-in live facilitator rotation are also available without
+an Anthropic key. See [session evaluation setup](backend/evaluation/SESSIONS.md).
+
 ## Getting Started
 
 ### Prerequisites

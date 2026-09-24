@@ -175,6 +175,7 @@ function SessionRoute({ userName, fallbackPipelineMode, defaultAvatarMode, onSes
       userName={userName}
       pipelineMode={pipelineMode}
       defaultAvatarMode={defaultAvatarMode}
+      evaluationFacilitator={sessionInfo.data.evaluation?.facilitator?.id}
     />
   );
 }
@@ -198,6 +199,8 @@ export default function App() {
   const [userId, setUserId] = useState(devSessionEnabled ? "dev-user" : storedAuth?.userId ?? null);
   const [userName, setUserName] = useState(devSessionEnabled ? "Ryan" : storedAuth?.userName ?? "");
   const [selectedPipelineMode, setSelectedPipelineMode] = useState(getInitialPipelineMode);
+  const [evaluationSelection, setEvaluationSelection] = useState('off');
+  const [startError, setStartError] = useState('');
   const [userSettings, setUserSettings] = useState(DEFAULT_USER_SETTINGS);
 
   useEffect(() => {
@@ -229,16 +232,19 @@ export default function App() {
   const handleStartSession = async (sessionOption = TEST_SESSIONS[0]) => {
     if (!userId || sessionOption.disabled) return;
     try {
+      setStartError('');
       const { data } = await api.post("/sessions", {
         userId,
         title: sessionOption.title,
         theme: sessionOption.theme,
         scriptId: sessionOption.id,
         pipelineMode: selectedPipelineMode,
+        evaluationSelection,
       });
       navigate(`/session/${data._id}`);
     } catch (err) {
       console.error("Failed to start session", err);
+      setStartError(err.response?.data?.error || 'Could not start the session. Please try again.');
     }
   };
 
@@ -292,6 +298,9 @@ export default function App() {
                 sessionOptions={TEST_SESSIONS}
                 pipelineMode={selectedPipelineMode}
                 onPipelineModeChange={setSelectedPipelineMode}
+                evaluationSelection={evaluationSelection}
+                onEvaluationSelectionChange={setEvaluationSelection}
+                startError={startError}
               />
             ) : (
               <Navigate to="/login" replace />
