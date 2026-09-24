@@ -52,6 +52,19 @@ test('updateUserSettings still applies a valid settings update', async (t) => {
   assert.deepEqual(res.body, updatedUser);
 });
 
+test('updateUserSettings applies a speech rate update', async (t) => {
+  let receivedUpdate;
+  t.mock.method(User, 'findByIdAndUpdate', async (_id, doc) => { receivedUpdate = doc; return { _id: 'abc123' }; });
+
+  const req = { params: { id: 'abc123' }, body: { speechRate: 0.85 } };
+  const res = makeRes();
+
+  await updateUserSettings(req, res, (err) => { assert.ifError(err); });
+
+  assert.deepEqual(receivedUpdate, { $set: { 'settings.speechRate': 0.85 } });
+  assert.equal(res.statusCode, 200);
+});
+
 test('updateUserSettings returns 404 when the user does not exist', async (t) => {
   t.mock.method(User, 'findByIdAndUpdate', async () => null);
 

@@ -16,6 +16,13 @@ import {
   rhubarbJsonToTimeline,
 } from "../utils/lipSync.js";
 import theme from "../utils/theme";
+import {
+  clampSpeechRate,
+  formatSpeechRate,
+  SPEECH_RATE_MAX,
+  SPEECH_RATE_MIN,
+  SPEECH_RATE_STEP,
+} from "../utils/speechRate.js";
 
 // Placeholder shown only until the real opening slide for this session loads -
 // intentionally has no imageUrl/title/bullets from any specific session, so the
@@ -206,6 +213,8 @@ export default function SessionPage({
   evaluationFacilitator,
   introductionRequired = false,
   defaultAvatarMode = "visualizer",
+  defaultSpeechRate = 1,
+  onSpeechRateChange,
 }) {
   const [sessionReady, setSessionReady] = useState(false);
   const [messages, setMessages] = useState([]);
@@ -217,6 +226,7 @@ export default function SessionPage({
   const [slide, setSlide] = useState(defaultSlide);
   const [avatarMode, setAvatarMode] = useState(() => getInitialAvatarMode(defaultAvatarMode));
   const [lipSyncMode, setLipSyncMode] = useState("rhubarb");
+  const [speechRate, setSpeechRate] = useState(() => clampSpeechRate(defaultSpeechRate));
   const [pendingPlay, setPendingPlay] = useState(false);
   const [avatarNarrationActive, setAvatarNarrationActive] = useState(false);
   const [autoAdvanceFailedSlideId, setAutoAdvanceFailedSlideId] = useState(null);
@@ -374,6 +384,17 @@ export default function SessionPage({
     avatarModeRef.current = avatarMode;
     if (avatarMode === "visualizer") timelineRef.current = null;
   }, [avatarMode]);
+
+  // Rate-shift playback in the browser rather than re-synthesising: pitch is
+  // preserved, the change applies mid-sentence, and Rhubarb cues stay aligned
+  // because lip sync samples audio.currentTime. defaultPlaybackRate carries the
+  // rate across the src swaps between narration segments.
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    audio.defaultPlaybackRate = speechRate;
+    audio.playbackRate = speechRate;
+  }, [speechRate]);
 
   useEffect(() => {
     startTime.current = Date.now();
@@ -2018,6 +2039,22 @@ export default function SessionPage({
                 <option key={mode.id} value={mode.id}>{mode.label}</option>
               ))}
             </select>
+            <label className="speech-rate-control">
+              <span>Speech speed <strong>{formatSpeechRate(speechRate)}</strong></span>
+              <input
+                type="range"
+                min={SPEECH_RATE_MIN}
+                max={SPEECH_RATE_MAX}
+                step={SPEECH_RATE_STEP}
+                value={speechRate}
+                onChange={(event) => {
+                  const rate = clampSpeechRate(event.target.value);
+                  setSpeechRate(rate);
+                  onSpeechRateChange?.(rate);
+                }}
+                aria-valuetext={formatSpeechRate(speechRate)}
+              />
+            </label>
             {pendingPlay && (
               <button
                 type="button"

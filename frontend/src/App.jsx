@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Navigate, Route, Routes, useNavigate, useParams } from "react-router-dom";
 import api from "./services/api.js";
 import LoginPage from "./pages/LoginPage";
@@ -12,7 +12,7 @@ import SettingsPage from "./pages/SettingsPage";
 import { toTitleCase } from "./utils/formatName";
 import { LanguageProvider } from "./language/LanguageContext.jsx";
 
-const DEFAULT_USER_SETTINGS = { personality: "default", language: "en", avatarMode: "visualizer" };
+const DEFAULT_USER_SETTINGS = { personality: "default", language: "en", avatarMode: "visualizer", speechRate: 1 };
 
 const devParams = new URLSearchParams(window.location.search);
 const devSessionEnabled = import.meta.env.DEV && devParams.get("devSession") === "1";
@@ -122,7 +122,7 @@ const TEST_SESSIONS = [
 
 // Rehydrates the pipeline mode a session actually started with, since a page
 // refresh loses the in-memory value chosen on the landing page.
-function SessionRoute({ userName, fallbackPipelineMode, defaultAvatarMode, onSessionEnd }) {
+function SessionRoute({ userName, fallbackPipelineMode, defaultAvatarMode, defaultSpeechRate, onSpeechRateChange, onSessionEnd }) {
   const { sessionId } = useParams();
   const [pipelineMode, setPipelineMode] = useState(fallbackPipelineMode);
   const [invalid, setInvalid] = useState(false);
@@ -178,6 +178,8 @@ function SessionRoute({ userName, fallbackPipelineMode, defaultAvatarMode, onSes
       userName={userName}
       pipelineMode={pipelineMode}
       defaultAvatarMode={defaultAvatarMode}
+      defaultSpeechRate={defaultSpeechRate}
+      onSpeechRateChange={onSpeechRateChange}
       evaluationFacilitator={sessionInfo.data.evaluation?.facilitator?.id}
     />
   );
@@ -221,6 +223,20 @@ export default function App() {
 
   const handleSettingsChange = (partial) => {
     setUserSettings((prev) => ({ ...prev, ...partial }));
+  };
+
+  // The in-session slider fires on every step while dragging, so only save
+  // the value the participant settles on.
+  const speechRateSaveTimeoutRef = useRef(null);
+  useEffect(() => () => window.clearTimeout(speechRateSaveTimeoutRef.current), []);
+  const handleSessionSpeechRateChange = (speechRate) => {
+    handleSettingsChange({ speechRate });
+    window.clearTimeout(speechRateSaveTimeoutRef.current);
+    if (!userId || devSessionEnabled) return;
+    speechRateSaveTimeoutRef.current = window.setTimeout(() => {
+      api.patch(`/users/${userId}/settings`, { speechRate })
+        .catch((err) => console.error("Failed to save speechRate", err));
+    }, 600);
   };
 
   const handleLogin = (id, name) => {
@@ -318,6 +334,8 @@ export default function App() {
                 userName={userName}
                 fallbackPipelineMode={selectedPipelineMode}
                 defaultAvatarMode={userSettings.avatarMode}
+                defaultSpeechRate={userSettings.speechRate}
+                onSpeechRateChange={handleSessionSpeechRateChange}
                 onSessionEnd={handleEndSession}
               />
             ) : (

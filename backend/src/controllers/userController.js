@@ -25,11 +25,12 @@ export const getUser = async (req, res, next) => {
 
 export const updateUserSettings = async (req, res, next) => {
   try {
-    const { personality, language, avatarMode } = req.body || {};
+    const { personality, language, avatarMode, speechRate } = req.body || {};
     const update = {};
     if (personality !== undefined) update['settings.personality'] = personality;
     if (language !== undefined) update['settings.language'] = language;
     if (avatarMode !== undefined) update['settings.avatarMode'] = avatarMode;
+    if (speechRate !== undefined) update['settings.speechRate'] = speechRate;
 
     if (Object.keys(update).length === 0) {
       return res.status(400).json({ error: 'No supported settings provided' });

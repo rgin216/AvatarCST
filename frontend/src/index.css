@@ -1628,6 +1628,29 @@ body {
   font: 700 12px Nunito, sans-serif;
 }
 
+.speech-rate-control {
+  display: grid;
+  gap: 4px;
+  border: 1px solid #FFFFFF55;
+  border-radius: 8px;
+  padding: 6px 10px 4px;
+  background: rgba(255, 250, 245, 0.94);
+  color: #3D2B1F;
+  font: 700 12px Nunito, sans-serif;
+}
+
+.speech-rate-control span {
+  display: flex;
+  justify-content: space-between;
+}
+
+.speech-rate-control input {
+  width: 100%;
+  margin: 0;
+  accent-color: #7AAB72;
+  cursor: pointer;
+}
+
 .avatar-audio-controls button {
   cursor: pointer;
   background: linear-gradient(135deg, #A8C5A0, #7AAB72);

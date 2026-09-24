@@ -27,6 +27,9 @@ const translations = {
     "settings.avatar.male": "Male",
     "settings.avatar.female": "Female",
     "settings.avatar.visualizer": "Audio visual",
+    "settings.speechRate": "Speech speed",
+    "settings.speechRate.slower": "Slower",
+    "settings.speechRate.faster": "Faster",
     "settings.saved": "Saved",
 
     "caregiver.title": "Caregiver View",
@@ -109,6 +112,9 @@ const translations = {
     "settings.avatar.male": "男性",
     "settings.avatar.female": "女性",
     "settings.avatar.visualizer": "音频可视化",
+    "settings.speechRate": "语速",
+    "settings.speechRate.slower": "较慢",
+    "settings.speechRate.faster": "较快",
     "settings.saved": "已保存",
 
     "caregiver.title": "照护者视图",
@@ -191,6 +197,9 @@ const translations = {
     "settings.avatar.male": "Masculino",
     "settings.avatar.female": "Femenino",
     "settings.avatar.visualizer": "Visualizador de audio",
+    "settings.speechRate": "Velocidad del habla",
+    "settings.speechRate.slower": "Más lento",
+    "settings.speechRate.faster": "Más rápido",
     "settings.saved": "Guardado",
 
     "caregiver.title": "Vista del cuidador",
@@ -273,6 +282,9 @@ const translations = {
     "settings.avatar.male": "Homme",
     "settings.avatar.female": "Femme",
     "settings.avatar.visualizer": "Visualiseur audio",
+    "settings.speechRate": "Vitesse de la voix",
+    "settings.speechRate.slower": "Plus lent",
+    "settings.speechRate.faster": "Plus rapide",
     "settings.saved": "Enregistré",
 
     "caregiver.title": "Vue de l'aidant",
@@ -355,6 +367,9 @@ const translations = {
     "settings.avatar.male": "Tāne",
     "settings.avatar.female": "Wahine",
     "settings.avatar.visualizer": "Whakaahua oro",
+    "settings.speechRate": "Te tere o te kōrero",
+    "settings.speechRate.slower": "Pōturi ake",
+    "settings.speechRate.faster": "Tere ake",
     "settings.saved": "Kua tiakina",
 
     "caregiver.title": "Tirohanga Kaitiaki",
