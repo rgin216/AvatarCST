@@ -44,7 +44,21 @@ avatarcst/
 └── CLAUDE.md          # Architecture & phases
 ```
 
+## LLM evaluation
+
+An offline facilitator/critic rotation benchmark is available. From `backend`, run
+`npm run eval:llm` for a dry run. See [the evaluation guide](backend/evaluation/README.md)
+for models, live runs, output files, and methodological limitations.
+
+Full-session replay and opt-in live facilitator rotation are also available without
+an Anthropic key. See [session evaluation setup](backend/evaluation/SESSIONS.md).
+
 ## Getting Started
+
+New accounts must finish Session 1 (Introduction & Welcome) before starting other
+sessions. Ending early does not unlock them, and slide skipping is disabled for
+the required introduction. The server records completion when the scripted flow
+reaches its ending. Existing accounts retain their previous access.
 
 ### Prerequisites
 - Node.js 18+

@@ -3,7 +3,9 @@ import Memory from '../models/Memory.js';
 
 export const createUser = async (req, res, next) => {
   try {
-    const user = await User.create(req.body);
+    const { name, preferredName, dateOfBirth, culturalBackground, role, caregivers, patients, settings } = req.body || {};
+    const user = await User.create({ name, preferredName, dateOfBirth, culturalBackground,
+      role, caregivers, patients, settings, introductionRequired: true });
     await Memory.create({ userId: user._id, entries: [] });
     res.status(201).json(user);
   } catch (err) {
@@ -51,7 +53,7 @@ export const findOrCreateByName = async (req, res, next) => {
     let user = await User.findOne({ name: { $regex: new RegExp(`^${name}$`, 'i') } });
     if (user) return res.json({ user, created: false });
 
-    user = await User.create({ name, preferredName: name, role: 'patient' });
+    user = await User.create({ name, preferredName: name, role: 'patient', introductionRequired: true });
     await Memory.create({ userId: user._id, entries: [] });
     res.status(201).json({ user, created: true });
   } catch (err) {

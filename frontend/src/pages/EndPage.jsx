@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import api from "../services/api.js";
+import SessionEvaluationReport from '../components/SessionEvaluationReport.jsx';
 import theme from "../utils/theme";
 import useIsDesktop from "../hooks/useIsDesktop";
 import { useLanguage } from "../language/useLanguage.js";
@@ -9,7 +10,8 @@ export default function EndPage({ onHome, userName, sessionId }) {
   const isDesktop = useIsDesktop();
   const { t } = useLanguage();
   const [summary, setSummary] = useState(null);
-  const [summaryLoading, setSummaryLoading] = useState(true);
+  const [summaryPending, setSummaryLoading] = useState(true);
+  const summaryLoading = Boolean(sessionId) && summaryPending;
   const [sessionData, setSessionData] = useState(null);
 
   useEffect(() => {
@@ -18,7 +20,7 @@ export default function EndPage({ onHome, userName, sessionId }) {
   }, [sessionId]);
 
   useEffect(() => {
-    if (!sessionId) { setSummaryLoading(false); return; }
+    if (!sessionId) return;
     let cancelled = false;
     let attempts = 0;
     const MAX_ATTEMPTS = 8;
@@ -126,6 +128,7 @@ export default function EndPage({ onHome, userName, sessionId }) {
           </div>
 
           <div className="fade-up delay-3">
+            <SessionEvaluationReport sessionId={sessionId} />
             <button onClick={onHome} className="btn-primary" style={{ padding: 16, fontSize: 17 }}>{t("end.finishSession")}</button>
           </div>
         </div>

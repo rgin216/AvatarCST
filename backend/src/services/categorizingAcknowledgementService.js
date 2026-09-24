@@ -1,4 +1,5 @@
 import { generateResponse } from './llmService.js';
+import { recordLlmFallback } from './llmContext.js';
 
 // The evaluator owns progression; this only gives a grounded, short acknowledgement.
 export async function personalizeCategorizingReply(turn, { provider, generate = generateResponse } = {}) {
@@ -12,6 +13,7 @@ export async function personalizeCategorizingReply(turn, { provider, generate = 
     const clean = response?.trim();
     if (clean && clean.length <= 450 && clean.split(/\s+/).length <= 45 && !clean.includes('?')) return { ...turn, response: clean + (kind === 'pair' ? ' Choose another pair, or press Done.' : '') };
   } catch { /* Keep the answer-specific local fallback if generation is unavailable. */ }
+  recordLlmFallback('Categorizing acknowledgement unavailable or rejected by validation');
   return turn;
 }
 

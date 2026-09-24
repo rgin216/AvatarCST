@@ -6,6 +6,7 @@ import Message from '../models/Message.js';
 import {
   getSessionInactivityReminder,
   respondToSessionTurn,
+  endSessionAndQueueEvaluation,
 } from '../services/sessionOrchestratorService.js';
 import { transcribeAudio } from '../services/sttService.js';
 import {
@@ -26,6 +27,9 @@ import {
 } from '../config/pipeline.js';
 import { generateSummary } from '../services/summaryService.js';
 import Summary from '../models/Summary.js';
+import { createEvaluationAssignment } from '../evaluation/liveConfig.js';
+import { EvaluationTurn, SessionEvaluation } from '../models/Evaluation.js';
+import { getSessionAccess, INTRO_SCRIPT_ID } from '../services/sessionAccessService.js';
 
 const nowMs = () => Number(process.hrtime.bigint() / 1_000_000n);
 const AVATAR_MODES = new Set(['male', 'female', 'visualizer']);
@@ -42,8 +46,15 @@ async function timeAsync(label, fn, timings) {
 
 export const createSession = async (req, res, next) => {
   try {
+    const access = await getSessionAccess(req.body?.userId);
+    const scriptId = req.body?.scriptId || INTRO_SCRIPT_ID;
+    if (access.introductionRequired && scriptId !== INTRO_SCRIPT_ID) {
+      return res.status(403).json({ error: 'Complete Session 1 fully to unlock the other sessions.', code: 'INTRODUCTION_REQUIRED' });
+    }
+    const evaluation = await createEvaluationAssignment(req.body?.userId, req.body?.evaluationSelection);
     const session = await Session.create({
-      ...req.body,
+      userId: req.body?.userId, title: req.body?.title, theme: req.body?.theme,
+      scriptId, evaluation, unlocksSessions: access.introductionRequired,
       pipelineMode: getSessionPipelineMode(req.body?.pipelineMode),
       status: 'active',
       startedAt: new Date(),
@@ -52,6 +63,11 @@ export const createSession = async (req, res, next) => {
   } catch (err) {
     next(err);
   }
+};
+
+export const getUserSessionAccess = async (req, res, next) => {
+  try { res.json(await getSessionAccess(req.params.userId)); }
+  catch (error) { next(error); }
 };
 
 export const getSession = async (req, res, next) => {
@@ -75,7 +91,18 @@ export const getUserSessions = async (req, res, next) => {
 
 export const updateSession = async (req, res, next) => {
   try {
-    const session = await Session.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    // Assignments and progression are server-owned, including dotted/operator updates.
+    const progressionKeys = ['scriptStepIndex', 'scriptStepTurnIndex', 'scriptStepRetryCount'];
+    const allowed = ['title', 'theme', ...progressionKeys];
+    if (Object.keys(req.body || {}).some(key => !allowed.includes(key))) {
+      return res.status(400).json({ error: 'Unsupported session update' });
+    }
+    if (progressionKeys.some(key => key in (req.body || {}))) {
+      const existing = await Session.findById(req.params.id).lean();
+      if (existing?.evaluation) return res.status(409).json({ error: 'Skipping slides is disabled during evaluation' });
+      if (existing?.unlocksSessions) return res.status(409).json({ error: 'Complete Session 1 without skipping slides to unlock the other sessions.' });
+    }
+    const session = await Session.findByIdAndUpdate(req.params.id, { $set: req.body }, { new: true, runValidators: true });
     if (!session) return res.status(404).json({ error: 'Session not found' });
     res.json(session);
   } catch (err) {
@@ -85,11 +112,7 @@ export const updateSession = async (req, res, next) => {
 
 export const endSession = async (req, res, next) => {
   try {
-    const session = await Session.findByIdAndUpdate(
-      req.params.id,
-      { status: 'completed', endedAt: new Date() },
-      { new: true }
-    );
+    const session = await endSessionAndQueueEvaluation(req.params.id);
     if (!session) return res.status(404).json({ error: 'Session not found' });
     res.json(session);
 
@@ -113,6 +136,8 @@ export const endSession = async (req, res, next) => {
 
 export const addMessage = async (req, res, next) => {
   try {
+    const session = await Session.findById(req.params.id).lean();
+    if (session?.evaluation) return res.status(409).json({ error: 'Evaluation messages must use the session response endpoint' });
     const message = await Message.create({ sessionId: req.params.id, ...req.body });
     res.status(201).json(message);
   } catch (err) {
@@ -137,7 +162,7 @@ const getSpeechProviderForPipeline = (mode) => {
   return 'edge';
 };
 
-const getAvatarMode = (value) => (AVATAR_MODES.has(value) ? value : 'male');
+const getAvatarMode = (value) => (AVATAR_MODES.has(value) ? value : 'visualizer');
 const getLipSyncMode = (value) => (LIP_SYNC_MODES.has(value) ? value : 'rhubarb');
 
 const shouldUseRhubarbForAvatar = (avatarMode) => avatarMode === 'male' || avatarMode === 'female';
@@ -401,6 +426,8 @@ export const clearUserSessions = async (req, res, next) => {
     const sessions = await Session.find({ userId: req.params.userId });
     const ids = sessions.map(s => s._id);
     await Message.deleteMany({ sessionId: { $in: ids } });
+    await EvaluationTurn.deleteMany({ sessionId: { $in: ids } });
+    await SessionEvaluation.deleteMany({ sessionId: { $in: ids } });
     await Session.deleteMany({ userId: req.params.userId });
     res.json({ deleted: sessions.length });
   } catch (err) {

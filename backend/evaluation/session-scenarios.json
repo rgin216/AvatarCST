@@ -1,0 +1,74 @@
+[
+  {
+    "id": "introduction-engaged",
+    "scriptId": "cst_intro_reminiscence",
+    "user": {
+      "name": "Alex"
+    },
+    "followUpAnswer": "I enjoyed the company, but I would like to move on now.",
+    "answers": {
+      "welcome_opening": [
+        "I feel well after a walk in the garden."
+      ],
+      "facilitator_role": [
+        "Please call me Alex."
+      ],
+      "introduce_yourself": [
+        "I live in Hamilton.",
+        "I live with my sister.",
+        "The tablet is easy to use."
+      ],
+      "what_is_cst": [
+        "It sounds like a nice way to have a conversation."
+      ],
+      "cst_interests": [
+        "I would enjoy sharing ideas."
+      ],
+      "cst_nutshell": [
+        "I like sharing opinions."
+      ],
+      "session_themes": [
+        "Food and cooking interest me."
+      ],
+      "next_session": [
+        "I would like to remember our conversation about sharing ideas."
+      ]
+    }
+  },
+  {
+    "id": "introduction-uncertain",
+    "scriptId": "cst_intro_reminiscence",
+    "user": {
+      "name": "Sam"
+    },
+    "followUpAnswer": "I cannot think of anything else, and would prefer to move on.",
+    "answers": {
+      "welcome_opening": [
+        "I feel tired and would like to take things slowly."
+      ],
+      "facilitator_role": [
+        "My usual name is fine."
+      ],
+      "introduce_yourself": [
+        "I would rather not discuss where I live.",
+        "I would prefer not to say.",
+        "Some of the buttons are difficult to see."
+      ],
+      "what_is_cst": [
+        "I am unsure what to expect."
+      ],
+      "cst_interests": [
+        "I do not know yet."
+      ],
+      "cst_nutshell": [
+        "I like that this is not a test."
+      ],
+      "session_themes": [
+        "I am not sure."
+      ],
+      "next_session": [
+        "I am ready to finish now."
+      ]
+    }
+  }
+]

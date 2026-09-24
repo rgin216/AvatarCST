@@ -22,11 +22,14 @@ const savedThemeSongSchema = new Schema({
 const userSettingsSchema = new Schema({
   personality: { type: String, enum: ['default', 'optimistic'], default: 'default' },
   language: { type: String, enum: ['en', 'zh', 'es', 'fr', 'mi'], default: 'en' },
-  avatarMode: { type: String, enum: ['male', 'female', 'visualizer'], default: 'male' },
+  avatarMode: { type: String, enum: ['male', 'female', 'visualizer'], default: 'visualizer' },
 }, { _id: false });
 
 const userSchema = new Schema({
   name: { type: String, required: true },
+  // Only registration opts in; older accounts retain their existing access.
+  introductionRequired: { type: Boolean, default: false },
+  introductionCompletedAt: Date,
   preferredName: { type: String },
   dateOfBirth: { type: Date },
   culturalBackground: { type: String },

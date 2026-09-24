@@ -145,12 +145,12 @@ function loadYouTubeIframeApi() {
   return youtubeIframeApiPromise;
 }
 
-function getInitialAvatarMode(defaultAvatarMode = "male") {
+function getInitialAvatarMode(defaultAvatarMode = "visualizer") {
   if (import.meta.env.DEV) {
     const requestedMode = new URLSearchParams(window.location.search).get("avatar");
     if (avatarModeIds.has(requestedMode)) return requestedMode;
   }
-  return avatarModeIds.has(defaultAvatarMode) ? defaultAvatarMode : "male";
+  return avatarModeIds.has(defaultAvatarMode) ? defaultAvatarMode : "visualizer";
 }
 
 function formatPlaybackDuration(seconds) {
@@ -202,8 +202,10 @@ export default function SessionPage({
   sessionId,
   onEnd,
   userName,
-  pipelineMode: initialPipelineMode = "free",
-  defaultAvatarMode = "male",
+  pipelineMode: initialPipelineMode = "openai-fast-scripted",
+  evaluationFacilitator,
+  introductionRequired = false,
+  defaultAvatarMode = "visualizer",
 }) {
   const [sessionReady, setSessionReady] = useState(false);
   const [messages, setMessages] = useState([]);
@@ -235,8 +237,8 @@ export default function SessionPage({
   const [wheelResultPending, setWheelResultPending] = useState(false);
   const [wheelRotation, setWheelRotation] = useState(0);
   const [skipSlideInput, setSkipSlideInput] = useState("");
-  const pipelineMode = initialPipelineMode || "free";
-  const showDevSkip = import.meta.env.DEV;
+  const pipelineMode = initialPipelineMode || "openai-fast-scripted";
+  const showDevSkip = import.meta.env.DEV && !introductionRequired;
   const timelineRef = useRef(null);
   const avatarModeRef = useRef(avatarMode);
 
@@ -1543,6 +1545,7 @@ export default function SessionPage({
 
   return (
     <div className="session-stage">
+      {evaluationFacilitator && <div role="status" style={{ position: 'absolute', bottom: 8, left: 12, zIndex: 20, background: 'white', padding: '4px 10px', borderRadius: 8, fontSize: 12 }}>Research facilitator: {evaluationFacilitator}</div>}
       <header className="session-topbar">
         <div className="session-status">
           <span className="pulse-dot" />
@@ -1551,7 +1554,7 @@ export default function SessionPage({
         <div className="session-meta">
           {sessionMetaLabel ? `${sessionMetaLabel} / ` : ""}{formatElapsed(elapsed)}
         </div>
-        {showDevSkip && (
+        {showDevSkip && !evaluationFacilitator && (
           <div className="session-skip-control" aria-label="Skip to slide for testing">
             <span>Skip</span>
             <input

@@ -142,3 +142,4 @@ vite.config.ts.timestamp-*
 backend/generated-audio/
 backend/temp/
 backend/vendor/
+backend/evaluation/results/
