@@ -66,18 +66,25 @@ export async function judgeFullSession({ turns, assignment, script, naturalCompl
   for (const critic of assignment.critics) {
     if (critic.id === assignment.facilitator.id ||
         (critic.provider === assignment.facilitator.provider && critic.model === assignment.facilitator.model)) continue;
-    const judgment = { judge: critic.id, status: 'ok', sections: [], synthesis: [] };
+    const judgment = { judge: critic.id, status: 'ok', sections: [], synthesis: [], invalidAttempts: [] };
     try {
       let requests = 0;
       const review = async (data, instruction) => {
-        // Background reviews can wait a quota window; interactive facilitator calls cannot.
-        if (requests++ && critic.provider === 'groq') await pause(61000);
-        const raw = await generate([
-          { role: 'system', content: SESSION_JUDGE_PROMPT + '\n' + instruction },
-          { role: 'user', content: JSON.stringify(data) },
-        ], { provider: critic.provider, model: critic.model, json: true, jsonSchema: JUDGE_SCHEMA,
-          temperature: 0, maxTokens: critic.judgeMaxTokens ?? 2048, timeoutMs: 60000 });
-        return { raw, result: parseJudgment(raw) };
+        for (let attempt = 0; attempt < 2; attempt++) {
+          // Background reviews can wait a quota window; interactive facilitator calls cannot.
+          if (requests++ && critic.provider === 'groq') await pause(61000);
+          const raw = await generate([
+            { role: 'system', content: SESSION_JUDGE_PROMPT + '\n' + instruction + (attempt
+              ? '\nYour previous response failed JSON/schema validation. Return all seven scores as integers with nonempty evidence strings. criticalFailures MUST be a top-level array: [] or objects with nonempty reason and evidence strings. Never use strings, null, or a nested criticalFailures field.' : '') },
+            { role: 'user', content: JSON.stringify(data) },
+          ], { provider: critic.provider, model: critic.model, json: true, jsonSchema: JUDGE_SCHEMA,
+            temperature: 0, maxTokens: critic.judgeMaxTokens ?? 2048, timeoutMs: 60000 });
+          try { return { raw, result: parseJudgment(raw) }; }
+          catch (error) {
+            judgment.invalidAttempts.push({ request: requests, raw, error: error.message });
+            if (attempt === 1) throw error;
+          }
+        }
       };
       for (const section of sections) {
         const reviewed = await review(section, sections.length > 1

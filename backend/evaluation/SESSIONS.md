@@ -39,6 +39,8 @@ Long transcripts are partitioned chronologically into requests of at most 10,000
 
 Groq requests within a critic's review wait 61 seconds between calls to accommodate per-minute quotas. Each request has a 60-second timeout. A long review can take many minutes; other application traffic and daily quotas can still cause failures. The UI identifies request-size and quota failures and supports retrying a saved transcript without replaying the participant session.
 
+Invalid JSON or rubric structure receives one additional paced attempt with explicit format guidance. Invalid responses and their validation errors are retained under `invalidAttempts`; scores are never coerced or silently repaired. A second invalid response fails that critic's review. Provider errors do not trigger this format retry.
+
 A live Groq verification completed all eight Session 1 steps in 16 turns, with both critiques valid, zero failed model calls, zero recorded fallbacks and zero forced progress. This verifies the workflow, not comparative model quality. The initial unpaced run encountered quota errors, motivating the replay delay. Browser verification covered opt-in, assignment persistence after refresh and the completion report for an early-ended session.
 
 The synthetic fixtures currently cover Session 1 only. Live capture follows the common session orchestrator, but other activities need their own replay fixtures and validation. These evaluations measure generated text and progression, not speech, avatar delivery, cost or therapeutic benefit. Full-session reports do not yet support the component benchmark's human-review import; a CST-informed human should independently review transcripts before interpreting automated scores as evidence of application effectiveness.

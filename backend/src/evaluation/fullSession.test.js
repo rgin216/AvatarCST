@@ -105,6 +105,27 @@ test('section limits count UTF-8 bytes and refuse oversized individual evidence'
   assert.ok(!critiqueFailure(new Error('Groq error 413: private provider detail')).message.includes('private'));
 });
 
+test('invalid critique format gets one paced retry and retains its invalid output', async () => {
+  let calls = 0;
+  const pauses = [];
+  const report = await judgeFullSession({ turns: [{ deliveredText: 'Welcome.' }], script: [],
+    assignment: { facilitator: roster[0], critics: [roster[1]] }, pause: async ms => pauses.push(ms),
+    generate: async () => ++calls === 1 ? '{"scores":{}}' : verdict,
+  });
+  assert.equal(calls, 2);
+  assert.deepEqual(pauses, [61000]);
+  assert.equal(report.judgments[0].status, 'ok');
+  assert.equal(report.judgments[0].invalidAttempts.length, 1);
+  let invalidCalls = 0;
+  const failed = await judgeFullSession({ turns: [{ deliveredText: 'Welcome.' }], script: [],
+    assignment: { facilitator: roster[0], critics: [roster[1]] }, pause: async () => {},
+    generate: async () => { invalidCalls++; return '{}'; },
+  });
+  assert.equal(invalidCalls, 2);
+  assert.equal(failed.judgments[0].status, 'error');
+  assert.equal(failed.judgments[0].invalidAttempts.length, 2);
+});
+
 test('real orchestrator replays every Session 1 step and captures delivered turns with pinned model', async t => {
   const scenario = JSON.parse(await readFile(new URL('../../evaluation/session-scenarios.json', import.meta.url), 'utf8'))[0];
   const transcript = [], captured = [], jobs = [], requests = [];
