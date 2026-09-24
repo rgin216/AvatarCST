@@ -171,6 +171,7 @@ function SessionRoute({ userName, fallbackPipelineMode, defaultAvatarMode, onSes
     <SessionPage
       key={sessionId}
       sessionId={sessionId}
+      introductionRequired={Boolean(sessionInfo.data.unlocksSessions)}
       onEnd={() => onSessionEnd(sessionId)}
       userName={userName}
       pipelineMode={pipelineMode}

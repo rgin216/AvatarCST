@@ -128,15 +128,16 @@ test('invalid critique format gets one paced retry and retains its invalid outpu
 
 test('real orchestrator replays every Session 1 step and captures delivered turns with pinned model', async t => {
   const scenario = JSON.parse(await readFile(new URL('../../evaluation/session-scenarios.json', import.meta.url), 'utf8'))[0];
-  const transcript = [], captured = [], jobs = [], requests = [];
+  const transcript = [], captured = [], jobs = [], requests = [], unlocks = [];
   const session = { _id: 'session', userId: 'user', status: 'active', pipelineMode: 'free', scriptId: scenario.scriptId,
-    scriptStepIndex: 0, scriptStepTurnIndex: 0, scriptStepRetryCount: 0, activityRevision: 0, interactionState: {},
+    scriptStepIndex: 0, scriptStepTurnIndex: 0, scriptStepRetryCount: 0, activityRevision: 0, interactionState: {}, unlocksSessions: true,
     evaluation: { facilitator: roster[1], critics: [roster[0]] }, save: async () => session };
   t.mock.method(Session, 'findOneAndUpdate', async () => { session.activityRevision++; return session; });
   t.mock.method(Session, 'findById', () => ({ lean: async () => session }));
   t.mock.method(Session, 'updateOne', async (_, update) => { Object.assign(session, update.$set); });
   t.mock.method(User, 'findById', () => ({ lean: async () => ({ name: 'Alex' }) }));
   t.mock.method(User, 'findByIdAndUpdate', async () => ({}));
+  t.mock.method(User, 'updateOne', async (filter, update) => { unlocks.push({ filter, update }); });
   t.mock.method(Memory, 'findOne', () => Object.assign(Promise.resolve(null), { lean: async () => null }));
   t.mock.method(Memory, 'findOneAndUpdate', () => ({ lean: async () => ({ entries: [] }) }));
   t.mock.method(Message, 'find', () => ({
@@ -163,6 +164,9 @@ test('real orchestrator replays every Session 1 step and captures delivered turn
   assert.ok(requests.length > 0 && requests.every(request => request.model === 'model-b'));
   assert.equal(jobs.length, 1);
   assert.equal(jobs[0][1].$setOnInsert.naturalCompletion, true);
+  assert.equal(unlocks.length, 1);
+  assert.equal(unlocks[0].filter._id, 'user');
+  assert.ok(unlocks[0].update.$set.introductionCompletedAt instanceof Date);
 });
 
 test('replay turn limits remain incomplete, never successful completion', async () => {

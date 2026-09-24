@@ -37,15 +37,22 @@ export default function LandingPage({
   const isDesktop = useIsDesktop();
   const { t, language } = useLanguage();
   const [lastSession, setLastSession] = useState(null);
+  const [access, setAccess] = useState(null);
+  const [accessAttempt, setAccessAttempt] = useState(0);
   const [pageIndex, setPageIndex] = useState(0);
   const [pageDirection, setPageDirection] = useState("next");
 
   useEffect(() => {
     if (!userId) return;
+    let cancelled = false;
     api.get(`/sessions/user/${userId}`)
-      .then(({ data }) => { if (data.length > 0) setLastSession(data[0]); })
+      .then(({ data }) => { if (!cancelled) setLastSession(data[0] || null); })
       .catch(() => {});
-  }, [userId]);
+    api.get(`/sessions/user/${userId}/access`)
+      .then(({ data }) => { if (!cancelled) setAccess({ userId, ...data }); })
+      .catch(() => { if (!cancelled) setAccess({ userId, error: true }); });
+    return () => { cancelled = true; };
+  }, [userId, accessAttempt]);
 
   const getLastSessionMeta = (s) => {
     if (!s) return null;
@@ -71,7 +78,13 @@ export default function LandingPage({
     return t("landing.greeting.evening");
   };
 
-  const sessions = sessionOptions.length ? sessionOptions : fallbackSessions;
+  const currentAccess = access?.userId === userId ? access : null;
+  const introductionLocked = !currentAccess || currentAccess.error || currentAccess.introductionRequired;
+  const sessions = (sessionOptions.length ? sessionOptions : fallbackSessions).map(session => ({
+    ...session,
+    prerequisiteLocked: introductionLocked && session.id !== 'cst_intro_reminiscence',
+    disabled: session.disabled || (introductionLocked && session.id !== 'cst_intro_reminiscence'),
+  }));
 
   const lastSessionMeta = getLastSessionMeta(lastSession);
   const lastSessionCardIndex = lastSession ? sessions.findIndex((s) => s.id === lastSession.scriptId) : -1;
@@ -228,6 +241,9 @@ export default function LandingPage({
 
           <EvaluationControls value={evaluationSelection} onChange={onEvaluationSelectionChange} />
           {startError && <p role="alert">{startError}</p>}
+          {currentAccess?.introductionRequired && <p role="status">Complete Session 1 fully to unlock all other sessions.</p>}
+          {!currentAccess && <p role="status">Checking available sessions…</p>}
+          {currentAccess?.error && <p role="alert">Could not check session access. <button type="button" onClick={() => setAccessAttempt(value => value + 1)}>Try again</button></p>}
           <div className="fade-up delay-4" style={{ display: "flex", alignItems: "center", gap: isDesktop ? 14 : 8 }}>
             {totalPages > 1 && (
               <button
@@ -290,7 +306,7 @@ export default function LandingPage({
                       )}
                     </div>
                     <div style={{ marginTop: 18, display: "flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 700, color: palette.accent }}>
-                      {session.disabled ? t("landing.comingSoon") : <>{t("landing.startSession")} <span aria-hidden="true">→</span></>}
+                      {session.prerequisiteLocked ? 'Complete Session 1 to unlock' : session.disabled ? t("landing.comingSoon") : <>{t("landing.startSession")} <span aria-hidden="true">→</span></>}
                     </div>
                   </button>
                 );

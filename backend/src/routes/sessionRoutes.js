@@ -3,6 +3,7 @@ import {
   createSession,
   getSession,
   getUserSessions,
+  getUserSessionAccess,
   updateSession,
   endSession,
   addMessage,
@@ -23,6 +24,7 @@ router.get('/evaluation-options', getEvaluationOptions);
 router.get('/speech-stream/:token', streamSpeechToken);
 router.post('/', createSession);
 router.get('/user/:userId', getUserSessions);
+router.get('/user/:userId/access', getUserSessionAccess);
 router.delete('/user/:userId', clearUserSessions);
 router.get('/:id', getSession);
 router.get('/:id/evaluation', getEvaluationReport);

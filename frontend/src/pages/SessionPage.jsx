@@ -202,6 +202,7 @@ export default function SessionPage({
   userName,
   pipelineMode: initialPipelineMode = "openai-fast-scripted",
   evaluationFacilitator,
+  introductionRequired = false,
   defaultAvatarMode = "visualizer",
 }) {
   const [sessionReady, setSessionReady] = useState(false);
@@ -235,7 +236,7 @@ export default function SessionPage({
   const [wheelRotation, setWheelRotation] = useState(0);
   const [skipSlideInput, setSkipSlideInput] = useState("");
   const pipelineMode = initialPipelineMode || "openai-fast-scripted";
-  const showDevSkip = import.meta.env.DEV;
+  const showDevSkip = import.meta.env.DEV && !introductionRequired;
   const timelineRef = useRef(null);
   const avatarModeRef = useRef(avatarMode);
 

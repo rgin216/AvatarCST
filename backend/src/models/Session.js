@@ -13,6 +13,8 @@ const sessionSchema = new Schema({
   },
   scriptId: { type: String, default: 'cst_intro_reminiscence' },
   evaluation: { type: Schema.Types.Mixed },
+  unlocksSessions: { type: Boolean, default: false },
+  scriptCompletedAt: Date,
   scriptStepIndex: { type: Number, default: 0, min: 0 },
   scriptStepTurnIndex: { type: Number, default: 0, min: 0 },
   scriptStepRetryCount: { type: Number, default: 0, min: 0 },

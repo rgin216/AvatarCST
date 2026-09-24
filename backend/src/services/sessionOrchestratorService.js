@@ -7,6 +7,7 @@ import { parseMatchingAnswer } from './matchingService.js';
 import Message from '../models/Message.js';
 import Session from '../models/Session.js';
 import User from '../models/User.js';
+import { unlockAfterIntroduction } from './sessionAccessService.js';
 import Memory from '../models/Memory.js';
 import { buildAvatarResponse } from './avatarService.js';
 import {
@@ -4022,12 +4023,17 @@ export const respondToSessionTurn = ({ sessionId, content }) =>
   serializeSessionWrite(sessionId, async () => {
     const activitySession = await registerSessionActivityWrite(sessionId);
     const assignment = activitySession.evaluation;
-    if (!assignment?.facilitator) return respondToSessionTurnWrite({ sessionId, content, activitySession });
+    if (!assignment?.facilitator) {
+      const turn = await respondToSessionTurnWrite({ sessionId, content, activitySession });
+      await unlockAfterIntroduction(activitySession, turn);
+      return turn;
+    }
     const calls = [];
     const turn = await withSessionLlm(assignment.facilitator, calls,
       () => respondToSessionTurnWrite({ sessionId, content, activitySession }), assignment.requestPolicy);
     // Persist what was actually delivered, after application filtering and fallback handling.
     await captureEvaluationTurn(activitySession, turn, content, calls);
+    await unlockAfterIntroduction(activitySession, turn);
     if (turn.sessionCompleteAfterResponse) {
       await Session.updateOne({ _id: sessionId }, { $set: { status: 'completed', endedAt: new Date() } });
       await enqueueSessionEvaluation(sessionId, true);

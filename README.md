@@ -55,6 +55,11 @@ an Anthropic key. See [session evaluation setup](backend/evaluation/SESSIONS.md)
 
 ## Getting Started
 
+New accounts must finish Session 1 (Introduction & Welcome) before starting other
+sessions. Ending early does not unlock them, and slide skipping is disabled for
+the required introduction. The server records completion when the scripted flow
+reaches its ending. Existing accounts retain their previous access.
+
 ### Prerequisites
 - Node.js 18+
 - MongoDB (local or Atlas)

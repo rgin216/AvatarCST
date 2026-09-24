@@ -27,6 +27,9 @@ const userSettingsSchema = new Schema({
 
 const userSchema = new Schema({
   name: { type: String, required: true },
+  // Only registration opts in; older accounts retain their existing access.
+  introductionRequired: { type: Boolean, default: false },
+  introductionCompletedAt: Date,
   preferredName: { type: String },
   dateOfBirth: { type: Date },
   culturalBackground: { type: String },

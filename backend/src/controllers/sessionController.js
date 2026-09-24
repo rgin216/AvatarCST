@@ -29,6 +29,7 @@ import { generateSummary } from '../services/summaryService.js';
 import Summary from '../models/Summary.js';
 import { createEvaluationAssignment } from '../evaluation/liveConfig.js';
 import { EvaluationTurn, SessionEvaluation } from '../models/Evaluation.js';
+import { getSessionAccess, INTRO_SCRIPT_ID } from '../services/sessionAccessService.js';
 
 const nowMs = () => Number(process.hrtime.bigint() / 1_000_000n);
 const AVATAR_MODES = new Set(['male', 'female', 'visualizer']);
@@ -45,10 +46,15 @@ async function timeAsync(label, fn, timings) {
 
 export const createSession = async (req, res, next) => {
   try {
+    const access = await getSessionAccess(req.body?.userId);
+    const scriptId = req.body?.scriptId || INTRO_SCRIPT_ID;
+    if (access.introductionRequired && scriptId !== INTRO_SCRIPT_ID) {
+      return res.status(403).json({ error: 'Complete Session 1 fully to unlock the other sessions.', code: 'INTRODUCTION_REQUIRED' });
+    }
     const evaluation = await createEvaluationAssignment(req.body?.userId, req.body?.evaluationSelection);
     const session = await Session.create({
       userId: req.body?.userId, title: req.body?.title, theme: req.body?.theme,
-      scriptId: req.body?.scriptId, evaluation,
+      scriptId, evaluation, unlocksSessions: access.introductionRequired,
       pipelineMode: getSessionPipelineMode(req.body?.pipelineMode),
       status: 'active',
       startedAt: new Date(),
@@ -57,6 +63,11 @@ export const createSession = async (req, res, next) => {
   } catch (err) {
     next(err);
   }
+};
+
+export const getUserSessionAccess = async (req, res, next) => {
+  try { res.json(await getSessionAccess(req.params.userId)); }
+  catch (error) { next(error); }
 };
 
 export const getSession = async (req, res, next) => {
@@ -89,6 +100,7 @@ export const updateSession = async (req, res, next) => {
     if (progressionKeys.some(key => key in (req.body || {}))) {
       const existing = await Session.findById(req.params.id).lean();
       if (existing?.evaluation) return res.status(409).json({ error: 'Skipping slides is disabled during evaluation' });
+      if (existing?.unlocksSessions) return res.status(409).json({ error: 'Complete Session 1 without skipping slides to unlock the other sessions.' });
     }
     const session = await Session.findByIdAndUpdate(req.params.id, { $set: req.body }, { new: true, runValidators: true });
     if (!session) return res.status(404).json({ error: 'Session not found' });
