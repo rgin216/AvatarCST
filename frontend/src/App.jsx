@@ -177,6 +177,7 @@ function SessionRoute({ userName, fallbackPipelineMode, defaultAvatarMode, defau
       onEnd={() => onSessionEnd(sessionId)}
       userName={userName}
       pipelineMode={pipelineMode}
+      sessionTitle={sessionInfo.data.title}
       defaultAvatarMode={defaultAvatarMode}
       defaultSpeechRate={defaultSpeechRate}
       onSpeechRateChange={onSpeechRateChange}

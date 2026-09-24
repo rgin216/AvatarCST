@@ -40,6 +40,8 @@
     overflow:auto;
     padding:12px;
   }
+  .session-slide-shell:has(.has-object-interaction) .avatar-dock { height:160px; }
+  .session-slide-shell:has(.has-object-interaction) .session-side-panel { display:flex; }
 }
 @media (max-height:600px) {
   .session-slide-shell:has(.has-object-interaction) { overflow:auto; }

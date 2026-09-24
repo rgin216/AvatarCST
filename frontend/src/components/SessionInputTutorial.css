@@ -2,6 +2,8 @@
 .tutorial-preview { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:18px; color:#fff; padding:36px; text-align:center; }
 .tutorial-preview h1 { color:#fff; }
 .tutorial-avatar { color:white; }
+.input-tutorial .session-side-panel { display:flex; }
+.input-tutorial .session-side-panel > .session-bubble { margin:16px 18px; }
 .tutorial-avatar > span { display:grid; place-items:center; width:100px; height:100px; border-radius:50%; background:#7A9DAD; font-size:52px; }
 .tutorial-dimmer { position:absolute; inset:0; z-index:10; background:rgba(9,18,29,.76); }
 .input-tutorial .session-input-bar { backdrop-filter:none; }
