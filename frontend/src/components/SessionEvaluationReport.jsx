@@ -28,9 +28,12 @@ export default function SessionEvaluationReport({ sessionId }) {
     <h3>Research evaluation</h3>
     <p>Facilitator: {data?.assignment?.facilitator?.id || "Loading"}</p>
     <p role="status">{error || ({ collecting: "Waiting for the session to end.", queued: "Critiques queued.", running: "Models are reviewing the session.", complete: "Review complete.", failed: "Review needs attention." }[data?.status])}</p>
+    {data?.status === 'running' && <p>Long sessions are reviewed in sections. This can take several minutes while requests wait for provider quota windows.</p>}
+    {data?.status === 'failed' && data.error && <p>{data.error}</p>}
     {data?.report && <>
       <p>{data.report.naturalCompletion ? "The scripted session reached its ending." : "This session ended before the scripted ending."}</p>
       <p>{data.report.turnCount} turns · {data.report.failedModelCalls} failed model calls · {data.report.recordedFallbacks || 0} recorded fallbacks · {data.report.forcedProgressCount} forced progressions</p>
+      {data.report.reviewMethod === 'section-synthesis' && <p>All turns were divided into {data.report.sectionCount} sections. Each critic combines its section reviews; cross-section continuity is assessed indirectly.</p>}
       {data.report.judgments.map(j => <details key={j.judge}>
         <summary>{j.judge}{j.status === "error" ? " — critique unavailable" : ""}</summary>
         {j.status === "ok" ? <>
@@ -38,7 +41,10 @@ export default function SessionEvaluationReport({ sessionId }) {
             <tbody>{Object.entries(j.result.scores).map(([key, item]) => <tr key={key}><td>{key.replaceAll("_", " ")}</td><td>{item.score}</td><td>{item.evidence}</td></tr>)}</tbody>
           </table></div>
           {j.result.criticalFailures.map((failure, index) => <p key={index}>{failure.reason}: {failure.evidence}</p>)}
-        </> : <p>The provider could not return a valid critique.</p>}
+        </> : <p>{j.failure?.message || (/413|request too large/i.test(j.error || '')
+          ? 'The transcript exceeded the provider request limit. Retry evaluation with the updated backend to review it in smaller sections.'
+          : /429|rate.limit|quota/i.test(j.error || '') ? 'The provider quota is exhausted. Wait for it to reset, then retry evaluation.'
+          : 'The provider could not return a valid critique. Retry evaluation.')}</p>}
       </details>)}
       <p>These ratings evaluate the application and are not a clinical outcome measure.</p>
     </>}

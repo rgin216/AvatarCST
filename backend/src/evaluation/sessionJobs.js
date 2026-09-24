@@ -29,6 +29,13 @@ export async function processEvaluationJob() {
   }, { $set: { status: 'running', leaseToken: token, leaseUntil: new Date(Date.now() + 10 * 60_000) }, $inc: { attempts: 1 } },
   { returnDocument: 'after', sort: { createdAt: 1 } });
   if (!job) return false;
+  // Section reviews may exceed one lease window. Renew only while this worker owns it.
+  const heartbeat = setInterval(() => {
+    void SessionEvaluation.updateOne({ _id: job._id, leaseToken: token, status: 'running' },
+      { $set: { leaseUntil: new Date(Date.now() + 10 * 60_000) } })
+      .catch(error => console.error('[evaluation lease]', error.message));
+  }, 30000);
+  heartbeat.unref();
   try {
     if (job.attempts > 3) throw new Error('Evaluation worker interrupted too many times; retry explicitly');
     const session = await Session.findById(job.sessionId).lean();
@@ -49,6 +56,8 @@ export async function processEvaluationJob() {
     } });
   } catch (error) {
     await SessionEvaluation.updateOne({ _id: job._id, leaseToken: token }, { $set: { status: 'failed', error: error.message } });
+  } finally {
+    clearInterval(heartbeat);
   }
   return true;
 }

@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises';
 import { withSessionLlm, getSessionLlm } from '../services/llmContext.js';
 import { generateResponse } from '../services/llmService.js';
 import { chooseFacilitator, createEvaluationAssignment } from './liveConfig.js';
-import { judgeFullSession } from './sessionJudge.js';
+import { judgeFullSession, buildReviewSections, critiqueFailure } from './sessionJudge.js';
 import { replaySession } from './sessionReplay.js';
 import { RUBRIC } from './runner.js';
 import { respondToSessionTurn, endSessionAndQueueEvaluation } from '../services/sessionOrchestratorService.js';
@@ -66,6 +66,43 @@ test('session judges reject overlong evidence rather than silently truncating it
   await assert.rejects(judgeFullSession({
     turns: [{ deliveredText: 'x'.repeat(180001) }], assignment: { facilitator: roster[0], critics: [] }, script: [],
   }), /no partial transcript/);
+});
+
+test('long reviews include every turn, bound requests, pace calls and synthesize separately', async () => {
+  const requests = [], pauses = [];
+  const turns = Array.from({ length: 12 }, (_, index) => ({ input: `Answer ${index}`, deliveredText: 'Evidence '.repeat(210), step: { id: 'welcome', index: 0 } }));
+  const report = await judgeFullSession({ turns, script: [{ id: 'welcome', index: 0, prompt: 'Welcome' }],
+    assignment: { facilitator: roster[0], critics: [roster[1]] }, naturalCompletion: true,
+    generate: async messages => { requests.push(JSON.parse(messages[1].content)); return verdict; },
+    pause: async ms => { pauses.push(ms); },
+  });
+  assert.equal(report.reviewMethod, 'section-synthesis');
+  assert.ok(report.sectionCount > 1);
+  assert.deepEqual(requests.filter(r => r.turns).flatMap(r => r.turns.map(t => t.turn)), Array.from({ length: 12 }, (_, i) => i + 1));
+  assert.ok(requests.every(r => Buffer.byteLength(JSON.stringify(r)) < 10200));
+  assert.equal(pauses.length, requests.length - 1);
+  assert.ok(pauses.every(ms => ms === 61000));
+  assert.equal(report.judgments[0].status, 'ok');
+  assert.ok(report.judgments[0].synthesis.length);
+});
+
+test('a failed section never becomes a successful full-session score', async () => {
+  let calls = 0;
+  const report = await judgeFullSession({
+    turns: Array.from({ length: 8 }, () => ({ deliveredText: 'a'.repeat(2500) })), script: [],
+    assignment: { facilitator: roster[0], critics: [roster[1]] }, pause: async () => {},
+    generate: async () => { if (++calls === 2) throw new Error('Groq error 429: quota'); return verdict; },
+  });
+  assert.equal(report.judgments[0].status, 'error');
+  assert.equal(report.judgments[0].result, undefined);
+  assert.equal(report.judgments[0].sections.length, 1);
+  assert.equal(report.judgments[0].failure.code, 'rate_limit');
+});
+
+test('section limits count UTF-8 bytes and refuse oversized individual evidence', () => {
+  assert.throws(() => buildReviewSections([{ assistant: '界'.repeat(4000) }], [], false), /no partial transcript/);
+  assert.equal(critiqueFailure(new Error('Groq error 413: private provider detail')).code, 'request_too_large');
+  assert.ok(!critiqueFailure(new Error('Groq error 413: private provider detail')).message.includes('private'));
 });
 
 test('real orchestrator replays every Session 1 step and captures delivered turns with pinned model', async t => {

@@ -68,9 +68,11 @@ const generateGroqResponse = async (messages, options = {}) => {
   // GPT-OSS shares its completion allowance between reasoning and visible text.
   const maxTokens = Math.max(options.maxTokens ?? 140, /^openai\/gpt-oss-/.test(model) ? 512 : 0);
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), GROQ_TIMEOUT_MS);
+  const timeoutMs = options.timeoutMs ?? GROQ_TIMEOUT_MS;
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
 
   let response;
+  let data;
   try {
     response = await fetch(GROQ_API_URL, {
       method: 'POST',
@@ -88,19 +90,18 @@ const generateGroqResponse = async (messages, options = {}) => {
         ...(options.json ? { response_format: { type: 'json_object' } } : {}),
       }),
     });
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(`Groq error ${response.status}: ${text}`);
+    }
+    data = await response.json();
   } catch (err) {
-    if (err.name === 'AbortError') throw new Error('Groq request timed out after 10s');
+    if (err.name === 'AbortError') throw new Error(`Groq request timed out after ${timeoutMs / 1000}s`);
     throw err;
   } finally {
     clearTimeout(timer);
   }
 
-  if (!response.ok) {
-    const text = await response.text();
-    throw new Error(`Groq error ${response.status}: ${text}`);
-  }
-
-  const data = await response.json();
   const choice = data.choices?.[0];
   const raw = choice?.message?.content?.trim() || '';
   if (choice?.finish_reason === 'length' || !raw) {
