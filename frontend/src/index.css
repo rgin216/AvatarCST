@@ -1750,6 +1750,26 @@ body {
   opacity: 0.55;
 }
 
+.avatar-skip-speech {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  z-index: 3;
+  border: 1px solid rgba(255, 250, 245, 0.28);
+  border-radius: 999px;
+  padding: 6px 12px;
+  background: rgba(13, 18, 42, 0.45);
+  color: #FFFAF5;
+  cursor: pointer;
+  font: 800 12px Nunito, sans-serif;
+  backdrop-filter: blur(6px);
+  pointer-events: auto;
+}
+
+.avatar-skip-speech:hover {
+  background: rgba(13, 18, 42, 0.7);
+}
+
 .avatar-play-button {
   position: absolute;
   bottom: 12px;

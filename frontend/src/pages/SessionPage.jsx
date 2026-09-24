@@ -739,6 +739,18 @@ export default function SessionPage({
     finishNarrationSequence();
   }
 
+  // Dev-only: finish Aria's speech now, exactly as if the audio had ended, so
+  // any slide change waiting on her narration still happens.
+  function skipNarration() {
+    if (!avatarNarrationActiveRef.current) return;
+    if (narrationPauseRef.current) window.clearTimeout(narrationPauseRef.current);
+    narrationPauseRef.current = null;
+    narrationQueueRef.current = [];
+    audioRef.current?.pause();
+    setPendingPlay(false);
+    continueNarrationSequence();
+  }
+
   function finishNarrationSequence() {
     activeNarrationSegmentRef.current = null;
     narrationQueueRef.current = [];
@@ -2079,6 +2091,11 @@ export default function SessionPage({
               }}
             >
               ▶ Play response
+            </button>
+          )}
+          {showDevSkip && !evaluationFacilitator && avatarNarrationActive && !pendingPlay && (
+            <button type="button" className="avatar-skip-speech" onClick={skipNarration}>
+              Skip ⏭
             </button>
           )}
           <audio
