@@ -32,6 +32,9 @@ const userSchema = new Schema({
   // Only registration opts in; older accounts retain their existing access.
   introductionRequired: { type: Boolean, default: false },
   introductionCompletedAt: Date,
+  // Same opt-in as above: only new registrations are shown the landing tour.
+  landingTourRequired: { type: Boolean, default: false },
+  landingTourCompletedAt: Date,
   preferredName: { type: String },
   dateOfBirth: { type: Date },
   culturalBackground: { type: String },

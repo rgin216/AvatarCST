@@ -208,15 +208,16 @@ export default function App() {
   const [evaluationSelection, setEvaluationSelection] = useState('off');
   const [startError, setStartError] = useState('');
   const [userSettings, setUserSettings] = useState(DEFAULT_USER_SETTINGS);
+  const [landingTourPending, setLandingTourPending] = useState(false);
 
   useEffect(() => {
     if (!userId || devSessionEnabled) return;
     let cancelled = false;
     api.get(`/users/${userId}`)
       .then(({ data }) => {
-        if (!cancelled && data.settings) {
-          setUserSettings({ ...DEFAULT_USER_SETTINGS, ...data.settings });
-        }
+        if (cancelled) return;
+        if (data.settings) setUserSettings({ ...DEFAULT_USER_SETTINGS, ...data.settings });
+        setLandingTourPending(Boolean(data.landingTourRequired && !data.landingTourCompletedAt));
       })
       .catch(() => {});
     return () => { cancelled = true; };
@@ -240,11 +241,18 @@ export default function App() {
     }, 600);
   };
 
+  const handleLandingTourComplete = () => {
+    setLandingTourPending(false);
+    api.post(`/users/${userId}/landing-tour/complete`)
+      .catch((err) => console.error("Failed to save landing tour completion", err));
+  };
+
   const handleLogin = (id, name) => {
     const titled = toTitleCase(name);
     setUserId(id);
     setUserName(titled);
     setUserSettings(DEFAULT_USER_SETTINGS);
+    setLandingTourPending(false);
     storeAuth(id, titled);
     navigate("/landing");
   };
@@ -282,6 +290,7 @@ export default function App() {
     setUserId(null);
     setUserName("");
     setUserSettings(DEFAULT_USER_SETTINGS);
+    setLandingTourPending(false);
     navigate("/login", { replace: true });
   };
 
@@ -321,6 +330,8 @@ export default function App() {
                 evaluationSelection={evaluationSelection}
                 onEvaluationSelectionChange={setEvaluationSelection}
                 startError={startError}
+                landingTourPending={landingTourPending}
+                onLandingTourComplete={handleLandingTourComplete}
               />
             ) : (
               <Navigate to="/login" replace />

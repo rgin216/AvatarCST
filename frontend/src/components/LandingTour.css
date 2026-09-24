@@ -1,0 +1,37 @@
+.landing-tour { position:fixed; inset:0; z-index:1000; }
+.landing-tour-backdrop { position:absolute; inset:0; background:transparent; }
+.landing-tour-backdrop.is-dim { background:rgba(9,18,29,.62); }
+/* The huge shadow dims everything around the highlighted target. */
+.landing-tour-spotlight { position:fixed; border-radius:20px; box-shadow:0 0 0 9999px rgba(9,18,29,.62), 0 0 0 4px #ffd66f; pointer-events:none; transition:top .2s ease, left .2s ease, width .2s ease, height .2s ease; }
+
+.landing-tour-card { position:fixed; width:min(440px, calc(100vw - 32px)); max-height:calc(100dvh - 32px); overflow:auto; box-sizing:border-box; padding:24px 26px 22px; background:#fffaf5; border:1px solid #e6d9cb; border-radius:22px; box-shadow:0 18px 70px rgba(0,0,0,.3); color:#3D2B1F; font-family:'Nunito', sans-serif; }
+.landing-tour-card.is-centered { top:50%; left:50%; transform:translate(-50%, -50%); width:min(520px, calc(100vw - 32px)); }
+
+.landing-tour-top { display:flex; align-items:center; justify-content:space-between; gap:12px; color:#645245; font-size:15px; }
+.landing-tour-card h2 { margin:14px 0 10px; font-family:'Playfair Display', serif; font-size:27px; line-height:1.2; color:#3D2B1F; }
+.landing-tour-card h2:focus { outline:none; }
+.landing-tour-card p { margin:0; font-size:19px; line-height:1.55; }
+
+.landing-tour-inputs { display:flex; gap:24px; margin-top:18px; font-size:16px; font-weight:700; color:#645245; }
+.landing-tour-inputs > span { display:flex; align-items:center; gap:10px; }
+.landing-tour-input-icon { display:grid; place-items:center; width:48px; height:48px; border-radius:50%; font-size:22px; }
+.landing-tour-input-icon.is-mic { background:linear-gradient(135deg, #B8CDD8, #7A9DAD); }
+.landing-tour-input-icon.is-type { background:linear-gradient(135deg, #A8C5A0, #7AAB72); }
+
+.landing-tour-footer { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-top:22px; }
+.landing-tour-dots { display:flex; gap:6px; }
+.landing-tour-dots span { width:8px; height:8px; border-radius:50%; background:#e0d3c5; }
+.landing-tour-dots span.is-active { width:22px; border-radius:999px; background:#315e51; }
+.landing-tour-actions { display:flex; gap:10px; margin-left:auto; }
+
+.landing-tour-card button { min-height:48px; padding:10px 18px; border:1px solid #89745d; border-radius:12px; background:transparent; color:#3D2B1F; font:700 17px/1.3 'Nunito', sans-serif; cursor:pointer; }
+.landing-tour-card .landing-tour-primary { background:#315e51; border-color:#315e51; color:#fff; }
+.landing-tour-card .landing-tour-skip { min-height:40px; padding:6px 12px; font-size:15px; }
+.landing-tour-card button:focus-visible { outline:3px solid #b36c00; outline-offset:3px; }
+
+@media (prefers-reduced-motion: reduce) { .landing-tour-spotlight { transition:none; } }
+@media (max-width:600px) {
+  .landing-tour-card { padding:20px; border-radius:18px; }
+  .landing-tour-card h2 { font-size:24px; }
+  .landing-tour-card p { font-size:18px; }
+}
