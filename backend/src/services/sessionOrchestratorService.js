@@ -25,6 +25,9 @@ import {
   buildCstOpenBlankAcknowledgementInstructions,
 } from './promptService.js';
 import { generateResponse } from './llmService.js';
+import { withSessionLlm, recordLlmFallback } from './llmContext.js';
+import { EvaluationTurn } from '../models/Evaluation.js';
+import { enqueueSessionEvaluation } from '../evaluation/sessionJobs.js';
 import { getPositiveNzNews } from './newsService.js';
 import { normalizeSongQuery, searchSpotifyTrack } from './spotifyService.js';
 import { isOpenAIFastScriptedPipeline, usesOpenAITextPipeline } from '../config/pipeline.js';
@@ -1241,6 +1244,7 @@ export const parseAdaptiveTurn = (text = '') => {
     };
   }
 
+  recordLlmFallback('Adaptive decision was not valid JSON; application recovery parser used');
   const explicitAnswerQuality = parseAnswerQuality(text);
   return {
     answered: explicitAnswerQuality === true,
@@ -2176,9 +2180,12 @@ export const generateSessionSummary = async ({
       }
     );
     const normalized = normalizeGeneratedSessionSummary(generated);
-    return isSafeGeneratedSessionSummary(normalized, answers) ? normalized : fallback;
+    if (isSafeGeneratedSessionSummary(normalized, answers)) return normalized;
+    recordLlmFallback('Generated session summary failed validation');
+    return fallback;
   } catch (err) {
     console.warn('[session-summary] Using topic fallback:', err.message);
+    recordLlmFallback('Session summary generation failed');
     return fallback;
   }
 };
@@ -2749,6 +2756,10 @@ const getSessionInactivityReminderWrite = async (sessionId, expectedActivityRevi
 
   const { session } = context;
 
+  if (session.evaluation?.facilitator) {
+    await captureEvaluationTurn(session, { assistantText, slide: context.slide }, '', [], true);
+  }
+
   return {
     sessionId: session._id,
     sessionStatus: session.status,
@@ -2766,10 +2777,9 @@ export const getSessionInactivityReminder = (sessionId, expectedActivityRevision
   );
 
 // TODO: wrap writes in a MongoDB transaction when upgrading to Atlas M10+ (replica set required)
-const respondToSessionTurnWrite = async ({ sessionId, content }) => {
+const respondToSessionTurnWrite = async ({ sessionId, content, activitySession }) => {
   const userContent = content?.trim();
 
-  const activitySession = await registerSessionActivityWrite(sessionId);
   const context = await getSessionTurnContext(sessionId, activitySession);
   const { session, user, memoryEntries, recentMessages, step, nextStep, slide, nextSlide, boundedIndex, isFinalStep, totalSteps } = context;
   const persistedSafetySupport = session.interactionState?.safetySupport || null;
@@ -3315,6 +3325,7 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
         }
       ).catch((error) => {
         console.warn('[session] Using complete scripted fallback:', error.message);
+        recordLlmFallback('Adaptive decision generation failed');
         return JSON.stringify({ answered: false, response: 'Thank you for sharing your thoughts.', followUp: null });
       }));
     }
@@ -3405,6 +3416,7 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
       }
     ).catch((error) => {
       console.warn('[session] Using trivia choice fallback:', error.message);
+      recordLlmFallback('Trivia acknowledgement generation failed');
       return fallbackFacts;
     });
     if (!collapseRepeatedAdjacentSpeech(adaptiveText || '').trim()) {
@@ -3452,6 +3464,7 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
       }
     ).catch((error) => {
       console.warn('[session] Naming-slot acknowledgement fallback:', error.message);
+      recordLlmFallback('Naming-slot acknowledgement generation failed');
       return '';
     });
     if (!collapseRepeatedAdjacentSpeech(adaptiveText || '').trim()) {
@@ -3487,6 +3500,7 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
       }
     ).catch((error) => {
       console.warn('[session] Open-blank acknowledgement fallback:', error.message);
+      recordLlmFallback('Open-blank acknowledgement generation failed');
       return '';
     });
     if (!collapseRepeatedAdjacentSpeech(adaptiveText || '').trim()) {
@@ -3740,6 +3754,7 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
       model: useFastScriptedTurn ? process.env.OPENAI_FAST_TEXT_MODEL : undefined,
     }).catch((error) => {
       console.warn('[session] Using acknowledgement fallback:', error.message);
+      recordLlmFallback('Acknowledgement generation failed');
       return 'Thank you for sharing your thoughts.';
     });
   }
@@ -3982,5 +3997,41 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
   };
 };
 
+const captureEvaluationTurn = async (session, turn, input, calls, reminder = false) => {
+  try {
+    await EvaluationTurn.create({ sessionId: session._id,
+      revision: session.activityRevision + (reminder ? 0.5 : 0), reminder,
+      input: input || '', deliveredText: turn.assistantText, step: turn.scriptStep,
+      slide: turn.slide, memory: turn.memoryUsed || [], complete: turn.sessionCompleteAfterResponse, calls });
+  } catch (error) {
+    console.error('[evaluation] Turn capture failed:', error.message);
+    await Session.updateOne({ _id: session._id }, { $set: { 'evaluation.captureError': true } });
+  }
+};
+
+// Wait for any in-flight text turn and its capture before freezing the transcript.
+export const endSessionAndQueueEvaluation = sessionId =>
+  serializeSessionWrite(sessionId, async () => {
+    const session = await Session.findByIdAndUpdate(sessionId,
+      { status: 'completed', endedAt: new Date() }, { returnDocument: 'after' });
+    if (session?.evaluation) await enqueueSessionEvaluation(session._id);
+    return session;
+  });
+
 export const respondToSessionTurn = ({ sessionId, content }) =>
-  serializeSessionWrite(sessionId, () => respondToSessionTurnWrite({ sessionId, content }));
+  serializeSessionWrite(sessionId, async () => {
+    const activitySession = await registerSessionActivityWrite(sessionId);
+    const assignment = activitySession.evaluation;
+    if (!assignment?.facilitator) return respondToSessionTurnWrite({ sessionId, content, activitySession });
+    const calls = [];
+    const turn = await withSessionLlm(assignment.facilitator, calls,
+      () => respondToSessionTurnWrite({ sessionId, content, activitySession }), assignment.requestPolicy);
+    // Persist what was actually delivered, after application filtering and fallback handling.
+    await captureEvaluationTurn(activitySession, turn, content, calls);
+    if (turn.sessionCompleteAfterResponse) {
+      await Session.updateOne({ _id: sessionId }, { $set: { status: 'completed', endedAt: new Date() } });
+      await enqueueSessionEvaluation(sessionId, true);
+    }
+    return { ...turn, sessionStatus: turn.sessionCompleteAfterResponse ? 'completed' : turn.sessionStatus,
+      evaluation: { facilitator: assignment.facilitator.id } };
+  });

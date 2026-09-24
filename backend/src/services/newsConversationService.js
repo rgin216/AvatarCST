@@ -1,4 +1,5 @@
 import { generateResponse } from './llmService.js';
+import { recordLlmFallback } from './llmContext.js';
 
 // NewsAPI supplies excerpts, not full articles. Keep complete sentences without
 // treating an unfinished trailing fragment as a fact.
@@ -45,5 +46,6 @@ export async function answerNewsQuestion({ currentAffairs, question, recentMessa
   } catch {
     // An unavailable model or unsupported answer must not turn into guessed news.
   }
+  recordLlmFallback('News answer unavailable or not supported by source evidence');
   return missing;
 }

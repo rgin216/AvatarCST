@@ -15,14 +15,18 @@ import {
   streamSpeechToken,
 } from '../controllers/sessionController.js';
 import { upload } from '../config/storage.js';
+import { getEvaluationOptions, getEvaluationReport, retryEvaluation } from '../controllers/evaluationController.js';
 
 const router = Router();
 router.get('/pipeline', getPipelineInfo);
+router.get('/evaluation-options', getEvaluationOptions);
 router.get('/speech-stream/:token', streamSpeechToken);
 router.post('/', createSession);
 router.get('/user/:userId', getUserSessions);
 router.delete('/user/:userId', clearUserSessions);
 router.get('/:id', getSession);
+router.get('/:id/evaluation', getEvaluationReport);
+router.post('/:id/evaluation/retry', retryEvaluation);
 router.patch('/:id', updateSession);
 router.patch('/:id/end', endSession);
 router.post('/:id/respond', respondToSession);

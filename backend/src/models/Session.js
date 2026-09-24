@@ -12,6 +12,7 @@ const sessionSchema = new Schema({
     default: DEFAULT_PIPELINE_MODE,
   },
   scriptId: { type: String, default: 'cst_intro_reminiscence' },
+  evaluation: { type: Schema.Types.Mixed },
   scriptStepIndex: { type: Number, default: 0, min: 0 },
   scriptStepTurnIndex: { type: Number, default: 0, min: 0 },
   scriptStepRetryCount: { type: Number, default: 0, min: 0 },

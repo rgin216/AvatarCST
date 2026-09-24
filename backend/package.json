@@ -10,7 +10,8 @@
     "start": "node src/server.js",
     "test": "node --test src/",
     "eval:llm": "node scripts/evaluate-llms.js",
-    "eval:calibrate": "node scripts/compare-human-review.js"
+    "eval:calibrate": "node scripts/compare-human-review.js",
+    "eval:sessions": "node scripts/evaluate-sessions.js"
   },
   "keywords": [],
   "author": "",

@@ -1,5 +1,6 @@
 import { generateAnthropicResponse } from './anthropicService.js';
 import { isSupportedProvider } from './llmProviders.js';
+import { getSessionLlm, paceSessionRequest } from './llmContext.js';
 
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
 const OPENAI_RESPONSES_URL = 'https://api.openai.com/v1/responses';
@@ -155,7 +156,7 @@ const generateOpenAIResponse = async (messages, options = {}) => {
   return options.json ? raw : stripAssistantPrefix(raw);
 };
 
-export const generateResponse = async (messages, options = {}) => {
+const generateProviderResponse = async (messages, options = {}) => {
   if (options.provider && !isSupportedProvider(options.provider)) {
     throw new Error(`Unsupported LLM provider: ${options.provider}`);
   }
@@ -165,4 +166,23 @@ export const generateResponse = async (messages, options = {}) => {
     return options.json ? raw : stripAssistantPrefix(raw);
   }
   return generateGroqResponse(messages, options);
+};
+
+export const generateResponse = async (messages, options = {}) => {
+  const context = getSessionLlm();
+  const effective = context ? { ...options, provider: context.facilitator.provider, model: context.facilitator.model } : options;
+  await paceSessionRequest(context);
+  const started = performance.now();
+  const call = { provider: effective.provider || 'groq', model: effective.model, status: 'ok' };
+  try {
+    const output = await generateProviderResponse(messages, effective);
+    call.output = output;
+    return output;
+  } catch (error) {
+    call.status = 'error'; call.error = error.message;
+    throw error;
+  } finally {
+    call.latencyMs = Math.round(performance.now() - started);
+    context?.calls.push(call);
+  }
 };
