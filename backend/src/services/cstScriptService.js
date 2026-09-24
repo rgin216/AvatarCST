@@ -1,5 +1,6 @@
 import { createCategorizingObjectsScript } from './categorizingObjectsScript.js';
 import { createFacesScenesScript } from './facesScenesScript.js';
+import { createNumberGamesScript } from './numberGamesScript.js';
 import { createOrientationScript } from './orientationScript.js';
 import { createWordGamesScript } from './wordGamesScript.js';
 ﻿import {
@@ -22,6 +23,7 @@ const scriptSlideFolders = {
   cst_word_associations: 'session8',
   cst_orientation: 'session11',
   cst_using_money: 'session12',
+  cst_number_games: 'session13',
   cst_word_games: 'session14',
 };
 
@@ -2649,6 +2651,7 @@ scripts.cst_faces_scenes = createFacesScenesScript(scripts.cst_current_affairs);
 scripts.cst_orientation = createOrientationScript(scripts.cst_faces_scenes);
 scripts.cst_word_games = createWordGamesScript(scripts.cst_faces_scenes);
 scripts.cst_categorizing_objects = createCategorizingObjectsScript(scripts.cst_current_affairs);
+scripts.cst_number_games = createNumberGamesScript(scripts.cst_current_affairs);
 
 export const getScript = (scriptId = 'cst_intro_reminiscence') =>
   scripts[scriptId] || scripts.cst_intro_reminiscence;

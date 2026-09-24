@@ -22,6 +22,7 @@ import {
   buildCstFoodPhraseGuessInstructions,
   buildCstInstrumentGuessInstructions,
   buildCstNameThatTuneInstructions,
+  buildCstNumberGuessInstructions,
   buildCstTriviaChoiceInstructions,
   buildCstOpenBlankAcknowledgementInstructions,
 } from './promptService.js';
@@ -695,15 +696,19 @@ const SCRIPTED_TRIVIA_RULES = {
 
 const getTriviaRule = (step) => {
   if (!step?.trivia) return SCRIPTED_TRIVIA_RULES[step?.id];
-  const { choices, answer, aliases } = step.trivia;
+  const { choices, answer, aliases, responses = {} } = step.trivia;
   return {
     choices,
     isCorrect: (content) => step.id.startsWith('word_games_teaser_') ? matchesWordGameAnswer(content, aliases) : aliases.some((alias) => (` ${content} `).includes(` ${normalizeAnswer(alias.normalize('NFD').replace(/[\u0300-\u036f]/g, ''))} `)),
-    correctResponse: `Yes, that is right — ${answer}.`,
-    incorrectResponse: `Thank you for having a go. The answer is ${answer}.`,
-    unsureResponse: `That is okay. The answer is ${answer}.`,
+    correctResponse: responses.correct || `Yes, that is right — ${answer}.`,
+    incorrectResponse: responses.incorrect || `Thank you for having a go. The answer is ${answer}.`,
+    unsureResponse: responses.unsure || `That is okay. The answer is ${answer}.`,
   };
 };
+
+// The question card's Pass button sends "I would like to pass".
+const isPassAnswer = (content = '') =>
+  /^(?:i (?:would|d) like to pass|pass|pass please|pass this (?:one|question)|skip|skip this one)$/.test(normalizeAnswer(content));
 
 const isScriptedTriviaQuestion = (step) => Boolean(getTriviaRule(step));
 
@@ -750,7 +755,7 @@ export const evaluateTriviaAnswer = ({ step, content, answers = [] }) => {
     ][variant % 3];
   }
 
-  if (isDontKnowAnswer(content)) {
+  if (isDontKnowAnswer(content) || isPassAnswer(content)) {
     return {
       answered: true,
       response: rule.unsureResponse || 'No problem. Let us reveal the answer.',
@@ -846,6 +851,13 @@ const labelKeywords = (label = '') =>
     .filter((word) => word.length >= 3 && !STOPWORDS.has(word));
 const labelMatchesContent = (label, normalizedContent) =>
   labelKeywords(label).some((word) => normalizedContent.includes(stem(word)));
+// An option can list its own keywords instead of its label's words, e.g. to
+// leave out "four" from "A four-leaf clover" when every round is about fours,
+// or to accept "Ringo" for "The Beatles".
+const optionMatchesContent = (option, normalizedContent) =>
+  option.keywords
+    ? option.keywords.some((word) => normalizedContent.includes(stem(normalizeGuessText(word))))
+    : labelMatchesContent(option.label, normalizedContent);
 
 const isNumericRound = (round) =>
   (round.options || []).every((option) => optionNumericValue(option.label) !== null);
@@ -893,7 +905,7 @@ export const matchTriviaChoiceRounds = (content, step, answeredRoundIndices = []
       // Only resolve when exactly one option's keywords appear in the message -
       // if the phrasing could plausibly match more than one, leave it
       // unresolved rather than guessing which one was meant.
-      const matches = options.filter((option) => labelMatchesContent(option.label, normalizedContent));
+      const matches = options.filter((option) => optionMatchesContent(option, normalizedContent));
       if (matches.length === 1) resolved.push({ roundIndex, round, option: matches[0] });
     }
   });
@@ -1346,8 +1358,10 @@ export const parseActivityRevealEvent = (content = '', step = null) => {
 const NAMING_SLOT_ORDINALS = [
   { slot: 0, re: /\b(?:first|1st|number one)\b/ },
   { slot: 1, re: /\b(?:second|2nd|number two|middle)\b/ },
-  { slot: 2, re: /\b(?:third|3rd|number three|last|final)\b/ },
+  { slot: 2, re: /\b(?:third|3rd|number three)\b/ },
+  { slot: 3, re: /\b(?:fourth|4th)\b/ },
 ];
+const LAST_NAMING_SLOT = /\b(?:last|final)\b/;
 
 // Split a normalized answer into the separate things the person listed, so a
 // multi-slot reply ("first a trumpet, second a drum") can be judged per slot.
@@ -1366,7 +1380,20 @@ const splitNamingFragments = (content = '') =>
     .replace(/\s+/g, ' ')
     .trim()
     .split(/\s*,\s*|\s*;\s*|\band\b|\bthen\b/)
-    .filter((fragment) => /[a-z]{3}/.test(fragment));
+    .filter((fragment) => /[a-z]{3}|\d/.test(fragment));
+
+// A content-routed slot can be identified by its card's own words (identify)
+// or by its correct answer (match), e.g. "rugby" or "15" for the rugby card.
+const matchesNamingSlotContent = (rule, text) =>
+  Boolean(rule && [rule.identify, rule.match].some((re) => re?.test(text)));
+
+// The listed fragment that names this slot: its card's words first, then its
+// correct answer. Picking by identify first keeps "tyres 3, tricycle 4" from
+// judging the tyres card against the tricycle card's fragment.
+const findNamingSlotFragment = (rule, fragments) =>
+  (rule?.identify && fragments.find((fragment) => rule.identify.test(fragment))) ||
+  (rule?.match && fragments.find((fragment) => rule.match.test(fragment))) ||
+  null;
 
 export const createNamingSlotState = (step, persisted = null) => {
   const count = Math.max(0, Math.trunc(Number(step?.namingSlots?.count) || 0));
@@ -1393,7 +1420,7 @@ export const parseNamingSlotAnswer = (content = '', { count = 3, filled = [], co
     return { slots: [] };
   }
 
-  if (/\b(?:all (?:three|3|of them|of these)|every one|they (?:re|are) all|each (?:one|of them))\b/.test(normalized)) {
+  if (/\b(?:all (?:three|3|four|4|of them|of these)|every one|they (?:re|are) all|each (?:one|of them))\b/.test(normalized)) {
     return { slots: emptySlots };
   }
 
@@ -1401,11 +1428,28 @@ export const parseNamingSlotAnswer = (content = '', { count = 3, filled = [], co
   // specific saying, unlike anonymous sound clips), match by content before
   // falling back to ordinal/positional guessing, so answering out of order and
   // without saying "first"/"second" still lands on the right slot.
+  // Each listed fragment routes separately: a fragment that names a card by
+  // its own words belongs to that card only, so a number inside it ("my old
+  // car has 3 tyres") cannot also claim the card whose answer is 3. A
+  // fragment naming no card routes by its correct answer instead ("4 and 3").
   if (contentRules) {
-    const contentHits = emptySlots.filter((index) =>
-      (contentRules[index]?.identify || contentRules[index]?.match)?.test(normalized)
-    );
-    if (contentHits.length > 0) return { slots: contentHits };
+    const fragments = splitNamingFragments(content);
+    const contentHits = new Set();
+    let namedAnyCard = false;
+    for (const fragment of fragments.length > 0 ? fragments : [normalized]) {
+      // Checked against every card, filled or not: mentioning an already
+      // answered card again must not hand its number to another card.
+      const namesACard = contentRules.some((rule) => rule?.identify?.test(fragment));
+      namedAnyCard ||= namesACard;
+      const routed = namesACard
+        ? emptySlots.filter((index) => contentRules[index]?.identify?.test(fragment))
+        : emptySlots.filter((index) => matchesNamingSlotContent(contentRules[index], fragment));
+      routed.forEach((index) => contentHits.add(index));
+    }
+    if (contentHits.size > 0) return { slots: [...contentHits].sort((a, b) => a - b) };
+    // Only talked about cards already answered: it names no empty card, so
+    // it must not fall through to filling the next one by position.
+    if (namedAnyCard) return { slots: [] };
   }
 
   const hits = new Set();
@@ -1418,12 +1462,14 @@ export const parseNamingSlotAnswer = (content = '', { count = 3, filled = [], co
   for (const { slot, re } of NAMING_SLOT_ORDINALS) {
     if (slot < count && !filled[slot] && re.test(normalized)) hits.add(slot);
   }
+  if (count > 0 && !filled[count - 1] && LAST_NAMING_SLOT.test(normalized)) hits.add(count - 1);
   if (hits.size > 0) {
     return { slots: [...hits].sort((a, b) => a - b) };
   }
 
-  // No ordinal cue and not a genuine attempt: name nothing.
-  if (isDontKnowAnswer(content) || /\?\s*$/.test(content) || !/[a-z]{3}/.test(normalized)) {
+  // No ordinal cue and not a genuine attempt: name nothing. A bare number
+  // ("12") is a genuine attempt at a number blank.
+  if (isDontKnowAnswer(content) || /\?\s*$/.test(content) || !/[a-z]{3}|\d/.test(normalized)) {
     return { slots: [] };
   }
 
@@ -1436,7 +1482,8 @@ export const parseNamingSlotAnswer = (content = '', { count = 3, filled = [], co
 export const buildNamingSlotPrompt = (
   missingLabels = [],
   noun = 'sound',
-  singlePrompt = (label) => `And what does the ${label} ${noun} sound like?`
+  singlePrompt = (label) => `And what does the ${label} ${noun} sound like?`,
+  multiPrompt = (joined) => `And what about the ${joined} ${noun}s?`
 ) => {
   const labels = missingLabels.filter(Boolean);
   if (labels.length === 0) return '';
@@ -1445,7 +1492,7 @@ export const buildNamingSlotPrompt = (
     labels.length === 2
       ? `${labels[0]} and ${labels[1]}`
       : `${labels.slice(0, -1).join(', ')}, and ${labels[labels.length - 1]}`;
-  return `And what about the ${joined} ${noun}s?`;
+  return multiPrompt(joined);
 };
 
 // Per-slot answers for a naming-slots step. Matching is lenient: a guess in the
@@ -1485,6 +1532,26 @@ const SCRIPTED_INSTRUMENT_RULES = {
     { label: 'happiness', identify: /\b(money|buy|happ\w*)\b/, match: /\bhapp(?:y|iness)\b/ },
     { label: 'beggars', identify: /\b(beggars?|choosers?)\b/, match: /\bbeggars?\b/ },
   ],
+  // Session 13 number blanks. identify is only the card's own words, so a
+  // bare number routes by match (its correct answer) or else positionally.
+  number_games_fill_in: [
+    { label: '4', identify: /\b(tyres?|tires?|cars?)\b/, match: /\b(4|four)\b/, fact: 'A car has 4 tyres.' },
+    { label: '3', identify: /\b(tricycles?|trikes?)\b/, match: /\b(3|three)\b/, fact: 'A tricycle has 3 wheels.' },
+    {
+      label: '13',
+      identify: /\b(unlucky|luck|superstitio\w*)\b/,
+      match: /\b(13|thirteen)\b/,
+      fact: '13 is the number often called unlucky.',
+      note: 'in some cultures 4 is the unlucky number, which is a fair answer too',
+    },
+    {
+      label: '15',
+      identify: /\b(rugby|players?|team|all blacks)\b/,
+      match: /\b(15|fifteen)\b/,
+      fact: 'A rugby team like the All Blacks has 15 players.',
+      note: 'a rugby league team has 13, so 13 is a fair answer if they meant league',
+    },
+  ],
 };
 
 // For an open-ended naming-slots step (no scripted correct answer, so no
@@ -1523,16 +1590,31 @@ export const evaluateNamedInstrumentSlots = ({ step, content, slotIndices = [] }
             ? fragments.slice(position).join(' ')
             : fragments[position]
       : () => normalized;
+  // Content-routed slots may be answered out of order, so judge each against
+  // the fragment that names it rather than the fragment in its position.
+  const slotText = step.namingSlots?.matchByContent
+    ? (index, position) => findNamingSlotFragment(rules[index], fragments) || perSlotText(position)
+    : (_index, position) => perSlotText(position);
 
   const outcomes = consideredSlots.map((index, position) => ({
     label: rules[index].label,
+    fact: rules[index].fact,
     outcome: unsure
       ? 'unsure'
-      : rules[index].match.test(perSlotText(position))
+      : rules[index].match.test(slotText(index, position))
       ? 'correct'
       : 'incorrect',
   }));
   if (outcomes.length === 0) return null;
+
+  if (step.namingSlots?.noun === 'number') {
+    const lead = outcomes.every((o) => o.outcome === 'unsure')
+      ? 'No trouble at all.'
+      : outcomes.every((o) => o.outcome === 'correct')
+      ? 'Yes, spot on.'
+      : 'Good try.';
+    return { outcomes, response: [lead, ...outcomes.map((o) => o.fact)].join(' ') };
+  }
 
   const correct = outcomes.filter((o) => o.outcome === 'correct').map((o) => o.label);
   const listCorrect =
@@ -1830,6 +1912,11 @@ export const buildTopicSessionSummary = (answers = [], { themeSong = null } = {}
     [/^faces_scenes_(celebrities|people)_/, 'comparing similarities and differences between people'],
     [/^faces_scenes_(scene_preference|landmarks|queen_street)$/, 'exploring scenes and how Queen Street has changed'],
     [/^faces_scenes_real_ai_\d+$/, 'trying real-or-AI picture guesses'],
+    [/^number_games_(calendar_|fill_in$|fours$)/,'playing number trivia about special days and everyday things'],
+    [/^number_games_(christmas|rugby|beatles|sweets)_memory$/, 'sharing memories the numbers brought back'],
+    [/^number_games_everyday$/, 'thinking of everyday things that come in twos and dozens'],
+    [/^number_games_lucky_number$/, 'talking about lucky numbers'],
+    [/^number_games_guess_/, 'guessing how many lollies were in a jar'],
   ]) {
     if (meaningful.some((item) => pattern.test(item.stepId))) addTopic(topic);
   }
@@ -1871,7 +1958,7 @@ export const buildTopicSessionSummary = (answers = [], { themeSong = null } = {}
   }
 
   for (const item of meaningful) {
-    if (/^(faces_scenes|categorizing_objects)_/.test(item.stepId || '')) continue;
+    if (/^(faces_scenes|categorizing_objects|number_games)_/.test(item.stepId || '')) continue;
     if ([
       'introduce_yourself',
       'what_is_cst',
@@ -2034,7 +2121,7 @@ export const buildTopicSessionSummary = (answers = [], { themeSong = null } = {}
   if (meaningful.some((item) => item.stepId === 'money_spin_question')) {
     addTopic('reflecting on a money-related question from the wheel');
   }
-  const wheelAnswer = meaningful.find((item) => ['current_affairs_spin_question', 'faces_scenes_spin_question', 'categorizing_objects_spin_question', 'orientation_spin_question'].includes(item.stepId));
+  const wheelAnswer = meaningful.find((item) => ['current_affairs_spin_question', 'faces_scenes_spin_question', 'categorizing_objects_spin_question', 'orientation_spin_question', 'number_games_spin_question'].includes(item.stepId));
   let wheelTopic = '';
   if (wheelAnswer) {
     const wheelText = `${wheelAnswer.answer || ''} ${wheelAnswer.adaptiveFollowUp?.answer || ''}`;
@@ -3438,19 +3525,26 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
     // except the original sound-naming one - that is the only case that needs
     // the instrument-guessing framing instead.
     const isSoundNamingStep = step.id === 'sounds_naming_instruments';
+    const isNumberNamingStep = step.namingSlots.noun === 'number';
     const namedItems = newlyFilledNamingSlots
       .filter((slotIndex) => rules[slotIndex])
-      .map((slotIndex) =>
-        isSoundNamingStep
-          ? `the ${step.namingSlots.labels?.[slotIndex] || `${slotIndex + 1}`} sound is ${rules[slotIndex].label}`
-          : `the "${step.namingSlots.labels?.[slotIndex] || `${slotIndex + 1}`}" saying is missing ${rules[slotIndex].label}`
-      );
+      .map((slotIndex) => {
+        const label = step.namingSlots.labels?.[slotIndex] || `${slotIndex + 1}`;
+        if (isSoundNamingStep) return `the ${label} sound is ${rules[slotIndex].label}`;
+        if (isNumberNamingStep) {
+          const note = rules[slotIndex].note ? ` (${rules[slotIndex].note})` : '';
+          return `"${label}": the number is ${rules[slotIndex].label}${note}`;
+        }
+        return `the "${label}" saying is missing ${rules[slotIndex].label}`;
+      });
     adaptiveText = await generateResponse(
       [
         {
           role: 'system',
           content: isSoundNamingStep
             ? buildCstInstrumentGuessInstructions({ recentMessages, namedSounds: namedItems })
+            : isNumberNamingStep
+            ? buildCstNumberGuessInstructions({ recentMessages, namedNumbers: namedItems })
             : buildCstFoodPhraseGuessInstructions({ recentMessages, namedPhrases: namedItems }),
         },
         { role: 'user', content: userContent },
@@ -3663,7 +3757,8 @@ const respondToSessionTurnWrite = async ({ sessionId, content }) => {
       ? buildNamingSlotPrompt(
           namingMissingLabels,
           step.namingSlots.noun || 'sound',
-          step.namingSlots.singlePrompt
+          step.namingSlots.singlePrompt,
+          step.namingSlots.multiPrompt
         )
       : '';
   const triviaChoicePromptLine =

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import "./TriviaChoiceActivity.css";
 
 // Both rounds' questions and options are shown at once (matching Aria's spoken
@@ -19,6 +19,7 @@ export default function TriviaChoiceActivity({
 }) {
   const [pendingRound, setPendingRound] = useState(null);
   const [optimistic, setOptimistic] = useState({});
+  const groupId = useId();
   const rounds = interaction?.rounds || [];
   const confirmed = persistedSelections || {};
   // Optimistic taps disappear once the server confirms them (or reverts if the
@@ -68,8 +69,19 @@ export default function TriviaChoiceActivity({
             const isCorrectGuess = answered && selectedId === round.correctOptionId;
 
             return (
-              <fieldset className="trivia-choice-round" key={roundIndex}>
-                {round.question && <legend className="trivia-choice-question">{round.question}</legend>}
+              // A labelled group rather than fieldset/legend: browsers draw a
+              // legend straddling the box's top edge, half outside the card.
+              <div
+                className="trivia-choice-round"
+                key={roundIndex}
+                role="group"
+                aria-labelledby={round.question ? `${groupId}-question-${roundIndex}` : undefined}
+              >
+                {round.question && (
+                  <p className="trivia-choice-question" id={`${groupId}-question-${roundIndex}`}>
+                    {round.question}
+                  </p>
+                )}
                 <div className="trivia-choice-options">
                   {(round.options || []).map((option) => {
                     const isSelected = option.id === selectedId;
@@ -104,7 +116,7 @@ export default function TriviaChoiceActivity({
                     {round.fact && <p className="trivia-choice-fact">{round.fact}</p>}
                   </div>
                 )}
-              </fieldset>
+              </div>
             );
           })}
         </div>
