@@ -52,7 +52,7 @@ const lipSyncModes = [
 ];
 const wheelColors = ["#7A9DAD", "#F47C20", "#A8C5A0", "#4472C4", "#F4C8B0"];
 const INACTIVITY_TIMEOUT_MS = 60_000;
-const SESSION_END_DELAY_MS = 10_000;
+const SESSION_END_DELAY_MS = 5_000;
 const MIN_RECORDING_MS = 700;
 const RECORDING_TAIL_MS = 250;
 const SPOTIFY_IFRAME_API_URL = "https://open.spotify.com/embed/iframe-api/v1";

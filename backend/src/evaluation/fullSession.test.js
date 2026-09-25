@@ -158,7 +158,7 @@ test('real orchestrator replays every Session 1 step and captures delivered turn
   });
   const result = await replaySession({ sessionId: 'session', scenario, loadSession: async () => session, respond: respondToSessionTurn });
   assert.equal(result.naturalCompletion, true);
-  assert.equal(new Set(result.turns.map(turn => turn.scriptStep.id)).size, 8);
+  assert.equal(new Set(result.turns.map(turn => turn.scriptStep.id)).size, 10);
   assert.equal(captured.length, result.turns.length);
   assert.deepEqual(captured.map(row => row.deliveredText), result.turns.map(turn => turn.assistantText));
   assert.ok(requests.length > 0 && requests.every(request => request.model === 'model-b'));

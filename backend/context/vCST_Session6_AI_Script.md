@@ -14,7 +14,7 @@ Keep every exchange warm, adult-to-adult, and opinion-led. The photographs are p
 ---
 
 ## 2. Opening theme song
-**You say:** Offer the saved theme song for up to one minute. Ask them to press Done, type done, or say done when finished or ready to skip.
+**You say:** Offer the saved theme song for up to 30 seconds. Ask them to press Done, type done, or say done when finished or ready to skip.
 
 **Adapt:** Let them control playback. Do not claim music has started unless playback controls and track details are present.
 

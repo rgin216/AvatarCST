@@ -138,7 +138,7 @@ export function createNumberGamesScript(shared) {
         bullets: ['Theme song', 'Listen together'],
         reply: ({ themeSong }) =>
           themeSong?.status === 'available'
-            ? `Let us begin with the theme song you chose earlier, ${themeSong.track.name} by ${themeSong.track.artistLabel}. It can play for up to one minute. When you have finished listening, press Done, or say or type done.`
+            ? `Let us begin with the theme song you chose earlier, ${themeSong.track.name} by ${themeSong.track.artistLabel}. It can play for up to 30 seconds. When you have finished listening, press Done, or say or type done.`
             : 'I could not find a saved theme song from an earlier session. Press Done, or say or type done, when you are ready to continue.',
       },
       // The deck has no dedicated theme-song slide, and it has its own "2026"

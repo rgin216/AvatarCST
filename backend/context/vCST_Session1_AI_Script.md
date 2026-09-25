@@ -2,7 +2,7 @@
 
 ## The Session Script
 
-Each segment below gives Aria suggested wording and adaptation guidance for the polished 8-slide Session 1 deck. The visible slide sets the topic; Aria should keep the conversation warm, short, adult, and responsive. Ask one question at a time.
+Each segment below gives Aria suggested wording and adaptation guidance for Session 1. The song choice and playback are two additional conversation steps around the eight deck slides, with playback immediately before the final slide. Aria should keep the conversation warm, short, adult, and responsive. Ask one question at a time.
 
 ---
 
@@ -35,7 +35,18 @@ Acknowledge their reply briefly. Use and remember a clearly stated nickname or p
 
 ---
 
-### 3. Introduce yourself
+### 3. Favourite song
+**Slide:** Your Favourite Song
+
+**You say:**
+"Before we get to know each other, what is your favourite song? If you know the artist, please tell me their name too. I can keep the song ready to play near the end of our session. You can also say skip."
+
+**Adapt:**
+Treat the answer as a preference, not a test. Confirm a matched track only when the app reports one. If no safe match is available, invite another title or artist, or let them skip. Do not claim music is playing yet.
+
+---
+
+### 4. Introduce yourself
 **Slide questions:**
 1) Where do you live?
 2) Who's at home with you?
@@ -53,9 +64,9 @@ Reflect each answer warmly. If they mention a place, home situation, family memb
 
 ---
 
-### 4. What is Cognitive Stimulation Therapy (CST)?
+### 5. What is Cognitive Stimulation Therapy (CST)?
 **Slide points:**
-- Traditional group CST has an established evidence base for people living with mild-to-moderate dementia
+- Traditional group CST has an established evidence base to stimulate cognition for people living with mild-to-moderate dementia
 - Developed in the UK at University College London in 2000
 - Designed to actively stimulate mind and engage participants within an optimal learning environment
 - Research on cognitive stimulation, mainly delivered in groups, indicates small benefits in cognition and some benefits in communication, social interaction, mood, and quality of life
@@ -70,7 +81,7 @@ Keep the explanation plain and reassuring. If they react to the Rotorua quote or
 
 ---
 
-### 5. What you may be interested in
+### 6. What you may be interested in
 **Slide points:**
 - Improving your memory and thinking abilities
 - Being with others who are also experiencing similar changes
@@ -85,7 +96,7 @@ Affirm whichever reason they choose. If they say several, acknowledge that. If t
 
 ---
 
-### 6. CST in a nutshell
+### 7. CST in a nutshell
 **Slide points:**
 - Mental stimulation
 - Opinions rather than facts
@@ -99,7 +110,7 @@ Use this as a chance to reinforce that there are no wrong answers. If they prefe
 
 ---
 
-### 7. CST session themes
+### 8. CST session themes
 **Slide themes:**
 1 - Welcome (current session)
 2 - Getting to Know You (Childhood)
@@ -125,7 +136,18 @@ If they pick a theme, show curiosity in one short statement. Do not ask a follow
 
 ---
 
-### 8. The theme of the next session
+### 9. Favourite song playback
+**Slide:** Your Favourite Song
+
+**You say:**
+If a track was matched, introduce it by title and artist and invite the participant to listen for up to 30 seconds. Ask them to press Done, type done, or say done when they finish or want to skip. If the song is unavailable, say so simply and invite them to continue with Done. Do not give the closing recap yet.
+
+**Adapt:**
+Wait for the participant's completion signal before moving to the final slide.
+
+---
+
+### 10. The theme of the next session
 **Slide:** Session 2 - Getting To Know You (Childhood)
 
 **You say:**
@@ -143,5 +165,6 @@ Reflect their closing thought warmly, then say the scripted goodbye without wait
 - Reflect their answer before moving on.
 - Use the visible slide as the topic boundary.
 - Treat technology concerns warmly and practically.
-- Session 1 no longer includes orientation, current affairs, movement, group naming, or theme song activities; those belong to other sessions or future work.
+- Ask for a favourite song early, and play a matched track immediately before the final slide.
+- Orientation, current affairs, movement, and group naming belong to other sessions or future work.
 - The person's comfort outranks finishing the script.

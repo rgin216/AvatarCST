@@ -59,7 +59,7 @@ export function createFacesScenesScript(shared) {
       themeSong: {
         title: 'Welcome Back', subtitle: 'Your theme song', bullets: ['Welcome back', 'Theme song'],
         reply: ({ themeSong }) => themeSong?.status === 'available'
-          ? `Let us begin with your theme song, ${themeSong.track.name} by ${themeSong.track.artistLabel}. It can play for up to one minute. When you have finished listening, press Done, or say or type done.`
+          ? `Let us begin with your theme song, ${themeSong.track.name} by ${themeSong.track.artistLabel}. It can play for up to 30 seconds. When you have finished listening, press Done, or say or type done.`
           : 'I could not find a saved theme song this time. Press Done, or say or type done, when you are ready to continue.',
       },
       checkIn: {

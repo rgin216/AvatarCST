@@ -22,6 +22,7 @@ import {
   evaluateImageObservationAnswer,
   evaluateSafetySupportTurn,
   evaluateOrientationAnswer,
+  evaluatePositiveNewsReaction,
   hasMeaningfulUserContent,
   evaluateTriviaAnswer,
   parseTriviaChoiceEvent,
@@ -84,7 +85,7 @@ test('configures Session 6 with the supplied deck and reusable opening interacti
   assert.equal(welcome.deckSlide, 1);
   assert.equal(welcome.acceptAnyAnswer, true);
   assert.equal(openingSong.interaction.type, 'spotifySong');
-  assert.equal(openingSong.interaction.playbackSeconds, 60);
+  assert.equal(openingSong.interaction.playbackSeconds, 30);
   assert.equal(yearReveal.deckSlide, 7);
   assert.equal(yearReveal.isAnswerReveal, true);
   assert.equal(yearReveal.interaction.type, 'autoAdvance');
@@ -925,12 +926,16 @@ test('lists clean artist suggestions and resolves ordinal or title choices', () 
   );
 });
 
-test('asks for a preferred name on Session 1 slide 2 and then moves to location', () => {
+test('asks for a preferred name and favourite song before Session 1 introductions', () => {
   const nicknameStep = getScriptStep('cst_intro_reminiscence', 1).step;
-  const introductionStep = getScriptStep('cst_intro_reminiscence', 2).step;
+  const songStep = getScriptStep('cst_intro_reminiscence', 2).step;
+  const introductionStep = getScriptStep('cst_intro_reminiscence', 3).step;
 
   assert.match(renderScriptReply(nicknameStep, { name: 'Ryan' }), /I know your name is Ryan/i);
   assert.match(renderScriptReply(nicknameStep, { name: 'Ryan' }), /nickname or another name/i);
+  assert.equal(songStep.id, 'theme_song_choice');
+  assert.match(renderScriptReply(songStep, {}), /favourite song/i);
+  assert.equal(songStep.deckSlide, null);
   assert.equal(introductionStep.turns, 3);
   assert.match(renderScriptReply(introductionStep, {}), /Where do you live/i);
   assert.doesNotMatch(renderScriptReply(introductionStep, {}), /what is your name/i);
@@ -1031,7 +1036,7 @@ test('distinguishes a tentative orientation question from a second incorrect ans
 });
 
 test('Session 1 closing slide includes the discussion recap', () => {
-  const closingStep = getScriptStep('cst_intro_reminiscence', 7).step;
+  const closingStep = getScriptStep('cst_intro_reminiscence', 9).step;
   const reply = renderScriptReply(closingStep, {
     sessionSummary: 'Today, you spent time sharing a little about your home and daily life.',
   });
@@ -1039,6 +1044,25 @@ test('Session 1 closing slide includes the discussion recap', () => {
   assert.match(reply, /Today, you spent time sharing a little about your home and daily life/i);
   assert.match(reply, /what is one part of today/i);
   assert.doesNotMatch(reply, /^Ryan,/i);
+});
+
+test('Session 1 plays the selected song immediately before its final slide', () => {
+  const { totalSteps } = getScriptStep('cst_intro_reminiscence', 0);
+  const songStep = getScriptStep('cst_intro_reminiscence', totalSteps - 2).step;
+  const closingStep = getScriptStep('cst_intro_reminiscence', totalSteps - 1).step;
+
+  assert.equal(totalSteps, 10);
+  assert.equal(songStep.id, 'intro_summary_song');
+  assert.equal(songStep.interaction.type, 'spotifySong');
+  assert.equal(songStep.interaction.playbackSeconds, 30);
+  assert.equal(closingStep.id, 'next_session');
+  assert.match(renderScriptReply(songStep, { themeSong: {
+    status: 'available',
+    track: { name: 'Here Comes the Sun', artistLabel: 'The Beatles' },
+  } }), /Here Comes the Sun by The Beatles/);
+  assert.match(renderScriptReply(songStep, { themeSong: { status: 'unavailable', reason: 'skipped' } }), /continue without a song/i);
+  assert.doesNotMatch(renderScriptReply(songStep, { themeSong: { status: 'unavailable', reason: 'skipped' } }), /could not prepare/i);
+  assert.match(renderScriptReply(songStep, { themeSong: { status: 'unavailable', reason: 'request-failed' } }), /could not prepare/i);
 });
 
 test('does not mistake using a working computer for a work-life discussion', () => {
@@ -1107,6 +1131,20 @@ test('recognises requests for more news and elaborates only from vetted details'
   assert.equal(isNewsElaborationRequest('What breed was the cat'), true);
   assert.equal(isNewsElaborationRequest('What a lovely story'), false);
   assert.equal(isNewsElaborationRequest('That sounds nice'), false);
+  for (const scriptId of [
+    'cst_childhood', 'cst_physical_games', 'cst_sounds', 'cst_food',
+    'cst_current_affairs', 'cst_faces_scenes', 'cst_word_associations',
+    'cst_categorizing_objects', 'cst_orientation', 'cst_using_money',
+    'cst_number_games', 'cst_word_games',
+  ]) {
+    const step = getScript(scriptId).find(({ interaction }) => interaction?.type === 'positiveNews');
+    assert.ok(step, `${scriptId} has a positive-news step`);
+    assert.deepEqual(evaluatePositiveNewsReaction({ step, content: 'sounds good' }), {
+      answered: true,
+      response: '',
+    });
+    assert.equal(evaluatePositiveNewsReaction({ step, content: 'tell me more' }), null);
+  }
 
   assert.equal(
     buildNewsElaboration({
@@ -1133,14 +1171,14 @@ test('recognises requests for more news and elaborates only from vetted details'
   );
 });
 
-test('keeps the music and summary as separate one-minute turns', () => {
+test('keeps the music and summary as separate 30-second turns', () => {
   const { step } = getScriptStep('cst_childhood', 18);
   const summary = renderScriptFollowUp(step, 0, {
     sessionSummary: 'Today, you remembered Sunday lunches with your family.',
   });
 
   assert.equal(step.turns, 2);
-  assert.equal(step.interaction.playbackSeconds, 60);
+  assert.equal(step.interaction.playbackSeconds, 30);
   assert.doesNotMatch(step.reply({ themeSong: null }), /Today, you/);
   assert.match(summary, /Sunday lunches/);
   assert.match(summary, /like to remember/);
@@ -1418,17 +1456,17 @@ test('enables useful Session 1 adaptive follow-ups without deepening every slide
     'cst_interests',
     'cst_nutshell',
   ];
-  const directProgressStepIds = ['facilitator_role', 'session_themes', 'next_session'];
+  const directProgressStepIds = ['facilitator_role', 'theme_song_choice', 'session_themes', 'intro_summary_song', 'next_session'];
 
   for (const stepId of adaptiveStepIds) {
-    const step = Array.from({ length: 8 }, (_, index) =>
+    const step = Array.from({ length: 10 }, (_, index) =>
       getScriptStep('cst_intro_reminiscence', index).step
     ).find((candidate) => candidate.id === stepId);
     assert.equal(step?.adaptiveFollowUp?.enabled, true, stepId);
   }
 
   for (const stepId of directProgressStepIds) {
-    const step = Array.from({ length: 8 }, (_, index) =>
+    const step = Array.from({ length: 10 }, (_, index) =>
       getScriptStep('cst_intro_reminiscence', index).step
     ).find((candidate) => candidate.id === stepId);
     assert.ok(step, `${stepId} should exist`);
@@ -1486,7 +1524,7 @@ test('does not treat punctuation alone as an accept-any answer or recap detail',
 });
 
 test('describes the AI-supported Session 1 format as a research prototype', () => {
-  const step = getScriptStep('cst_intro_reminiscence', 3).step;
+  const step = getScriptStep('cst_intro_reminiscence', 4).step;
   const reply = renderScriptReply(step, {});
 
   assert.match(reply, /traditional group cognitive stimulation therapy/i);
@@ -1822,7 +1860,7 @@ test('quotes memory and transcript content as untrusted prompt data', () => {
   );
 });
 
-test('returns vetted news elaboration without advancing the backend-controlled slide', async (t) => {
+test('news elaboration stays on the slide, then a brief reaction advances across sessions', async (t) => {
   const originals = {
     sessionFindOneAndUpdate: Session.findOneAndUpdate,
     userFindById: User.findById,
@@ -1838,32 +1876,7 @@ test('returns vetted news elaboration without advancing the backend-controlled s
     Message.create = originals.messageCreate;
   });
 
-  const session = {
-    _id: 'session-current-affairs-news',
-    userId: 'user-current-affairs-news',
-    status: 'active',
-    pipelineMode: 'free',
-    scriptId: 'cst_current_affairs',
-    scriptStepIndex: 20,
-    scriptStepTurnIndex: 1,
-    scriptStepRetryCount: 0,
-    activityRevision: 3,
-    shownNewsUrls: [],
-    shownNewsTitles: [],
-    interactionState: {
-      sessionAnswers: [],
-      currentAffairs: {
-        status: 'available',
-        article: {
-          title: 'Community garden opens beside the library',
-          description: 'Local volunteers created accessible garden beds for residents to enjoy.',
-          url: 'https://example.test/community-garden',
-        },
-      },
-    },
-    save: async () => session,
-  };
-
+  let session;
   Session.findOneAndUpdate = async () => session;
   User.findById = () => ({
     lean: async () => ({ _id: session.userId, name: 'Test User' }),
@@ -1878,18 +1891,55 @@ test('returns vetted news elaboration without advancing the backend-controlled s
     }],
   });
   Message.create = async (message) => ({ _id: `${message.role}-message`, ...message });
+  t.mock.method(globalThis, 'fetch', async () => Response.json({
+    choices: [{ message: { content: 'That sounds good.' }, finish_reason: 'stop' }],
+  }));
 
-  const turn = await respondToSessionTurn({
-    sessionId: session._id,
-    content: 'Please tell me more.',
-  });
+  for (const [scriptId, stepId] of [
+    ['cst_childhood', 'childhood_current_affairs'],
+    ['cst_physical_games', 'physical_games_current_affairs'],
+    ['cst_current_affairs', 'current_affairs_positive_news'],
+  ]) {
+    const index = getScriptStepIndex(scriptId, stepId);
+    assert.ok(index >= 0, stepId);
+    session = {
+      _id: `session-${scriptId}`,
+      userId: 'user-current-affairs-news',
+      status: 'active',
+      pipelineMode: 'free',
+      scriptId,
+      scriptStepIndex: index,
+      scriptStepTurnIndex: 1,
+      scriptStepRetryCount: 0,
+      activityRevision: 3,
+      shownNewsUrls: [],
+      shownNewsTitles: [],
+      interactionState: {
+        sessionAnswers: [],
+        currentAffairs: {
+          status: 'available',
+          article: {
+            title: 'Community garden opens beside the library',
+            description: 'Local volunteers created accessible garden beds for residents to enjoy.',
+            url: 'https://example.test/community-garden',
+          },
+        },
+      },
+      save: async () => session,
+    };
 
-  assert.match(turn.assistantText, /accessible garden beds/i);
-  assert.doesNotMatch(turn.assistantText, /report adds|what part of that story stands out/i);
-  assert.equal(turn.scriptStep.id, 'current_affairs_positive_news');
-  assert.equal(turn.scriptStep.nextIndex, 20);
-  assert.equal(turn.slide.id, 'current_affairs_positive_news');
-  assert.equal(session.scriptStepIndex, 20);
+    const elaboration = await respondToSessionTurn({ sessionId: session._id, content: 'Please tell me more.' });
+    assert.match(elaboration.assistantText, /accessible garden beds/i);
+    assert.match(elaboration.assistantText, /What do you think about that story/i);
+    assert.equal(elaboration.scriptStep.id, stepId);
+    assert.equal(elaboration.scriptStep.nextIndex, index);
+    assert.equal(session.scriptStepIndex, index);
+
+    const reaction = await respondToSessionTurn({ sessionId: session._id, content: 'sounds good' });
+    assert.equal(reaction.scriptStep.answeredCurrentQuestion, true, scriptId);
+    assert.equal(reaction.scriptStep.nextIndex, index + 1, scriptId);
+    assert.equal(session.scriptStepIndex, index + 1, scriptId);
+  }
 });
 
 test('gives Session 5 a 26-step script aligned one-to-one with its markdown sections', () => {

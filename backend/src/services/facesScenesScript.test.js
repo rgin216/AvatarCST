@@ -40,7 +40,7 @@ test('Session 7 uses live NZ orientation and shared completion interactions', ()
   const year = new Intl.DateTimeFormat('en-NZ', {year:'numeric', timeZone:'Pacific/Auckland'}).format(new Date());
   assert.equal(find('orientation_year_reveal').title, year);
   assert.equal(evaluateOrientationAnswer({step:find('orientation_year'), content:year, retryCount:0}).outcome, 'correct');
-  assert.equal(find('opening_song').interaction.playbackSeconds, 60);
+  assert.equal(find('opening_song').interaction.playbackSeconds, 30);
   assert.equal(find('summary_song').interaction.summarizeOnComplete, true);
   assert.equal(find('spin_question').interaction.type, 'questionWheel');
   assert.equal(find('closing').autoCompleteAfterNarration, true);
