@@ -302,6 +302,8 @@ const scripts = {
       reply: ({ themeSong }) =>
         themeSong?.status === 'available'
           ? `Before our last slide, here is your favourite song, ${themeSong.track.name} by ${themeSong.track.artistLabel}. It can play for up to 30 seconds. When you have finished listening, press Done, or say or type done.`
+          : themeSong?.reason === 'skipped'
+            ? 'No problem. We can continue without a song today. Press Done, or say or type done, when you are ready to continue.'
           : 'Before our last slide, I could not prepare the song this time. Press Done, or say or type done, when you are ready to continue.',
     },
     {

@@ -18,7 +18,7 @@ export const seatedExerciseInteraction = {
 
 export const spotifySongInteraction = ({ summarizeOnComplete = false } = {}) => ({
   type: 'spotifySong',
-  playbackSeconds: 60,
+  playbackSeconds: 30,
   ...(summarizeOnComplete ? { summarizeOnComplete: true } : {}),
 });
 

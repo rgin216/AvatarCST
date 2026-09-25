@@ -85,7 +85,7 @@ test('configures Session 6 with the supplied deck and reusable opening interacti
   assert.equal(welcome.deckSlide, 1);
   assert.equal(welcome.acceptAnyAnswer, true);
   assert.equal(openingSong.interaction.type, 'spotifySong');
-  assert.equal(openingSong.interaction.playbackSeconds, 60);
+  assert.equal(openingSong.interaction.playbackSeconds, 30);
   assert.equal(yearReveal.deckSlide, 7);
   assert.equal(yearReveal.isAnswerReveal, true);
   assert.equal(yearReveal.interaction.type, 'autoAdvance');
@@ -1054,11 +1054,15 @@ test('Session 1 plays the selected song immediately before its final slide', () 
   assert.equal(totalSteps, 10);
   assert.equal(songStep.id, 'intro_summary_song');
   assert.equal(songStep.interaction.type, 'spotifySong');
+  assert.equal(songStep.interaction.playbackSeconds, 30);
   assert.equal(closingStep.id, 'next_session');
   assert.match(renderScriptReply(songStep, { themeSong: {
     status: 'available',
     track: { name: 'Here Comes the Sun', artistLabel: 'The Beatles' },
   } }), /Here Comes the Sun by The Beatles/);
+  assert.match(renderScriptReply(songStep, { themeSong: { status: 'unavailable', reason: 'skipped' } }), /continue without a song/i);
+  assert.doesNotMatch(renderScriptReply(songStep, { themeSong: { status: 'unavailable', reason: 'skipped' } }), /could not prepare/i);
+  assert.match(renderScriptReply(songStep, { themeSong: { status: 'unavailable', reason: 'request-failed' } }), /could not prepare/i);
 });
 
 test('does not mistake using a working computer for a work-life discussion', () => {
@@ -1167,14 +1171,14 @@ test('recognises requests for more news and elaborates only from vetted details'
   );
 });
 
-test('keeps the music and summary as separate one-minute turns', () => {
+test('keeps the music and summary as separate 30-second turns', () => {
   const { step } = getScriptStep('cst_childhood', 18);
   const summary = renderScriptFollowUp(step, 0, {
     sessionSummary: 'Today, you remembered Sunday lunches with your family.',
   });
 
   assert.equal(step.turns, 2);
-  assert.equal(step.interaction.playbackSeconds, 60);
+  assert.equal(step.interaction.playbackSeconds, 30);
   assert.doesNotMatch(step.reply({ themeSong: null }), /Today, you/);
   assert.match(summary, /Sunday lunches/);
   assert.match(summary, /like to remember/);
