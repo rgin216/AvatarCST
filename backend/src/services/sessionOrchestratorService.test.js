@@ -22,6 +22,7 @@ import {
   evaluateImageObservationAnswer,
   evaluateSafetySupportTurn,
   evaluateOrientationAnswer,
+  evaluatePositiveNewsReaction,
   hasMeaningfulUserContent,
   evaluateTriviaAnswer,
   parseTriviaChoiceEvent,
@@ -1126,6 +1127,20 @@ test('recognises requests for more news and elaborates only from vetted details'
   assert.equal(isNewsElaborationRequest('What breed was the cat'), true);
   assert.equal(isNewsElaborationRequest('What a lovely story'), false);
   assert.equal(isNewsElaborationRequest('That sounds nice'), false);
+  for (const scriptId of [
+    'cst_childhood', 'cst_physical_games', 'cst_sounds', 'cst_food',
+    'cst_current_affairs', 'cst_faces_scenes', 'cst_word_associations',
+    'cst_categorizing_objects', 'cst_orientation', 'cst_using_money',
+    'cst_number_games', 'cst_word_games',
+  ]) {
+    const step = getScript(scriptId).find(({ interaction }) => interaction?.type === 'positiveNews');
+    assert.ok(step, `${scriptId} has a positive-news step`);
+    assert.deepEqual(evaluatePositiveNewsReaction({ step, content: 'sounds good' }), {
+      answered: true,
+      response: '',
+    });
+    assert.equal(evaluatePositiveNewsReaction({ step, content: 'tell me more' }), null);
+  }
 
   assert.equal(
     buildNewsElaboration({
@@ -1841,7 +1856,7 @@ test('quotes memory and transcript content as untrusted prompt data', () => {
   );
 });
 
-test('returns vetted news elaboration without advancing the backend-controlled slide', async (t) => {
+test('news elaboration stays on the slide, then a brief reaction advances across sessions', async (t) => {
   const originals = {
     sessionFindOneAndUpdate: Session.findOneAndUpdate,
     userFindById: User.findById,
@@ -1857,32 +1872,7 @@ test('returns vetted news elaboration without advancing the backend-controlled s
     Message.create = originals.messageCreate;
   });
 
-  const session = {
-    _id: 'session-current-affairs-news',
-    userId: 'user-current-affairs-news',
-    status: 'active',
-    pipelineMode: 'free',
-    scriptId: 'cst_current_affairs',
-    scriptStepIndex: 20,
-    scriptStepTurnIndex: 1,
-    scriptStepRetryCount: 0,
-    activityRevision: 3,
-    shownNewsUrls: [],
-    shownNewsTitles: [],
-    interactionState: {
-      sessionAnswers: [],
-      currentAffairs: {
-        status: 'available',
-        article: {
-          title: 'Community garden opens beside the library',
-          description: 'Local volunteers created accessible garden beds for residents to enjoy.',
-          url: 'https://example.test/community-garden',
-        },
-      },
-    },
-    save: async () => session,
-  };
-
+  let session;
   Session.findOneAndUpdate = async () => session;
   User.findById = () => ({
     lean: async () => ({ _id: session.userId, name: 'Test User' }),
@@ -1897,18 +1887,55 @@ test('returns vetted news elaboration without advancing the backend-controlled s
     }],
   });
   Message.create = async (message) => ({ _id: `${message.role}-message`, ...message });
+  t.mock.method(globalThis, 'fetch', async () => Response.json({
+    choices: [{ message: { content: 'That sounds good.' }, finish_reason: 'stop' }],
+  }));
 
-  const turn = await respondToSessionTurn({
-    sessionId: session._id,
-    content: 'Please tell me more.',
-  });
+  for (const [scriptId, stepId] of [
+    ['cst_childhood', 'childhood_current_affairs'],
+    ['cst_physical_games', 'physical_games_current_affairs'],
+    ['cst_current_affairs', 'current_affairs_positive_news'],
+  ]) {
+    const index = getScriptStepIndex(scriptId, stepId);
+    assert.ok(index >= 0, stepId);
+    session = {
+      _id: `session-${scriptId}`,
+      userId: 'user-current-affairs-news',
+      status: 'active',
+      pipelineMode: 'free',
+      scriptId,
+      scriptStepIndex: index,
+      scriptStepTurnIndex: 1,
+      scriptStepRetryCount: 0,
+      activityRevision: 3,
+      shownNewsUrls: [],
+      shownNewsTitles: [],
+      interactionState: {
+        sessionAnswers: [],
+        currentAffairs: {
+          status: 'available',
+          article: {
+            title: 'Community garden opens beside the library',
+            description: 'Local volunteers created accessible garden beds for residents to enjoy.',
+            url: 'https://example.test/community-garden',
+          },
+        },
+      },
+      save: async () => session,
+    };
 
-  assert.match(turn.assistantText, /accessible garden beds/i);
-  assert.doesNotMatch(turn.assistantText, /report adds|what part of that story stands out/i);
-  assert.equal(turn.scriptStep.id, 'current_affairs_positive_news');
-  assert.equal(turn.scriptStep.nextIndex, 20);
-  assert.equal(turn.slide.id, 'current_affairs_positive_news');
-  assert.equal(session.scriptStepIndex, 20);
+    const elaboration = await respondToSessionTurn({ sessionId: session._id, content: 'Please tell me more.' });
+    assert.match(elaboration.assistantText, /accessible garden beds/i);
+    assert.match(elaboration.assistantText, /What do you think about that story/i);
+    assert.equal(elaboration.scriptStep.id, stepId);
+    assert.equal(elaboration.scriptStep.nextIndex, index);
+    assert.equal(session.scriptStepIndex, index);
+
+    const reaction = await respondToSessionTurn({ sessionId: session._id, content: 'sounds good' });
+    assert.equal(reaction.scriptStep.answeredCurrentQuestion, true, scriptId);
+    assert.equal(reaction.scriptStep.nextIndex, index + 1, scriptId);
+    assert.equal(session.scriptStepIndex, index + 1, scriptId);
+  }
 });
 
 test('gives Session 5 a 26-step script aligned one-to-one with its markdown sections', () => {

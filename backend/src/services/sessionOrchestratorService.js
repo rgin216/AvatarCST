@@ -1213,6 +1213,13 @@ const evaluateNewsElaborationRequest = ({ step, content, currentAffairs }) => {
   };
 };
 
+export const evaluatePositiveNewsReaction = ({ step, content }) =>
+  step?.interaction?.type === 'positiveNews' &&
+  hasMeaningfulUserContent(content) &&
+  !isNewsElaborationRequest(content)
+    ? { answered: true, response: '' }
+    : null;
+
 const parseAnswerQuality = (text = '') => {
   try {
     const parsed = JSON.parse(text);
@@ -3397,6 +3404,9 @@ const respondToSessionTurnWrite = async ({ sessionId, content, activitySession }
       step,
       content: userContent,
       currentAffairs,
+    }) || evaluatePositiveNewsReaction({
+      step,
+      content: userContent,
     }) || evaluateAcceptedAnswer({
       step,
       content: userContent,
@@ -3820,7 +3830,7 @@ const respondToSessionTurnWrite = async ({ sessionId, content, activitySession }
     ? adaptiveFollowUpQuestion
     : shouldElaborateNews
     ? currentAffairs?.status === 'available'
-      ? ''
+      ? 'What do you think about that story?'
       : PLEASANT_NEWS_PROMPT
     : hasUserContent && hasDeliveredQuestion
     ? sessionCompleteAfterResponse && completionReply
