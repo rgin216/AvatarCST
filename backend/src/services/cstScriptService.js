@@ -320,7 +320,7 @@ const scripts = {
       reply: ({ sessionSummary }) =>
         `This has been a lovely first session. Thank you for your company and for sharing your thoughts. ${sessionSummary || 'Today, we got to know a little about you and introduced what CST will be like.'} Next time, our theme will be Getting To Know You, with a focus on childhood. Before we finish, what is one part of today that you would like to remember?`,
       completionReply: () =>
-        'It was great sharing thoughts and ideas with you, and I am looking forward to our next session on Getting To Know You, focusing on childhood.',
+        'It was great sharing thoughts and ideas with you, and I am looking forward to our next session on Getting To Know You, focusing on childhood. See you then!',
     },
   ],
   cst_childhood: [
