@@ -278,6 +278,9 @@ export default function SessionPage({
   const spotifyControllerRef = useRef(null);
   const spotifyPauseTimeoutRef = useRef(null);
   const spotifyAutoplayPendingRef = useRef(false);
+  const completeMusicRef = useRef(null);
+  const completeExerciseRef = useRef(null);
+  const mediaCompletionInFlightRef = useRef(null);
   const videoMountRef = useRef(null);
   const videoPlayerRef = useRef(null);
   const videoReadyRef = useRef(false);
@@ -477,6 +480,7 @@ export default function SessionPage({
     if (!slideData) return;
     if (slideData.id !== slideIdRef.current) {
       slideIdRef.current = slideData.id;
+      mediaCompletionInFlightRef.current = null;
       autoAdvanceRequestedSlideRef.current = null;
       autoAdvanceRetryCountRef.current = 0;
       setAutoAdvanceFailedSlideId(null);
@@ -1000,6 +1004,26 @@ export default function SessionPage({
 
     let cancelled = false;
     let controller = null;
+    let hasStarted = false;
+    let completing = false;
+    const clearMusicTimer = () => {
+      if (spotifyPauseTimeoutRef.current) {
+        window.clearTimeout(spotifyPauseTimeoutRef.current);
+        spotifyPauseTimeoutRef.current = null;
+      }
+    };
+    const finishMusic = () => {
+      if (cancelled || completing) return;
+      completing = true;
+      clearMusicTimer();
+      spotifyControllerRef.current?.pause();
+      setMusicPlaybackState("complete");
+      completeMusicRef.current?.(true);
+    };
+    const scheduleMusicEnd = (remainingMs) => {
+      clearMusicTimer();
+      spotifyPauseTimeoutRef.current = window.setTimeout(finishMusic, remainingMs);
+    };
 
     loadSpotifyIframeApi()
       .then((api) => {
@@ -1021,16 +1045,25 @@ export default function SessionPage({
             setMusicPlaybackState("ready");
 
             embedController.addListener("playback_started", () => {
+              hasStarted = true;
               spotifyAutoplayPendingRef.current = false;
               audioRef.current?.pause();
-              if (spotifyPauseTimeoutRef.current) {
-                window.clearTimeout(spotifyPauseTimeoutRef.current);
-              }
               setMusicPlaybackState("playing");
-              spotifyPauseTimeoutRef.current = window.setTimeout(() => {
-                embedController.pause();
-                setMusicPlaybackState("complete");
-              }, musicPlaybackSeconds * 1000);
+              scheduleMusicEnd(musicPlaybackSeconds * 1000);
+            });
+            embedController.addListener("playback_update", (event) => {
+              if (!hasStarted || cancelled || completing) return;
+              const position = Number(event.data?.position);
+              const duration = Number(event.data?.duration);
+              const target = Math.min(musicPlaybackSeconds * 1000, duration > 0 ? duration : Infinity);
+              if (event.data?.isPaused) {
+                clearMusicTimer();
+                if (Number.isFinite(position) && position >= target - 250) finishMusic();
+                else setMusicPlaybackState("paused");
+              } else if (Number.isFinite(position) && position >= 0) {
+                setMusicPlaybackState("playing");
+                scheduleMusicEnd(Math.max(0, target - position));
+              }
             });
             attemptSpotifyAutoplay();
           }
@@ -1045,10 +1078,7 @@ export default function SessionPage({
 
     return () => {
       cancelled = true;
-      if (spotifyPauseTimeoutRef.current) {
-        window.clearTimeout(spotifyPauseTimeoutRef.current);
-        spotifyPauseTimeoutRef.current = null;
-      }
+      clearMusicTimer();
       const activeController = controller || spotifyControllerRef.current;
       activeController?.pause();
       activeController?.destroy();
@@ -1097,6 +1127,8 @@ export default function SessionPage({
               if (cancelled) return;
               if (event.data === YT.PlayerState.PLAYING) {
                 setVideoPlaybackState(event.target.isMuted?.() ? "playing-muted" : "playing");
+              } else if (event.data === YT.PlayerState.ENDED) {
+                completeExerciseRef.current?.(true);
               }
             },
           },
@@ -1350,8 +1382,9 @@ export default function SessionPage({
     }
   }
 
-  async function handleMusicDone() {
-    if (typing || !musicAwaitingCompletion) return;
+  async function handleMusicDone(automatic = false) {
+    if (typing || !musicAwaitingCompletion || mediaCompletionInFlightRef.current === slide.id) return;
+    mediaCompletionInFlightRef.current = slide.id;
 
     if (spotifyPauseTimeoutRef.current) {
       window.clearTimeout(spotifyPauseTimeoutRef.current);
@@ -1360,7 +1393,7 @@ export default function SessionPage({
     spotifyAutoplayPendingRef.current = false;
     spotifyControllerRef.current?.pause();
     setMusicPlaybackState("complete");
-    setMessages((items) => [...items, { from: "user", text: "Done" }]);
+    if (!automatic) setMessages((items) => [...items, { from: "user", text: "Done" }]);
     setTyping(true);
 
     try {
@@ -1371,6 +1404,7 @@ export default function SessionPage({
       });
       applyTurn(data);
     } catch (err) {
+      mediaCompletionInFlightRef.current = null;
       console.error("Failed to complete music playback", err);
       setMusicPlaybackState(themeSong?.status === "available" ? "ready" : "idle");
       setMessages((items) => [
@@ -1385,8 +1419,11 @@ export default function SessionPage({
     }
   }
 
-  async function handleExerciseDone() {
-    if (typing || !exerciseAwaitingCompletion) return;
+  completeMusicRef.current = handleMusicDone;
+
+  async function handleExerciseDone(automatic = false) {
+    if (typing || !exerciseAwaitingCompletion || mediaCompletionInFlightRef.current === slide.id) return;
+    mediaCompletionInFlightRef.current = slide.id;
 
     videoAutoplayPendingRef.current = false;
     if (videoAutoplayFallbackRef.current) {
@@ -1394,7 +1431,7 @@ export default function SessionPage({
       videoAutoplayFallbackRef.current = null;
     }
     videoPlayerRef.current?.stopVideo?.();
-    setMessages((items) => [...items, { from: "user", text: "Done" }]);
+    if (!automatic) setMessages((items) => [...items, { from: "user", text: "Done" }]);
     setTyping(true);
 
     try {
@@ -1405,6 +1442,7 @@ export default function SessionPage({
       });
       applyTurn(data);
     } catch (err) {
+      mediaCompletionInFlightRef.current = null;
       console.error("Failed to complete exercise video", err);
       videoAutoplayPendingRef.current = true;
       setMessages((items) => [
@@ -1418,6 +1456,8 @@ export default function SessionPage({
       setTyping(false);
     }
   }
+
+  completeExerciseRef.current = handleExerciseDone;
 
   function handleAudioClipToggle(clip) {
     if (avatarNarrationActive || pendingPlay) return;
@@ -1804,7 +1844,7 @@ export default function SessionPage({
                 <button
                   type="button"
                   className="slide-media-done"
-                  onClick={handleExerciseDone}
+                  onClick={() => handleExerciseDone()}
                   disabled={typing}
                 >
                   Done
@@ -1886,7 +1926,8 @@ export default function SessionPage({
                     <p className="slide-music-artist">{themeSong.track.artistLabel}</p>
                     <p className="slide-music-instruction">
                       The music will start when Aria finishes speaking. If your browser blocks it,
-                      press Spotify's play button below.
+                      press Spotify's play button below. We will continue when the music pauses;
+                      press Done to continue sooner.
                     </p>
                     <div
                       className={`slide-spotify-embed is-${musicPlaybackState}`}
@@ -1897,6 +1938,8 @@ export default function SessionPage({
                       {musicPlaybackState === "ready" && "Ready when you are."}
                       {musicPlaybackState === "playing" &&
                         `Playing for up to ${musicPlaybackDurationLabel}.`}
+                      {musicPlaybackState === "paused" &&
+                        "Paused. Press Spotify's play button to resume, or press Done to continue."}
                       {musicPlaybackState === "complete" &&
                         `Music paused after ${musicPlaybackDurationLabel}.`}
                       {musicPlaybackState === "error" && "Spotify could not load this time."}
@@ -1905,7 +1948,7 @@ export default function SessionPage({
                       <button
                         type="button"
                         className="slide-media-done"
-                        onClick={handleMusicDone}
+                        onClick={() => handleMusicDone()}
                         disabled={typing}
                       >
                         Done
@@ -1922,7 +1965,7 @@ export default function SessionPage({
                   <button
                     type="button"
                     className="slide-media-done"
-                    onClick={handleMusicDone}
+                    onClick={() => handleMusicDone()}
                     disabled={typing}
                   >
                     Done

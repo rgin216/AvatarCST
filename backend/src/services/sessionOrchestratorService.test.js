@@ -6,6 +6,7 @@ import {
   buildTopicSessionSummary,
   buildSafetyInactivityReminderText,
   buildNewsElaboration,
+  buildInteractiveGameGuidance,
   buildThemeSongLookupFeedback,
   canRequestAdaptiveFollowUp,
   collapseRepeatedAdjacentSpeech,
@@ -14,6 +15,7 @@ import {
   parseNamingSlotAnswer,
   buildNamingSlotPrompt,
   getRetryDecision,
+  getProgressScriptLine,
   extractPreferredNameAnswer,
   evaluateAdaptiveFollowUpAnswer,
   evaluateNamedInstrumentSlots,
@@ -44,6 +46,7 @@ import {
   parseMealBuilderEvent,
   resolveNamingSlotReveal,
   resolveThemeSongSelectionAnswer,
+  resolveThemeSongSelectedTrack,
   respondToSessionTurn,
   selectRelevantMemoryEntries,
   shouldUseNextSlideResponseOnly,
@@ -990,6 +993,66 @@ test('lists clean artist suggestions and resolves ordinal or title choices', () 
     resolveThemeSongSelectionAnswer('Japanese Denim', pendingSong),
     'Japanese Denim by Daniel Caesar'
   );
+});
+
+test('asks which Celebration recording to use and resolves the chosen track', () => {
+  const pendingSong = {
+    status: 'needs-selection', reason: 'title-only', query: 'Celebration',
+    suggestions: [
+      { id: 'kool', name: 'Celebration', artistLabel: 'Kool & The Gang' },
+      { id: 'madonna', name: 'Celebration', artistLabel: 'Madonna' },
+    ],
+  };
+  const feedback = buildThemeSongLookupFeedback(pendingSong);
+  assert.match(feedback, /first, Celebration by Kool & The Gang; second, Celebration by Madonna/i);
+  assert.match(feedback, /Which one would you like/i);
+  assert.equal(resolveThemeSongSelectedTrack('the second one', pendingSong)?.id, 'madonna');
+  assert.equal(resolveThemeSongSelectedTrack('the one by Kool and the Gang', pendingSong)?.id, 'kool');
+  assert.equal(resolveThemeSongSelectedTrack('Celebration', pendingSong), null);
+});
+
+test('every interactive game has first-entry guidance without repeating it on the next matching slide', () => {
+  const scriptIds = [
+    'cst_childhood', 'cst_physical_games', 'cst_sounds', 'cst_food', 'cst_current_affairs',
+    'cst_faces_scenes', 'cst_word_associations', 'cst_categorizing_objects',
+    'cst_orientation', 'cst_using_money', 'cst_number_games', 'cst_word_games',
+  ];
+  const gameTypes = new Set([
+    'questionWheel', 'activityReveal', 'triviaChoice', 'phraseCards', 'matching',
+    'realOrAi', 'mealBuilder', 'objectSelection', 'pronunciation', 'wordGuess',
+    'audioClips', 'choiceQuestion',
+  ]);
+  for (const scriptId of scriptIds) {
+    const steps = getScript(scriptId);
+    for (const [index, step] of steps.entries()) {
+      const type = step.interaction?.type;
+      if (!gameTypes.has(type)) continue;
+      assert.ok(buildInteractiveGameGuidance(step), `${scriptId}: ${step.id}`);
+      if (steps[index - 1]?.interaction?.type === type) {
+        assert.equal(buildInteractiveGameGuidance(step, steps[index - 1]), '', `${scriptId}: ${step.id}`);
+      }
+    }
+  }
+});
+
+test('spoken game guidance appears on entry and is omitted on the next matching slide', () => {
+  const first = getScriptStep('cst_sounds', getScriptStepIndex('cst_sounds', 'sounds_trivia_1')).step;
+  const second = getScriptStep('cst_sounds', getScriptStepIndex('cst_sounds', 'sounds_trivia_2')).step;
+  const prior = getScriptStep('cst_sounds', getScriptStepIndex('cst_sounds', 'sounds_trivia_1') - 1).step;
+  const firstLine = getProgressScriptLine({ step: prior, nextStep: first, currentTurnIndex: 1, stepTurns: 1, context: {} });
+  const secondLine = getProgressScriptLine({ step: first, nextStep: second, currentTurnIndex: 1, stepTurns: 1, context: {} });
+  assert.match(firstLine, /tap one answer on the slide/i);
+  assert.doesNotMatch(secondLine, /tap one answer on the slide/i);
+  assert.match(secondLine, /sound bounces/i);
+});
+
+test('spoken media instructions explain automatic continuation and early Done', () => {
+  const songStep = getScriptStep('cst_childhood', getScriptStepIndex('cst_childhood', 'childhood_summary_song')).step;
+  const songLine = getProgressScriptLine({ step: songStep, currentTurnIndex: 0, stepTurns: 1, context: {
+    themeSong: { status: 'available', track: { name: 'Celebration', artistLabel: 'Kool & The Gang' } },
+  } });
+  assert.match(songLine, /continue when the music pauses/i);
+  assert.match(songLine, /Press Done if you want to continue sooner/i);
 });
 
 test('asks for a preferred name and favourite song before Session 1 introductions', () => {

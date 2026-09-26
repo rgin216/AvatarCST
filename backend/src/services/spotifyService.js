@@ -274,6 +274,24 @@ export const selectSpotifyArtistSuggestions = (payload = {}, artist = '', limit 
     .map((candidate) => candidate.track);
 };
 
+export const selectSpotifyTitleSuggestions = (payload = {}, title = '', limit = 3) => {
+  const requestedTitle = toMatchTokens(title).join(' ');
+  if (!requestedTitle) return [];
+  const seen = new Set();
+  return getTrackItems(payload)
+    .map((rawTrack) => ({ track: normalizeSpotifyTrack(rawTrack), explicit: rawTrack?.explicit }))
+    .filter(({ track, explicit }) => track && explicit === false && toMatchTokens(track.name).join(' ') === requestedTitle)
+    .sort((left, right) => Number(right.track.name.toLowerCase() === title.toLowerCase()) - Number(left.track.name.toLowerCase() === title.toLowerCase()))
+    .filter(({ track }) => {
+      const key = track.artistLabel.toLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .slice(0, Math.max(0, limit))
+    .map(({ track }) => track);
+};
+
 const getAccessToken = async ({ clientId, clientSecret, signal }) => {
   const now = Date.now();
   if (accessToken && accessTokenExpiresAt > now + 30_000) return accessToken;
@@ -388,6 +406,10 @@ export const searchSpotifyTrack = async (songAnswer = '') => {
     }
 
     let explicitCandidate = null;
+    let fallbackTrack = null;
+    const titleOnly = !parseSongRequest(query).artist;
+    const titleSuggestions = [];
+    const seenSuggestions = new Set();
     for (const searchQuery of buildSpotifySearchQueries(query)) {
       const requestUrl = new URL(SPOTIFY_SEARCH_URL);
       requestUrl.searchParams.set('q', searchQuery);
@@ -401,19 +423,36 @@ export const searchSpotifyTrack = async (songAnswer = '') => {
       });
       if (!response.ok) throw new Error(`Spotify search failed with ${response.status}`);
 
-      const match = inspectSpotifyTrackMatch(await response.json(), query);
+      const payload = await response.json();
+      if (titleOnly) {
+        for (const suggestion of selectSpotifyTitleSuggestions(payload, query)) {
+          const key = suggestion.artistLabel.toLowerCase();
+          if (!seenSuggestions.has(key)) {
+            seenSuggestions.add(key);
+            titleSuggestions.push(suggestion);
+          }
+        }
+      }
+      const match = inspectSpotifyTrackMatch(payload, query);
       if (match.status === 'available') {
-        return {
-          status: 'available',
-          query,
-          track: match.track,
-          matchedAt: new Date().toISOString(),
+        if (!titleOnly) return {
+          status: 'available', query, track: match.track, matchedAt: new Date().toISOString(),
         };
+        fallbackTrack ||= match.track;
       }
       if (!explicitCandidate && match.reason === 'explicit-content') {
         explicitCandidate = match.candidate;
       }
     }
+
+    if (titleSuggestions.length > 1) return {
+      status: 'needs-selection', reason: 'title-only', query,
+      suggestions: titleSuggestions.slice(0, 3),
+    };
+    const chosenTrack = titleSuggestions[0] || fallbackTrack;
+    if (chosenTrack) return {
+      status: 'available', query, track: chosenTrack, matchedAt: new Date().toISOString(),
+    };
 
     return explicitCandidate
       ? unavailableResult('explicit-content', query, explicitCandidate)

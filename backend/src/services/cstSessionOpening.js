@@ -298,7 +298,7 @@ export const buildStandardSessionOpening = ({
     title: 'Exercises',
     subtitle: 'Gentle follow along',
     prompt: 'Try a short seated exercise',
-    bullets: ['Sit safely', 'Only do what feels comfortable', 'Press Done when finished'],
+    bullets: ['Sit safely', 'Only do what feels comfortable', 'Continues when the video ends'],
     visualHint: visualHint(deckSlide - 1),
     accent: ACCENTS.exercise,
     interaction: exercise.interaction || { ...seatedExerciseInteraction },
