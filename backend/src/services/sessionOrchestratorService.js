@@ -2321,7 +2321,7 @@ export const generateSessionSummary = async ({
 export const buildInteractiveGameGuidance = (step, previousStep = null) => {
   const interaction = step?.interaction;
   const type = interaction?.type;
-  if (!type || previousStep?.interaction?.type === type) return '';
+  if (!type || (previousStep?.interaction?.type === type && previousStep?.interaction?.mode === interaction.mode)) return '';
   const guidance = {
     questionWheel: 'Press Spin on the wheel. When it stops, I will ask its question; you can answer by speaking or typing.',
     activityReveal: 'Tap a black card, try the action while seated, then press “I have finished this action” before choosing another card.',
@@ -3887,7 +3887,8 @@ const respondToSessionTurnWrite = async ({ sessionId, content, activitySession }
           })
         )
     : repeatRequest && hasDeliveredQuestion
-    ? extractLastQuestion(expectedQuestion) || expectedQuestion || step.prompt
+    ? (themeSong?.status === 'needs-selection' ? buildThemeSongLookupFeedback(themeSong) : '') ||
+      extractLastQuestion(expectedQuestion) || expectedQuestion || step.prompt
     : shouldRepeatQuestion
     ? requiresMediaCompletion
       ? requiresMusicCompletion

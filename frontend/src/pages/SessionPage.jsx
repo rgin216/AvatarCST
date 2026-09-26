@@ -240,6 +240,7 @@ export default function SessionPage({
   const [themeSong, setThemeSong] = useState(null);
   const [musicPlayback, setMusicPlayback] = useState(null);
   const [musicPlaybackState, setMusicPlaybackState] = useState("idle");
+  const [queuedMediaCompletionVersion, setQueuedMediaCompletionVersion] = useState(0);
   const [questionWheel, setQuestionWheel] = useState(null);
   const [activityReveal, setActivityReveal] = useState(null);
   const [triviaChoice, setTriviaChoice] = useState(null);
@@ -281,6 +282,7 @@ export default function SessionPage({
   const completeMusicRef = useRef(null);
   const completeExerciseRef = useRef(null);
   const mediaCompletionInFlightRef = useRef(null);
+  const queuedMediaCompletionRef = useRef(null);
   const videoMountRef = useRef(null);
   const videoPlayerRef = useRef(null);
   const videoReadyRef = useRef(false);
@@ -481,6 +483,7 @@ export default function SessionPage({
     if (slideData.id !== slideIdRef.current) {
       slideIdRef.current = slideData.id;
       mediaCompletionInFlightRef.current = null;
+      queuedMediaCompletionRef.current = null;
       autoAdvanceRequestedSlideRef.current = null;
       autoAdvanceRetryCountRef.current = 0;
       setAutoAdvanceFailedSlideId(null);
@@ -1056,7 +1059,10 @@ export default function SessionPage({
               const position = Number(event.data?.position);
               const duration = Number(event.data?.duration);
               const target = Math.min(musicPlaybackSeconds * 1000, duration > 0 ? duration : Infinity);
-              if (event.data?.isPaused) {
+              if (event.data?.isBuffering) {
+                clearMusicTimer();
+                setMusicPlaybackState("buffering");
+              } else if (event.data?.isPaused) {
                 clearMusicTimer();
                 if (Number.isFinite(position) && position >= target - 250) finishMusic();
                 else setMusicPlaybackState("paused");
@@ -1383,7 +1389,14 @@ export default function SessionPage({
   }
 
   async function handleMusicDone(automatic = false) {
-    if (typing || !musicAwaitingCompletion || mediaCompletionInFlightRef.current === slide.id) return;
+    if (!musicAwaitingCompletion || mediaCompletionInFlightRef.current === slide.id) return;
+    if (typing) {
+      if (automatic) {
+        queuedMediaCompletionRef.current = { slideId: slide.id, mediaType: "music" };
+        setQueuedMediaCompletionVersion((value) => value + 1);
+      }
+      return;
+    }
     mediaCompletionInFlightRef.current = slide.id;
 
     if (spotifyPauseTimeoutRef.current) {
@@ -1422,7 +1435,14 @@ export default function SessionPage({
   completeMusicRef.current = handleMusicDone;
 
   async function handleExerciseDone(automatic = false) {
-    if (typing || !exerciseAwaitingCompletion || mediaCompletionInFlightRef.current === slide.id) return;
+    if (!exerciseAwaitingCompletion || mediaCompletionInFlightRef.current === slide.id) return;
+    if (typing) {
+      if (automatic) {
+        queuedMediaCompletionRef.current = { slideId: slide.id, mediaType: "exercise" };
+        setQueuedMediaCompletionVersion((value) => value + 1);
+      }
+      return;
+    }
     mediaCompletionInFlightRef.current = slide.id;
 
     videoAutoplayPendingRef.current = false;
@@ -1458,6 +1478,16 @@ export default function SessionPage({
   }
 
   completeExerciseRef.current = handleExerciseDone;
+
+  useEffect(() => {
+    if (typing) return;
+    const queued = queuedMediaCompletionRef.current;
+    if (!queued) return;
+    queuedMediaCompletionRef.current = null;
+    if (queued.slideId !== slide.id) return;
+    if (queued.mediaType === "music" && musicAwaitingCompletion) completeMusicRef.current?.(true);
+    if (queued.mediaType === "exercise" && exerciseAwaitingCompletion) completeExerciseRef.current?.(true);
+  }, [typing, queuedMediaCompletionVersion, slide.id, musicAwaitingCompletion, exerciseAwaitingCompletion]);
 
   function handleAudioClipToggle(clip) {
     if (avatarNarrationActive || pendingPlay) return;
@@ -1940,6 +1970,7 @@ export default function SessionPage({
                         `Playing for up to ${musicPlaybackDurationLabel}.`}
                       {musicPlaybackState === "paused" &&
                         "Paused. Press Spotify's play button to resume, or press Done to continue."}
+                      {musicPlaybackState === "buffering" && "Music is buffering..."}
                       {musicPlaybackState === "complete" &&
                         `Music paused after ${musicPlaybackDurationLabel}.`}
                       {musicPlaybackState === "error" && "Spotify could not load this time."}

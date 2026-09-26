@@ -296,6 +296,8 @@ test('offers distinct clean songs with the exact requested title', () => {
     track({ id: 'madonna', name: 'Celebration', artists: [{ name: 'Madonna' }] }),
     track({ id: 'duplicate', name: 'Celebration', artists: [{ name: 'Madonna' }] }),
     track({ id: 'other', name: 'Celebration Day', artists: [{ name: 'Led Zeppelin' }] }),
+    track({ id: 'live', name: 'Celebration (Live)', artists: [{ name: 'Kool & The Gang' }] }),
+    track({ id: 'remaster', name: 'Celebration (2019 Remaster)', artists: [{ name: 'Another Artist' }] }),
     track({ id: 'explicit', name: 'Celebration', artists: [{ name: 'Other Artist' }], explicit: true }),
   ] } }, 'Celebration');
   assert.deepEqual(suggestions.map(({ artistLabel }) => artistLabel), ['Kool & The Gang', 'Madonna']);
@@ -316,8 +318,10 @@ test('title-only Spotify search asks the user to choose between exact-title arti
       else process.env[key] = value;
     }
   });
+  let searches = 0;
   t.mock.method(globalThis, 'fetch', async (url) => {
     if (String(url).includes('/api/token')) return Response.json({ access_token: 'test-token', expires_in: 3600 });
+    searches += 1;
     return Response.json({ tracks: { items: [
       track({ id: 'kool', name: 'Celebration', artists: [{ name: 'Kool & The Gang' }] }),
       track({ id: 'madonna', name: 'Celebration', artists: [{ name: 'Madonna' }] }),
@@ -328,6 +332,37 @@ test('title-only Spotify search asks the user to choose between exact-title arti
   assert.equal(result.status, 'needs-selection');
   assert.equal(result.reason, 'title-only');
   assert.deepEqual(result.suggestions.map(({ artistLabel }) => artistLabel), ['Kool & The Gang', 'Madonna']);
+  assert.equal(searches, 1);
+});
+
+test('keeps a usable first Spotify result if the fallback search fails', async (t) => {
+  const old = {
+    openAi: process.env.OPENAI_API_KEY,
+    clientId: process.env.SPOTIFY_CLIENT_ID,
+    clientSecret: process.env.SPOTIFY_CLIENT_SECRET,
+  };
+  delete process.env.OPENAI_API_KEY;
+  process.env.SPOTIFY_CLIENT_ID = 'test-client';
+  process.env.SPOTIFY_CLIENT_SECRET = 'test-secret';
+  t.after(() => {
+    for (const [key, value] of Object.entries({ OPENAI_API_KEY: old.openAi, SPOTIFY_CLIENT_ID: old.clientId, SPOTIFY_CLIENT_SECRET: old.clientSecret })) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+  });
+  let searches = 0;
+  t.mock.method(globalThis, 'fetch', async (url) => {
+    if (String(url).includes('/api/token')) return Response.json({ access_token: 'test-token', expires_in: 3600 });
+    searches += 1;
+    if (searches === 1) return Response.json({ tracks: { items: [
+      track({ id: 'kool', name: 'Celebration', artists: [{ name: 'Kool & The Gang' }] }),
+    ] } });
+    throw new Error('fallback search unavailable');
+  });
+  const result = await searchSpotifyTrack('Play Celebration');
+  assert.equal(searches, 2);
+  assert.equal(result.status, 'available');
+  assert.equal(result.track.id, 'kool');
 });
 
 test('reports a matching explicit track instead of treating it as missing', () => {

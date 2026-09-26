@@ -139,6 +139,22 @@ test('repeats the current question without advancing or using a retry', async (t
   assert.equal(session.scriptStepTurnIndex, 1);
   assert.equal(session.scriptStepRetryCount, 2);
   assert.deepEqual(session.interactionState.sessionAnswers, []);
+
+  session.scriptId = 'cst_intro_reminiscence';
+  session.scriptStepIndex = getScriptStepIndex(session.scriptId, 'theme_song_choice');
+  session.interactionState.themeSong = {
+    status: 'needs-selection', reason: 'title-only', query: 'Celebration',
+    suggestions: [
+      { name: 'Celebration', artistLabel: 'Kool & The Gang' },
+      { name: 'Celebration', artistLabel: 'Madonna' },
+    ],
+  };
+  const choiceTurn = await respondToSessionTurn({ sessionId: session._id, content: 'Can you repeat the question?' });
+  assert.match(choiceTurn.assistantText, /Which one would you like\?/i);
+  assert.match(choiceTurn.assistantText, /Celebration by Madonna/i);
+  assert.doesNotMatch(choiceTurn.assistantText, /what is your favou?rite song/i);
+  assert.equal(session.scriptStepIndex, getScriptStepIndex(session.scriptId, 'theme_song_choice'));
+  assert.equal(session.scriptStepRetryCount, 2);
 });
 
 test('configures Session 6 with the supplied deck and reusable opening interactions', () => {
@@ -1028,11 +1044,18 @@ test('every interactive game has first-entry guidance without repeating it on th
       const type = step.interaction?.type;
       if (!gameTypes.has(type)) continue;
       assert.ok(buildInteractiveGameGuidance(step), `${scriptId}: ${step.id}`);
-      if (steps[index - 1]?.interaction?.type === type) {
+      if (steps[index - 1]?.interaction?.type === type && steps[index - 1]?.interaction?.mode === step.interaction?.mode) {
         assert.equal(buildInteractiveGameGuidance(step, steps[index - 1]), '', `${scriptId}: ${step.id}`);
       }
     }
   }
+});
+
+test('object selection explains pairs after odd-one-out even though the interaction type matches', () => {
+  const odd = { interaction: { type: 'objectSelection', mode: 'odd' } };
+  const pairs = { interaction: { type: 'objectSelection', mode: 'pairs' } };
+  assert.match(buildInteractiveGameGuidance(pairs, odd), /Check pair/i);
+  assert.equal(buildInteractiveGameGuidance(pairs, pairs), '');
 });
 
 test('spoken game guidance appears on entry and is omitted on the next matching slide', () => {
