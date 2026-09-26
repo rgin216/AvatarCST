@@ -35,7 +35,7 @@ export function createWordGamesScript(shared) {
     return step;
   };
   const opening = shared.slice(0, shared.findIndex(s => s.id === 'faces_scenes_theme_intro') + 1).map(s => clone(s));
-  Object.assign(opening[0], { subtitle: 'Session 14: Word Games', bullets: ['Session 14', 'Word Games'], reply: ({ name }) => `Welcome back, ${name}. Today is Session 14: Word Games. We will explore words and enjoy some puzzles together. Say ready when you would like to begin.` });
+  Object.assign(opening[0], { subtitle: 'Session 14: Word Games', bullets: ['Session 14', 'Word Games'], reply: ({ name }) => `Welcome back, ${name}. Today is Session 14: Word Games. We will explore words and enjoy some puzzles together.` });
   Object.assign(opening.at(-1), { title: 'Word Games', subtitle: 'Words and puzzles', prompt: 'Word Games', bullets: ['Te reo Māori', 'Brain teasers', 'Words that go together'], reply: () => 'Today we will listen to some Māori words, try word brain teasers, and explore words that go together and rhyme. Take your time; it is always fine to be unsure.' });
   const activity = (id, deckSlide, title, prompt, extra = {}) => ({ id: `word_games_${id}`, deckSlide, title, subtitle: 'Word Games', prompt, turns: 1, acceptAnyAnswer: true, bullets: [], accent: '#4472C4', reply: () => prompt, ...extra });
   const associations = [

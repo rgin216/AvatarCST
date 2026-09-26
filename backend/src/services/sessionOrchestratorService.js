@@ -977,6 +977,14 @@ const isVideoCompletionProtocol = (content = '') =>
 const isAutoAdvanceProtocol = (content = '') =>
   /^\[\[auto-advance\]\]$/i.test(content.trim());
 
+export const isRepeatQuestionRequest = (content = '') => {
+  const request = String(content).toLowerCase().replace(/[?.!,'’]+/g, ' ').replace(/\s+/g, ' ').trim()
+    .replace(/^(?:sorry|excuse me|pardon me) /, '');
+  return /^(?:(?:can|could|would) you |please )?(?:repeat|say) (?:(?:the|that|your|last|previous) )?(?:question|that|it)(?: again)?(?: please)?$/.test(request) ||
+    /^(?:what was|what is) (?:the|your|that) question(?: again)?(?: please)?$/.test(request) ||
+    /^i (?:did not|didn t|could not|couldn t) (?:catch|hear) (?:the|your|that) question$/.test(request);
+};
+
 const isActivityRevealProtocol = (content = '') =>
   /^\[\[activity-reveal:/i.test(content.trim());
 
@@ -1714,6 +1722,7 @@ export const resolveNamingSlotReveal = ({ step, content = '', slotIndices = [] }
 export const isRecordableSessionAnswer = ({ step, content, wheelEvent }) =>
   Boolean(
     hasMeaningfulUserContent(content) &&
+    !isRepeatQuestionRequest(content) &&
     !wheelEvent &&
     !isAutoAdvanceProtocol(content) &&
     !isActivityRevealProtocol(content) &&
@@ -2888,6 +2897,7 @@ export const getSessionInactivityReminder = (sessionId, expectedActivityRevision
 // TODO: wrap writes in a MongoDB transaction when upgrading to Atlas M10+ (replica set required)
 const respondToSessionTurnWrite = async ({ sessionId, content, activitySession }) => {
   const userContent = content?.trim();
+  const repeatRequest = isRepeatQuestionRequest(userContent);
 
   const context = await getSessionTurnContext(sessionId, activitySession);
   const { session, user, memoryEntries, recentMessages, step, nextStep, slide, nextSlide, boundedIndex, isFinalStep, totalSteps } = context;
@@ -2933,7 +2943,7 @@ const respondToSessionTurnWrite = async ({ sessionId, content, activitySession }
   // no (or an already-answered) tap event, so a malformed tap never falls through
   // to a fuzzy guess at the wrong round.
   const triviaChoiceSpeechMatches =
-    !hasTriviaChoiceProtocol && triviaChoiceStep && userContent
+    !repeatRequest && !hasTriviaChoiceProtocol && triviaChoiceStep && userContent
       ? matchTriviaChoiceRounds(userContent, step, answeredTriviaChoiceRoundIndices)
       : [];
   const triviaChoiceEvent = triviaChoiceTapEvent
@@ -3159,9 +3169,9 @@ const respondToSessionTurnWrite = async ({ sessionId, content, activitySession }
     };
   }
 
-  const categorizingTurn = userContent && effectiveTurnIndex > 0
+  const categorizingTurn = !repeatRequest && userContent && effectiveTurnIndex > 0
     ? await personalizeCategorizingReply(evaluateCategorizingTurn({ step, content: userContent, stored: session.interactionState?.categorizing }), { provider: llmProvider }) : null;
-  const matchingAnswer = parseMatchingAnswer(step, userContent || '');
+  const matchingAnswer = repeatRequest ? null : parseMatchingAnswer(step, userContent || '');
   let userMessage = null;
   const hasAutomatedProtocol = /^\[\[[^\]]+\]\]$/.test(userContent || '');
   if (
@@ -3274,7 +3284,7 @@ const respondToSessionTurnWrite = async ({ sessionId, content, activitySession }
     wheelEvent && step.interaction?.type === 'questionWheel'
   );
   const newsElaborationRequested = Boolean(
-    step.interaction?.type === 'positiveNews' &&
+    !repeatRequest && step.interaction?.type === 'positiveNews' &&
     hasDeliveredQuestion &&
     isNewsElaborationRequest(userContent || '')
   );
@@ -3290,7 +3300,7 @@ const respondToSessionTurnWrite = async ({ sessionId, content, activitySession }
   scriptContext.sessionSummary = buildTopicSessionSummary(storedAnswers, { themeSong });
 
   const namingSlotParse =
-    namingSlotStep && userContent && hasDeliveredQuestion && !hasAutoAdvanceProtocol
+    namingSlotStep && userContent && hasDeliveredQuestion && !hasAutoAdvanceProtocol && !repeatRequest
       ? parseNamingSlotAnswer(userContent, {
           count: currentNamingSlotState.count,
           filled: currentNamingSlotState.filled,
@@ -3354,7 +3364,7 @@ const respondToSessionTurnWrite = async ({ sessionId, content, activitySession }
   let adaptiveFollowUpQuestion = null;
   let emotionalSupportTurn = null;
   let orientationTurn = null;
-  if (!isQuestionWheelEvent && !isActivityInteractionEvent && !mealBuilderEvent && userContent && hasDeliveredQuestion) {
+  if (!repeatRequest && !isQuestionWheelEvent && !isActivityInteractionEvent && !mealBuilderEvent && userContent && hasDeliveredQuestion) {
     emotionalSupportTurn = evaluateEmotionalSupportAnswer({
       content: userContent,
       hasActiveSupport: activeAdaptiveFollowUp?.kind === 'emotional_support',
@@ -3634,6 +3644,11 @@ const respondToSessionTurnWrite = async ({ sessionId, content, activitySession }
 
   let themeSongFeedback = '';
   let themeSongRequiresRetry = false;
+  if (repeatRequest && hasDeliveredQuestion) {
+    answeredCurrentQuestion = false;
+    adaptiveText = '';
+    adaptiveFollowUpQuestion = null;
+  }
   if (
     hasDeliveredQuestion &&
     answeredCurrentQuestion &&
@@ -3695,7 +3710,7 @@ const respondToSessionTurnWrite = async ({ sessionId, content, activitySession }
     step.interaction?.type === 'youtubeShort' && effectiveTurnIndex === 1
   );
   const requiresMediaCompletion = requiresMusicCompletion || requiresVideoCompletion;
-  const unansweredAttemptCount =
+  const unansweredAttemptCount = repeatRequest ? currentRetryCount :
     hasUserContent && hasDeliveredQuestion && !answeredCurrentQuestion ? currentRetryCount + 1 : 0;
   let { shouldRepeatQuestion, shouldForceProgress } = getRetryDecision({
     hasUserContent,
@@ -3704,6 +3719,10 @@ const respondToSessionTurnWrite = async ({ sessionId, content, activitySession }
     unansweredAttemptCount,
   });
   if (themeSongRequiresRetry) {
+    shouldRepeatQuestion = true;
+    shouldForceProgress = false;
+  }
+  if (repeatRequest && hasDeliveredQuestion) {
     shouldRepeatQuestion = true;
     shouldForceProgress = false;
   }
@@ -3732,7 +3751,7 @@ const respondToSessionTurnWrite = async ({ sessionId, content, activitySession }
     answeredCurrentQuestion &&
     newsElaborationRequested
   );
-  const shouldAdvance = categorizingTurn && !emotionalSupportTurn
+  const shouldAdvance = repeatRequest ? false : categorizingTurn && !emotionalSupportTurn
     ? categorizingTurn.complete && !isFinalStep
     : isActivityInteractionEvent
     ? completedAllActivities && !isFinalStep
@@ -3820,6 +3839,8 @@ const respondToSessionTurnWrite = async ({ sessionId, content, activitySession }
             context: scriptContext,
           })
         )
+    : repeatRequest && hasDeliveredQuestion
+    ? extractLastQuestion(expectedQuestion) || expectedQuestion || step.prompt
     : shouldRepeatQuestion
     ? requiresMediaCompletion
       ? requiresMusicCompletion
@@ -3848,6 +3869,7 @@ const respondToSessionTurnWrite = async ({ sessionId, content, activitySession }
   let assistantText = scriptedNextLine;
   if (
     userContent &&
+    !repeatRequest &&
     !adaptiveText &&
     !categorizingTurn &&
     !themeSongFeedback &&

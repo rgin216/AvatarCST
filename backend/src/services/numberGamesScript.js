@@ -130,7 +130,7 @@ export function createNumberGamesScript(shared) {
         sessionNumber: 13,
         sessionTitle: 'Number Games',
         reply: ({ name }) =>
-          `Welcome back, ${name}. It is lovely to see you again. Today is our thirteenth session, and our theme will be Number Games. When you are ready, say "I'm ready" to begin.`,
+          `Welcome back, ${name}. It is lovely to see you again. Today is our thirteenth session, and our theme will be Number Games.`,
       },
       themeSong: {
         title: 'Theme Song',

@@ -24,7 +24,7 @@ export function createCategorizingObjectsScript(shared) {
         title: 'Virtual Cognitive Stimulation Therapy',
         sessionNumber: 10,
         sessionTitle: 'Categorizing Objects',
-        reply: ({ name }) => `Welcome back, ${name}. Today is our tenth session: Categorizing Objects. We will explore our senses, group everyday objects, and try a category word game. Take your time. Say ready when you would like to begin.`,
+        reply: ({ name }) => `Welcome back, ${name}. Today is our tenth session: Categorizing Objects. We will explore our senses, group everyday objects, and try a category word game. Take your time.`,
       },
       themeSong: {
         title: 'Welcome Back', subtitle: 'Your theme song', bullets: ['Welcome back', 'Theme song'],

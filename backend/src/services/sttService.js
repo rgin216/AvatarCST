@@ -34,7 +34,10 @@ export async function transcribeAudio(audioFilePath, originalName = 'audio.webm'
   const formData = new FormData();
   formData.append('file', blob, originalName);
   formData.append('model', model);
-  formData.append('language', 'en');
+  if (options.language === 'en') {
+    formData.append('language', 'en');
+    formData.append('prompt', 'The speaker is speaking English, possibly with a strong accent. Transcribe the speech in English. Do not translate it into another language.');
+  }
   formData.append('response_format', 'json');
 
   const res = await fetch(provider === 'openai' ? OPENAI_STT_URL : GROQ_STT_URL, {

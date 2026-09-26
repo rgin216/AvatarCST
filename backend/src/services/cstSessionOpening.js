@@ -111,6 +111,7 @@ export const buildStandardSessionOpening = ({
     id: `${prefix}_welcome`,
     turns: 1,
     acceptAnyAnswer: true,
+    interaction: { type: 'autoAdvance' },
     deckSlide: nextDeckSlide(),
     title: welcome.title,
     subtitle: `Session ${welcome.sessionNumber}: ${welcome.sessionTitle}`,

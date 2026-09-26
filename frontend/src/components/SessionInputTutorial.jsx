@@ -32,7 +32,7 @@ export default function SessionInputTutorial({ onComplete, sessionTitle = 'Your 
   const busy = ['requesting','processing'].includes(recording.status);
   const isRecording = recording.status === 'recording';
   const message = recording.status === 'requesting' ? 'Your browser may ask for microphone access. Choose Allow to try it.'
-    : isRecording ? 'Recording now. Say a few words, then press the square Stop button. It will also stop after 20 seconds.'
+    : isRecording ? 'Recording now. Say a few words, then press the button at the bottom left again (now a square Stop icon) to stop. It will also stop after 20 seconds.'
     : recording.status === 'processing' ? 'Preparing your practice recording…'
     : recording.status === 'recorded' ? 'Your recording is ready. Play it back below to check whether you can hear yourself.'
     : recording.status === 'error' ? recording.message : '';
@@ -47,7 +47,7 @@ export default function SessionInputTutorial({ onComplete, sessionTitle = 'Your 
   return <div ref={root} className={`session-stage input-tutorial tutorial-step-${step}`} role="dialog" aria-modal="true" aria-labelledby="practice-title" onKeyDown={trapFocus}>
     <header className="session-topbar" inert aria-hidden="true"><div className="session-status">Getting ready</div><span>{sessionTitle}</span></header>
     <main className="session-slide-shell" inert aria-hidden="true">
-      <section className="ppt-slide tutorial-preview"><span>Welcome</span><h1>{sessionTitle}</h1><p>We will begin when you are ready.</p></section>
+      <section className="ppt-slide tutorial-preview"><span>Welcome</span><h1>{sessionTitle}</h1><p>Your first slide will appear after practice.</p></section>
       <aside className="session-side-panel"><div className="session-focus-panel"><span>Your conversation</span><strong>Aria will speak here</strong></div><div className="session-bubble avatar">You can speak or type. Take your time.</div></aside>
       <section className="avatar-dock tutorial-avatar"><span aria-hidden="true">A</span><p>Aria</p></section>
     </main>
@@ -61,8 +61,8 @@ export default function SessionInputTutorial({ onComplete, sessionTitle = 'Your 
       <div className="tutorial-coach-top"><span>Quick practice · {step==='text' ? '1' : '2'} of 2</span><button type="button" onClick={finish}>Skip practice</button></div>
       <h2 ref={heading} tabIndex={-1} id="practice-title">{step==='text' ? 'Try typing a reply' : 'Try speaking a reply'}</h2>
       <p id="practice-instruction">{step==='text'
-        ? 'Tap the highlighted box below. Type “Hello”, or any words you like, then press the Send arrow or Enter.'
-        : 'Press the highlighted microphone below. Say “Hello, Aria”, then press it again to stop.'}</p>
+        ? <>Type a message in the highlighted box at the bottom of the screen. Try “Hello”, or any words you like. Then press the <strong>Send button <svg className="tutorial-inline-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg> at the bottom right of the screen</strong>, or press Enter.</>
+        : <>Press the <strong>highlighted microphone at the bottom left of the screen</strong>. Say “Hello, Aria”, then <strong>press the same button again to stop recording</strong>.</>}</p>
       {step==='text' && <div role="status" className={sent ? 'tutorial-feedback' : ''}>{sent && <>You sent: <strong>{sent}</strong><br/>That is how you can reply by typing.</>}</div>}
       {step==='microphone' && <>
         <p role="status" className={message ? 'tutorial-feedback' : ''}>{message}</p>

@@ -32,6 +32,7 @@ import {
   hasSubstantialSpeechOverlap,
   inferMemorySuggestions,
   isRecordableSessionAnswer,
+  isRepeatQuestionRequest,
   isMusicCompletionAnswer,
   isNewsElaborationRequest,
   isLowMoodDisclosure,
@@ -70,6 +71,71 @@ test('does not record the auto-advance protocol as a session answer', () => {
   }
 
   assert.deepEqual(sessionAnswers, [{ stepId: 'previous', answer: 'A meaningful memory' }]);
+});
+
+test('welcome slides after Session 1 advance after narration without asking for readiness', () => {
+  for (const scriptId of [
+    'cst_childhood', 'cst_physical_games', 'cst_sounds', 'cst_food',
+    'cst_current_affairs', 'cst_faces_scenes', 'cst_word_associations',
+    'cst_categorizing_objects', 'cst_orientation', 'cst_using_money',
+    'cst_number_games', 'cst_word_games',
+  ]) {
+    const welcome = getScriptStep(scriptId, 0).step;
+    assert.equal(welcome.interaction?.type, 'autoAdvance', scriptId);
+    assert.doesNotMatch(renderScriptReply(welcome, { name: 'Pat' }), /say (?:i'm )?ready/i, scriptId);
+  }
+  assert.notEqual(getScriptStep('cst_intro_reminiscence', 0).step.interaction?.type, 'autoAdvance');
+});
+
+test('recognises a request to repeat a question without treating it as an answer', () => {
+  const step = getScriptStep('cst_childhood', 1).step;
+  for (const content of ['Can you repeat the question?', 'Sorry, could you say that again?', 'What was the question again?', "I didn't catch the question."]) {
+    assert.equal(isRepeatQuestionRequest(content), true, content);
+    assert.equal(isRecordableSessionAnswer({ step, content, wheelEvent: null }), false, content);
+  }
+  assert.equal(isRepeatQuestionRequest('Can you repeat the song?'), false);
+});
+
+test('repeats the current question without advancing or using a retry', async (t) => {
+  const originals = {
+    sessionFindOneAndUpdate: Session.findOneAndUpdate,
+    userFindById: User.findById,
+    memoryFindOne: Memory.findOne,
+    messageFind: Message.find,
+    messageCreate: Message.create,
+  };
+  t.after(() => {
+    Session.findOneAndUpdate = originals.sessionFindOneAndUpdate;
+    User.findById = originals.userFindById;
+    Memory.findOne = originals.memoryFindOne;
+    Message.find = originals.messageFind;
+    Message.create = originals.messageCreate;
+  });
+  const stepIndex = 1;
+  const session = {
+    _id: 'repeat-question-session', userId: 'repeat-question-user', status: 'active',
+    pipelineMode: 'free', scriptId: 'cst_childhood', scriptStepIndex: stepIndex,
+    scriptStepTurnIndex: 1, scriptStepRetryCount: 2, activityRevision: 1,
+    interactionState: { sessionAnswers: [] },
+    save: async () => session,
+  };
+  Session.findOneAndUpdate = async () => session;
+  User.findById = () => ({ lean: async () => ({ _id: session.userId, name: 'Pat' }) });
+  Memory.findOne = () => ({ lean: async () => null });
+  Message.find = () => ({
+    sort() { return this; }, limit() { return this; },
+    lean: async () => [{ role: 'assistant', content: 'How are you doing today?' }],
+  });
+  Message.create = async (message) => ({ _id: `${message.role}-message`, ...message });
+
+  const turn = await respondToSessionTurn({ sessionId: session._id, content: 'Can you repeat the question?' });
+  assert.match(turn.assistantText, /how are you doing today\?/i);
+  assert.equal(turn.scriptStep.nextIndex, stepIndex);
+  assert.equal(turn.scriptStep.forcedProgress, false);
+  assert.equal(session.scriptStepIndex, stepIndex);
+  assert.equal(session.scriptStepTurnIndex, 1);
+  assert.equal(session.scriptStepRetryCount, 2);
+  assert.deepEqual(session.interactionState.sessionAnswers, []);
 });
 
 test('configures Session 6 with the supplied deck and reusable opening interactions', () => {
