@@ -64,13 +64,13 @@ const MATCH_STOP_WORDS = new Set([
   'the',
 ]);
 
-const toMatchTokens = (value = '') =>
+const toMatchTokens = (value = '', preserveQualifiers = false) =>
   cleanText(value, 180)
     .normalize('NFKD')
     .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase()
     .replace(/[&+]/g, ' and ')
-    .replace(/\([^)]*\)|\[[^\]]*\]/g, ' ')
+    .replace(preserveQualifiers ? /[()[\]]/g : /\([^)]*\)|\[[^\]]*\]/g, ' ')
     .replace(/[^a-z0-9\s]/g, ' ')
     .split(/\s+/)
     .filter(Boolean)
@@ -274,6 +274,24 @@ export const selectSpotifyArtistSuggestions = (payload = {}, artist = '', limit 
     .map((candidate) => candidate.track);
 };
 
+export const selectSpotifyTitleSuggestions = (payload = {}, title = '', limit = 3) => {
+  const requestedTitle = toMatchTokens(title, true).join(' ');
+  if (!requestedTitle) return [];
+  const seen = new Set();
+  return getTrackItems(payload)
+    .map((rawTrack) => ({ track: normalizeSpotifyTrack(rawTrack), explicit: rawTrack?.explicit }))
+    .filter(({ track, explicit }) => track && explicit === false && toMatchTokens(track.name, true).join(' ') === requestedTitle)
+    .sort((left, right) => Number(right.track.name.toLowerCase() === title.toLowerCase()) - Number(left.track.name.toLowerCase() === title.toLowerCase()))
+    .filter(({ track }) => {
+      const key = track.artistLabel.toLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .slice(0, Math.max(0, limit))
+    .map(({ track }) => track);
+};
+
 const getAccessToken = async ({ clientId, clientSecret, signal }) => {
   const now = Date.now();
   if (accessToken && accessTokenExpiresAt > now + 30_000) return accessToken;
@@ -342,6 +360,21 @@ export const searchSpotifyTrack = async (songAnswer = '') => {
     return unavailableResult(reason || 'missing-query', fallbackQuery);
   }
 
+  let explicitCandidate = null;
+  let fallbackTrack = null;
+  const titleOnly = !parseSongRequest(query).artist;
+  const titleSuggestions = [];
+  const seenSuggestions = new Set();
+  const collectedTitleResult = () => {
+    if (titleSuggestions.length > 1) return {
+      status: 'needs-selection', reason: 'title-only', query,
+      suggestions: titleSuggestions.slice(0, 3),
+    };
+    const chosenTrack = titleSuggestions[0] || fallbackTrack;
+    return chosenTrack
+      ? { status: 'available', query, track: chosenTrack, matchedAt: new Date().toISOString() }
+      : null;
+  };
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
@@ -387,7 +420,6 @@ export const searchSpotifyTrack = async (songAnswer = '') => {
         : unavailableResult('no-match', artist);
     }
 
-    let explicitCandidate = null;
     for (const searchQuery of buildSpotifySearchQueries(query)) {
       const requestUrl = new URL(SPOTIFY_SEARCH_URL);
       requestUrl.searchParams.set('q', searchQuery);
@@ -401,24 +433,41 @@ export const searchSpotifyTrack = async (songAnswer = '') => {
       });
       if (!response.ok) throw new Error(`Spotify search failed with ${response.status}`);
 
-      const match = inspectSpotifyTrackMatch(await response.json(), query);
+      const payload = await response.json();
+      if (titleOnly) {
+        for (const suggestion of selectSpotifyTitleSuggestions(payload, query)) {
+          const key = suggestion.artistLabel.toLowerCase();
+          if (!seenSuggestions.has(key)) {
+            seenSuggestions.add(key);
+            titleSuggestions.push(suggestion);
+          }
+        }
+        if (titleSuggestions.length > 1) return collectedTitleResult();
+      }
+      const match = inspectSpotifyTrackMatch(payload, query);
       if (match.status === 'available') {
-        return {
-          status: 'available',
-          query,
-          track: match.track,
-          matchedAt: new Date().toISOString(),
+        if (!titleOnly) return {
+          status: 'available', query, track: match.track, matchedAt: new Date().toISOString(),
         };
+        fallbackTrack ||= match.track;
       }
       if (!explicitCandidate && match.reason === 'explicit-content') {
         explicitCandidate = match.candidate;
       }
     }
 
+    const titleResult = collectedTitleResult();
+    if (titleResult) return titleResult;
+
     return explicitCandidate
       ? unavailableResult('explicit-content', query, explicitCandidate)
       : unavailableResult('no-match', query);
   } catch (error) {
+    const titleResult = collectedTitleResult();
+    if (titleResult) {
+      console.warn('[spotify] Fallback search failed; using earlier match:', error.message);
+      return titleResult;
+    }
     console.warn('[spotify] Theme song unavailable:', error.message);
     return unavailableResult('request-failed', query);
   } finally {

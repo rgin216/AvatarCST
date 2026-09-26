@@ -2,6 +2,7 @@ import path from 'path';
 import fs from 'fs';
 import { v4 as uuidv4 } from 'uuid';
 import Session from '../models/Session.js';
+import User from '../models/User.js';
 import Message from '../models/Message.js';
 import {
   getSessionInactivityReminder,
@@ -365,15 +366,20 @@ export const respondAudioToSession = async (req, res, next) => {
   try {
     const avatarMode = getAvatarMode(req.body?.avatarMode);
     const lipSyncMode = getLipSyncMode(req.body?.lipSyncMode);
-    const session = await Session.findById(req.params.id).select('pipelineMode').lean();
+    const session = await Session.findById(req.params.id).select('pipelineMode userId').lean();
     if (!session) return res.status(404).json({ error: 'Session not found' });
     const transcriptionProvider = getTranscriptionProviderForPipeline(session.pipelineMode);
+    const user = await User.findById(session.userId).select('settings.language').lean();
+    const selectedLanguage = user?.settings?.language || 'en';
 
     let transcript = '';
     if (uploadedFilePath) {
       transcript = await timeAsync(
         'sttMs',
-        () => transcribeAudio(uploadedFilePath, req.file?.originalname, { provider: transcriptionProvider }),
+        () => transcribeAudio(uploadedFilePath, req.file?.originalname, {
+          provider: transcriptionProvider,
+          language: selectedLanguage,
+        }),
         timings
       );
     }

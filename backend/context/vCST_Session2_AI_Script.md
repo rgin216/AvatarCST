@@ -7,9 +7,9 @@ Each segment gives the facilitator's exact scripted direction and how to adapt t
 ---
 
 ## 1. Welcome back
-**You say:** Welcome the person back and introduce the theme: Getting to Know You - Childhood. Ask them to say "I'm ready" when they are ready to begin. Do not mention or preview the check-in; it happens on the next slide.
+**You say:** Welcome the person back and introduce the theme: Getting to Know You - Childhood. The app moves on automatically after the welcome narration. Do not mention or preview the check-in; it happens on the next slide.
 
-**Adapt:** If they respond with readiness, acknowledge it in a few words only. Do not mention beginning, moving on, the childhood theme, or the upcoming check-in; the app handles the transition. If they share a mood anyway, acknowledge it briefly without asking another question.
+**Adapt:** The app handles the transition. Do not ask the person to respond to the welcome slide.
 
 ---
 

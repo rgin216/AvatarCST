@@ -13,7 +13,7 @@ export const seatedExerciseInteraction = {
   // the embedded player as 16:9 instead of the Shorts-style 9:16 frame.
   orientation: 'landscape',
   aspectRatio: '16 / 9',
-  completionPrompt: 'When you are finished, press Done, or say or type "done" to continue.',
+  completionPrompt: 'The session continues when the video ends. Press Done to continue sooner.',
 };
 
 export const spotifySongInteraction = ({ summarizeOnComplete = false } = {}) => ({
