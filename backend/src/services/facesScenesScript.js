@@ -54,7 +54,7 @@ export function createFacesScenesScript(shared) {
         title: 'Virtual Cognitive Stimulation Therapy',
         sessionNumber: 7,
         sessionTitle: 'Faces and Scenes',
-        reply: ({ name }) => `Welcome back, ${name}. Today is our seventh session: Faces and Scenes. We will look at familiar faces, compare places, and try a few picture activities together. Take your time. Say ready when you would like to begin.`,
+        reply: ({ name }) => `Welcome back, ${name}. Today is our seventh session: Faces and Scenes. We will look at familiar faces, compare places, and try a few picture activities together. Take your time.`,
       },
       themeSong: {
         title: 'Welcome Back', subtitle: 'Your theme song', bullets: ['Welcome back', 'Theme song'],

@@ -526,9 +526,9 @@ export const isThemeSongSkipAnswer = (content = '') => {
   );
 };
 
-export const resolveThemeSongSelectionAnswer = (content = '', themeSong = {}) => {
+export const resolveThemeSongSelectedTrack = (content = '', themeSong = {}) => {
   const suggestions = Array.isArray(themeSong?.suggestions) ? themeSong.suggestions : [];
-  if (themeSong?.status !== 'needs-selection' || suggestions.length === 0) return content;
+  if (themeSong?.status !== 'needs-selection' || suggestions.length === 0) return null;
 
   const normalized = normalizeAnswer(content);
   const ordinalPatterns = [
@@ -540,6 +540,11 @@ export const resolveThemeSongSelectionAnswer = (content = '', themeSong = {}) =>
 
   if (selectedIndex < 0) {
     selectedIndex = suggestions.findIndex((suggestion) => {
+      if (themeSong.reason === 'title-only') {
+        const artistName = normalizeAnswer(String(suggestion?.artistLabel || '').replace(/&/g, ' and '));
+        const spokenArtist = normalizeAnswer(String(content).replace(/&/g, ' and '));
+        return artistName && spokenArtist.length >= 3 && (spokenArtist.includes(artistName) || artistName.includes(spokenArtist));
+      }
       const songName = normalizeAnswer(suggestion?.name || '');
       return songName && (normalized.includes(songName) || (
         normalized.length >= 3 && songName.includes(normalized)
@@ -547,7 +552,11 @@ export const resolveThemeSongSelectionAnswer = (content = '', themeSong = {}) =>
     });
   }
 
-  const selected = suggestions[selectedIndex];
+  return suggestions[selectedIndex] || null;
+};
+
+export const resolveThemeSongSelectionAnswer = (content = '', themeSong = {}) => {
+  const selected = resolveThemeSongSelectedTrack(content, themeSong);
   if (!selected?.name) return content;
   return selected.artistLabel
     ? `${selected.name} by ${selected.artistLabel}`
@@ -563,10 +572,12 @@ export const buildThemeSongLookupFeedback = (themeSong = {}) => {
     const ordinalLabels = ['first', 'second', 'third'];
     const choices = themeSong.suggestions
       .slice(0, ordinalLabels.length)
-      .map((track, index) => `${ordinalLabels[index]}, ${track.name}`)
+      .map((track, index) => `${ordinalLabels[index]}, ${track.name}${themeSong.reason === 'title-only' ? ` by ${track.artistLabel}` : ''}`)
       .join('; ');
     if (choices) {
-      return `I found a few clean songs by ${themeSong.artist || 'that artist'}: ${choices}. Which one would you like? You can say the song title, or first, second, or third.`;
+      return themeSong.reason === 'title-only'
+        ? `I found a few songs called ${themeSong.query}: ${choices}. Which one would you like? You can say the artist, or first, second, or third.`
+        : `I found a few clean songs by ${themeSong.artist || 'that artist'}: ${choices}. Which one would you like? You can say the song title, or first, second, or third.`;
     }
   }
 
@@ -976,6 +987,14 @@ const isVideoCompletionProtocol = (content = '') =>
 
 const isAutoAdvanceProtocol = (content = '') =>
   /^\[\[auto-advance\]\]$/i.test(content.trim());
+
+export const isRepeatQuestionRequest = (content = '') => {
+  const request = String(content).toLowerCase().replace(/[?.!,'’]+/g, ' ').replace(/\s+/g, ' ').trim()
+    .replace(/^(?:sorry|excuse me|pardon me) /, '');
+  return /^(?:(?:can|could|would) you |please )?(?:repeat|say) (?:(?:the|that|your|last|previous) )?(?:question|that|it)(?: again)?(?: please)?$/.test(request) ||
+    /^(?:what was|what is) (?:the|your|that) question(?: again)?(?: please)?$/.test(request) ||
+    /^i (?:did not|didn t|could not|couldn t) (?:catch|hear) (?:the|your|that) question$/.test(request);
+};
 
 const isActivityRevealProtocol = (content = '') =>
   /^\[\[activity-reveal:/i.test(content.trim());
@@ -1714,6 +1733,7 @@ export const resolveNamingSlotReveal = ({ step, content = '', slotIndices = [] }
 export const isRecordableSessionAnswer = ({ step, content, wheelEvent }) =>
   Boolean(
     hasMeaningfulUserContent(content) &&
+    !isRepeatQuestionRequest(content) &&
     !wheelEvent &&
     !isAutoAdvanceProtocol(content) &&
     !isActivityRevealProtocol(content) &&
@@ -2298,20 +2318,53 @@ export const generateSessionSummary = async ({
   }
 };
 
-const renderContextualScriptReply = (step, context) =>
-  step?.interaction?.type === 'positiveNews' &&
-  context?.currentAffairs?.reason === 'no-new-headline'
+export const buildInteractiveGameGuidance = (step, previousStep = null) => {
+  const interaction = step?.interaction;
+  const type = interaction?.type;
+  if (!type || (previousStep?.interaction?.type === type && previousStep?.interaction?.mode === interaction.mode)) return '';
+  const guidance = {
+    questionWheel: 'Press Spin on the wheel. When it stops, I will ask its question; you can answer by speaking or typing.',
+    activityReveal: 'Tap a black card, try the action while seated, then press “I have finished this action” before choosing another card.',
+    triviaChoice: 'For each question, tap one answer on the slide, or say or type your choice. We can take them one at a time.',
+    phraseCards: 'Look at each card, then say or type what belongs in its blank. You can answer in any order.',
+    matching: 'Drag to connect each pair, or tap one item on each side. Press Check matches when you are finished.',
+    realOrAi: 'Use the Real person, AI generated, or Not sure buttons, or tell me your guess.',
+    mealBuilder: 'Drag foods onto the plate or tap their cards, then press “That’s my plate” when you are ready.',
+    pronunciation: 'Tap each word to hear it. After all six have played, press Continue.',
+    wordGuess: 'Type a five-letter word into the boxes and press Enter. You can use “Give me a hint” or “Finish this game” whenever you like.',
+    audioClips: 'Press Play on the sound clip, then tell me what you think by speaking or typing. You can replay it.',
+    choiceQuestion: 'Choose an answer from the list and press Confirm answer, or say or type its letter or name.',
+  };
+  if (type === 'objectSelection') return interaction.mode === 'pairs'
+    ? 'Tap two objects and press Check pair. You can make more pairs, then press Done when you are finished.'
+    : 'Tap the objects you think do not belong, then press Check selections.';
+  return guidance[type] || '';
+};
+
+const renderContextualScriptReply = (step, context, previousStep = null, includeGuide = false) => {
+  let reply = step?.interaction?.type === 'positiveNews' &&
+    context?.currentAffairs?.reason === 'no-new-headline'
     ? `There are no new positive New Zealand stories available right now. ${PLEASANT_NEWS_PROMPT}`
     : renderScriptReply(step, context);
+  if (step?.interaction?.type === 'spotifySong' && context?.themeSong?.status === 'available') {
+    reply = reply.replace(/When you have finished listening, press Done, or say or type done\./i,
+      'I will continue when the music pauses. Press Done if you want to continue sooner.');
+  }
+  if (step?.interaction?.type === 'youtubeShort') {
+    reply = reply.replace(/When you are finished, press Done, or say or type done\./i,
+      'I will continue when the video ends. Press Done if you want to continue sooner.');
+  }
+  return includeGuide ? joinSpeechParts(reply, buildInteractiveGameGuidance(step, previousStep)) : reply;
+};
 
 const getAskedScriptLine = (step, currentTurnIndex, context) =>
   currentTurnIndex <= 1
     ? renderContextualScriptReply(step, context)
     : renderScriptFollowUp(step, currentTurnIndex - 2, context);
 
-const getProgressScriptLine = ({ step, nextStep, currentTurnIndex, stepTurns, context }) => {
-  if (currentTurnIndex <= 0) return renderContextualScriptReply(step, context);
-  if (currentTurnIndex >= stepTurns) return renderContextualScriptReply(nextStep, context);
+export const getProgressScriptLine = ({ step, nextStep, currentTurnIndex, stepTurns, context }) => {
+  if (currentTurnIndex <= 0) return renderContextualScriptReply(step, context, null, true);
+  if (currentTurnIndex >= stepTurns) return renderContextualScriptReply(nextStep, context, step, true);
   return renderScriptFollowUp(step, currentTurnIndex - 1, context);
 };
 
@@ -2888,6 +2941,7 @@ export const getSessionInactivityReminder = (sessionId, expectedActivityRevision
 // TODO: wrap writes in a MongoDB transaction when upgrading to Atlas M10+ (replica set required)
 const respondToSessionTurnWrite = async ({ sessionId, content, activitySession }) => {
   const userContent = content?.trim();
+  const repeatRequest = isRepeatQuestionRequest(userContent);
 
   const context = await getSessionTurnContext(sessionId, activitySession);
   const { session, user, memoryEntries, recentMessages, step, nextStep, slide, nextSlide, boundedIndex, isFinalStep, totalSteps } = context;
@@ -2933,7 +2987,7 @@ const respondToSessionTurnWrite = async ({ sessionId, content, activitySession }
   // no (or an already-answered) tap event, so a malformed tap never falls through
   // to a fuzzy guess at the wrong round.
   const triviaChoiceSpeechMatches =
-    !hasTriviaChoiceProtocol && triviaChoiceStep && userContent
+    !repeatRequest && !hasTriviaChoiceProtocol && triviaChoiceStep && userContent
       ? matchTriviaChoiceRounds(userContent, step, answeredTriviaChoiceRoundIndices)
       : [];
   const triviaChoiceEvent = triviaChoiceTapEvent
@@ -3159,9 +3213,9 @@ const respondToSessionTurnWrite = async ({ sessionId, content, activitySession }
     };
   }
 
-  const categorizingTurn = userContent && effectiveTurnIndex > 0
+  const categorizingTurn = !repeatRequest && userContent && effectiveTurnIndex > 0
     ? await personalizeCategorizingReply(evaluateCategorizingTurn({ step, content: userContent, stored: session.interactionState?.categorizing }), { provider: llmProvider }) : null;
-  const matchingAnswer = parseMatchingAnswer(step, userContent || '');
+  const matchingAnswer = repeatRequest ? null : parseMatchingAnswer(step, userContent || '');
   let userMessage = null;
   const hasAutomatedProtocol = /^\[\[[^\]]+\]\]$/.test(userContent || '');
   if (
@@ -3274,7 +3328,7 @@ const respondToSessionTurnWrite = async ({ sessionId, content, activitySession }
     wheelEvent && step.interaction?.type === 'questionWheel'
   );
   const newsElaborationRequested = Boolean(
-    step.interaction?.type === 'positiveNews' &&
+    !repeatRequest && step.interaction?.type === 'positiveNews' &&
     hasDeliveredQuestion &&
     isNewsElaborationRequest(userContent || '')
   );
@@ -3290,7 +3344,7 @@ const respondToSessionTurnWrite = async ({ sessionId, content, activitySession }
   scriptContext.sessionSummary = buildTopicSessionSummary(storedAnswers, { themeSong });
 
   const namingSlotParse =
-    namingSlotStep && userContent && hasDeliveredQuestion && !hasAutoAdvanceProtocol
+    namingSlotStep && userContent && hasDeliveredQuestion && !hasAutoAdvanceProtocol && !repeatRequest
       ? parseNamingSlotAnswer(userContent, {
           count: currentNamingSlotState.count,
           filled: currentNamingSlotState.filled,
@@ -3354,7 +3408,7 @@ const respondToSessionTurnWrite = async ({ sessionId, content, activitySession }
   let adaptiveFollowUpQuestion = null;
   let emotionalSupportTurn = null;
   let orientationTurn = null;
-  if (!isQuestionWheelEvent && !isActivityInteractionEvent && !mealBuilderEvent && userContent && hasDeliveredQuestion) {
+  if (!repeatRequest && !isQuestionWheelEvent && !isActivityInteractionEvent && !mealBuilderEvent && userContent && hasDeliveredQuestion) {
     emotionalSupportTurn = evaluateEmotionalSupportAnswer({
       content: userContent,
       hasActiveSupport: activeAdaptiveFollowUp?.kind === 'emotional_support',
@@ -3634,6 +3688,11 @@ const respondToSessionTurnWrite = async ({ sessionId, content, activitySession }
 
   let themeSongFeedback = '';
   let themeSongRequiresRetry = false;
+  if (repeatRequest && hasDeliveredQuestion) {
+    answeredCurrentQuestion = false;
+    adaptiveText = '';
+    adaptiveFollowUpQuestion = null;
+  }
   if (
     hasDeliveredQuestion &&
     answeredCurrentQuestion &&
@@ -3650,6 +3709,7 @@ const respondToSessionTurnWrite = async ({ sessionId, content, activitySession }
       : [...storedAnswers, toSessionAnswer({ step, content: categorizingTurn?.transcript || matchingAnswer?.transcript || triviaChoiceEvent?.transcript || userContent })];
 
     if (step.id === 'theme_song_choice' && !activeAdaptiveFollowUp) {
+      const selectedTrack = resolveThemeSongSelectedTrack(userContent, themeSong);
       const themeSongSearchAnswer = resolveThemeSongSelectionAnswer(userContent, themeSong);
       themeSong = isThemeSongSkipAnswer(userContent)
         ? {
@@ -3658,6 +3718,8 @@ const respondToSessionTurnWrite = async ({ sessionId, content, activitySession }
             track: null,
             reason: 'skipped',
           }
+        : selectedTrack
+        ? { status: 'available', query: themeSong?.query || themeSongSearchAnswer, track: selectedTrack, matchedAt: new Date().toISOString() }
         : await searchSpotifyTrack(themeSongSearchAnswer);
       scriptContext.themeSong = themeSong;
       themeSongFeedback = buildThemeSongLookupFeedback(themeSong);
@@ -3695,7 +3757,7 @@ const respondToSessionTurnWrite = async ({ sessionId, content, activitySession }
     step.interaction?.type === 'youtubeShort' && effectiveTurnIndex === 1
   );
   const requiresMediaCompletion = requiresMusicCompletion || requiresVideoCompletion;
-  const unansweredAttemptCount =
+  const unansweredAttemptCount = repeatRequest ? currentRetryCount :
     hasUserContent && hasDeliveredQuestion && !answeredCurrentQuestion ? currentRetryCount + 1 : 0;
   let { shouldRepeatQuestion, shouldForceProgress } = getRetryDecision({
     hasUserContent,
@@ -3704,6 +3766,10 @@ const respondToSessionTurnWrite = async ({ sessionId, content, activitySession }
     unansweredAttemptCount,
   });
   if (themeSongRequiresRetry) {
+    shouldRepeatQuestion = true;
+    shouldForceProgress = false;
+  }
+  if (repeatRequest && hasDeliveredQuestion) {
     shouldRepeatQuestion = true;
     shouldForceProgress = false;
   }
@@ -3732,7 +3798,7 @@ const respondToSessionTurnWrite = async ({ sessionId, content, activitySession }
     answeredCurrentQuestion &&
     newsElaborationRequested
   );
-  const shouldAdvance = categorizingTurn && !emotionalSupportTurn
+  const shouldAdvance = repeatRequest ? false : categorizingTurn && !emotionalSupportTurn
     ? categorizingTurn.complete && !isFinalStep
     : isActivityInteractionEvent
     ? completedAllActivities && !isFinalStep
@@ -3820,6 +3886,9 @@ const respondToSessionTurnWrite = async ({ sessionId, content, activitySession }
             context: scriptContext,
           })
         )
+    : repeatRequest && hasDeliveredQuestion
+    ? (themeSong?.status === 'needs-selection' ? buildThemeSongLookupFeedback(themeSong) : '') ||
+      extractLastQuestion(expectedQuestion) || expectedQuestion || step.prompt
     : shouldRepeatQuestion
     ? requiresMediaCompletion
       ? requiresMusicCompletion
@@ -3836,7 +3905,7 @@ const respondToSessionTurnWrite = async ({ sessionId, content, activitySession }
     ? sessionCompleteAfterResponse && completionReply
       ? completionReply
       : getProgressScriptLine({ step, nextStep, currentTurnIndex: effectiveTurnIndex, stepTurns, context: scriptContext })
-    : expectedQuestion || renderScriptReply(step, scriptContext));
+    : getProgressScriptLine({ step, nextStep, currentTurnIndex: effectiveTurnIndex, stepTurns, context: scriptContext }) || expectedQuestion);
   const answerState = shouldRepeatQuestion
     ? 'repeat_question'
     : shouldAskAdaptiveFollowUp
@@ -3848,6 +3917,7 @@ const respondToSessionTurnWrite = async ({ sessionId, content, activitySession }
   let assistantText = scriptedNextLine;
   if (
     userContent &&
+    !repeatRequest &&
     !adaptiveText &&
     !categorizingTurn &&
     !themeSongFeedback &&

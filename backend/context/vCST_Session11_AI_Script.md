@@ -8,7 +8,7 @@ Use a warm adult-to-adult tone. Invite attempts, never demand accurate memories.
 
 Deck slide 1: Virtual Cognitive Stimulation Therapy
 
-Welcome the participant to Session 11: Orientation. Introduce familiar places, landmarks, and memories. Invite them to say ready, without pressure.
+Welcome the participant to Session 11: Orientation. Introduce familiar places, landmarks, and memories. The app moves on automatically after the welcome narration.
 
 ---
 

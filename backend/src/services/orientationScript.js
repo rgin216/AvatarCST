@@ -16,7 +16,7 @@ export function createOrientationScript(shared) {
   const opening = shared.slice(0, shared.findIndex((step) => step.id === 'faces_scenes_theme_intro') + 1).map((step) => clone(step));
   Object.assign(opening[0], {
     subtitle: 'Session 11: Orientation', bullets: ['Session 11', 'Orientation'],
-    reply: ({ name }) => `Welcome back, ${name}. Today is Session 11: Orientation. We will explore familiar places, landmarks, and memories together. Take your time, and say ready when you would like to begin.`,
+    reply: ({ name }) => `Welcome back, ${name}. Today is Session 11: Orientation. We will explore familiar places, landmarks, and memories together. Take your time.`,
   });
   Object.assign(opening.at(-1), {
     title: 'Orientation', subtitle: 'Places and finding our way', prompt: 'Orientation',

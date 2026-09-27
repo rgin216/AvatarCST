@@ -9,7 +9,11 @@
 .input-tutorial .session-input-bar { backdrop-filter:none; }
 .input-tutorial .tutorial-spotlight { position:relative; z-index:12; outline:4px solid #ffd66f; outline-offset:5px; background-color:#fffaf5; box-shadow:0 0 0 10px rgba(255,214,111,.14); }
 .input-tutorial .session-text-controls.tutorial-spotlight { border-radius:18px; }
+.input-tutorial .session-text-controls.tutorial-spotlight .send-btn { position:relative; outline:4px solid #ffd66f; outline-offset:2px; border-radius:12px; }
+.input-tutorial .session-text-controls.tutorial-spotlight .send-btn::after { content:'↓'; position:absolute; bottom:calc(100% + 18px); left:50%; transform:translateX(-50%); font:700 46px/1 Arial,sans-serif; color:#ffd66f; text-shadow:0 2px 8px #101920; pointer-events:none; animation:tutorial-point 1.4s ease-in-out infinite; }
+.input-tutorial .session-text-controls.tutorial-spotlight::after { display:none; }
 .input-tutorial .tutorial-spotlight::after { content:'↓'; position:absolute; bottom:calc(100% + 12px); left:50%; transform:translateX(-50%); font:700 46px/1 Arial,sans-serif; color:#ffd66f; text-shadow:0 2px 8px #101920; pointer-events:none; animation:tutorial-point 1.4s ease-in-out infinite; }
+.tutorial-inline-icon { display:inline-block; width:22px; height:22px; vertical-align:-4px; margin:0 3px; }
 .tutorial-coach { position:absolute; z-index:12; bottom:calc(var(--practice-footer-height, 90px) + 68px); left:50%; transform:translateX(-50%); width:min(600px,calc(100% - 32px)); max-height:calc(100% - var(--practice-footer-height, 90px) - 88px); overflow:auto; padding:28px; box-sizing:border-box; background:#fffaf5; border:1px solid #e6d9cb; border-radius:22px; box-shadow:0 18px 70px #0005; color:#3D2B1F; }
 .tutorial-coach-top { display:flex; align-items:center; justify-content:space-between; gap:12px; color:#645245; font-size:15px; }
 .tutorial-coach h2 { margin:16px 0; font-size:30px; line-height:1.2; color:#3D2B1F; }
@@ -24,5 +28,5 @@
 .tutorial-feedback { padding:12px 16px; background:#eaf2e8; border-radius:12px; font-size:18px; line-height:1.45; overflow-wrap:anywhere; }
 .tutorial-coach audio { display:block; width:100%; margin:12px 0; }
 @keyframes tutorial-point { 0%,100% { translate:0 -6px; } 50% { translate:0 4px; } }
-@media (prefers-reduced-motion:reduce) { .input-tutorial .tutorial-spotlight::after,.input-tutorial .mic-btn-active { animation:none; } }
+@media (prefers-reduced-motion:reduce) { .input-tutorial .tutorial-spotlight::after,.input-tutorial .session-text-controls.tutorial-spotlight .send-btn::after,.input-tutorial .mic-btn-active { animation:none; } }
 @media (max-width:600px) { .tutorial-coach { padding:20px; border-radius:16px; } .tutorial-coach h2 { font-size:26px; } .tutorial-coach p { font-size:17px; } .tutorial-coach-top { font-size:13px; } }

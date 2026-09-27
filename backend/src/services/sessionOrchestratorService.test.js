@@ -6,6 +6,7 @@ import {
   buildTopicSessionSummary,
   buildSafetyInactivityReminderText,
   buildNewsElaboration,
+  buildInteractiveGameGuidance,
   buildThemeSongLookupFeedback,
   canRequestAdaptiveFollowUp,
   collapseRepeatedAdjacentSpeech,
@@ -14,6 +15,7 @@ import {
   parseNamingSlotAnswer,
   buildNamingSlotPrompt,
   getRetryDecision,
+  getProgressScriptLine,
   extractPreferredNameAnswer,
   evaluateAdaptiveFollowUpAnswer,
   evaluateNamedInstrumentSlots,
@@ -32,6 +34,7 @@ import {
   hasSubstantialSpeechOverlap,
   inferMemorySuggestions,
   isRecordableSessionAnswer,
+  isRepeatQuestionRequest,
   isMusicCompletionAnswer,
   isNewsElaborationRequest,
   isLowMoodDisclosure,
@@ -43,6 +46,7 @@ import {
   parseMealBuilderEvent,
   resolveNamingSlotReveal,
   resolveThemeSongSelectionAnswer,
+  resolveThemeSongSelectedTrack,
   respondToSessionTurn,
   selectRelevantMemoryEntries,
   shouldUseNextSlideResponseOnly,
@@ -70,6 +74,87 @@ test('does not record the auto-advance protocol as a session answer', () => {
   }
 
   assert.deepEqual(sessionAnswers, [{ stepId: 'previous', answer: 'A meaningful memory' }]);
+});
+
+test('welcome slides after Session 1 advance after narration without asking for readiness', () => {
+  for (const scriptId of [
+    'cst_childhood', 'cst_physical_games', 'cst_sounds', 'cst_food',
+    'cst_current_affairs', 'cst_faces_scenes', 'cst_word_associations',
+    'cst_categorizing_objects', 'cst_orientation', 'cst_using_money',
+    'cst_number_games', 'cst_word_games',
+  ]) {
+    const welcome = getScriptStep(scriptId, 0).step;
+    assert.equal(welcome.interaction?.type, 'autoAdvance', scriptId);
+    assert.doesNotMatch(renderScriptReply(welcome, { name: 'Pat' }), /say (?:i'm )?ready/i, scriptId);
+  }
+  assert.notEqual(getScriptStep('cst_intro_reminiscence', 0).step.interaction?.type, 'autoAdvance');
+});
+
+test('recognises a request to repeat a question without treating it as an answer', () => {
+  const step = getScriptStep('cst_childhood', 1).step;
+  for (const content of ['Can you repeat the question?', 'Sorry, could you say that again?', 'What was the question again?', "I didn't catch the question."]) {
+    assert.equal(isRepeatQuestionRequest(content), true, content);
+    assert.equal(isRecordableSessionAnswer({ step, content, wheelEvent: null }), false, content);
+  }
+  assert.equal(isRepeatQuestionRequest('Can you repeat the song?'), false);
+});
+
+test('repeats the current question without advancing or using a retry', async (t) => {
+  const originals = {
+    sessionFindOneAndUpdate: Session.findOneAndUpdate,
+    userFindById: User.findById,
+    memoryFindOne: Memory.findOne,
+    messageFind: Message.find,
+    messageCreate: Message.create,
+  };
+  t.after(() => {
+    Session.findOneAndUpdate = originals.sessionFindOneAndUpdate;
+    User.findById = originals.userFindById;
+    Memory.findOne = originals.memoryFindOne;
+    Message.find = originals.messageFind;
+    Message.create = originals.messageCreate;
+  });
+  const stepIndex = 1;
+  const session = {
+    _id: 'repeat-question-session', userId: 'repeat-question-user', status: 'active',
+    pipelineMode: 'free', scriptId: 'cst_childhood', scriptStepIndex: stepIndex,
+    scriptStepTurnIndex: 1, scriptStepRetryCount: 2, activityRevision: 1,
+    interactionState: { sessionAnswers: [] },
+    save: async () => session,
+  };
+  Session.findOneAndUpdate = async () => session;
+  User.findById = () => ({ lean: async () => ({ _id: session.userId, name: 'Pat' }) });
+  Memory.findOne = () => ({ lean: async () => null });
+  Message.find = () => ({
+    sort() { return this; }, limit() { return this; },
+    lean: async () => [{ role: 'assistant', content: 'How are you doing today?' }],
+  });
+  Message.create = async (message) => ({ _id: `${message.role}-message`, ...message });
+
+  const turn = await respondToSessionTurn({ sessionId: session._id, content: 'Can you repeat the question?' });
+  assert.match(turn.assistantText, /how are you doing today\?/i);
+  assert.equal(turn.scriptStep.nextIndex, stepIndex);
+  assert.equal(turn.scriptStep.forcedProgress, false);
+  assert.equal(session.scriptStepIndex, stepIndex);
+  assert.equal(session.scriptStepTurnIndex, 1);
+  assert.equal(session.scriptStepRetryCount, 2);
+  assert.deepEqual(session.interactionState.sessionAnswers, []);
+
+  session.scriptId = 'cst_intro_reminiscence';
+  session.scriptStepIndex = getScriptStepIndex(session.scriptId, 'theme_song_choice');
+  session.interactionState.themeSong = {
+    status: 'needs-selection', reason: 'title-only', query: 'Celebration',
+    suggestions: [
+      { name: 'Celebration', artistLabel: 'Kool & The Gang' },
+      { name: 'Celebration', artistLabel: 'Madonna' },
+    ],
+  };
+  const choiceTurn = await respondToSessionTurn({ sessionId: session._id, content: 'Can you repeat the question?' });
+  assert.match(choiceTurn.assistantText, /Which one would you like\?/i);
+  assert.match(choiceTurn.assistantText, /Celebration by Madonna/i);
+  assert.doesNotMatch(choiceTurn.assistantText, /what is your favou?rite song/i);
+  assert.equal(session.scriptStepIndex, getScriptStepIndex(session.scriptId, 'theme_song_choice'));
+  assert.equal(session.scriptStepRetryCount, 2);
 });
 
 test('configures Session 6 with the supplied deck and reusable opening interactions', () => {
@@ -924,6 +1009,73 @@ test('lists clean artist suggestions and resolves ordinal or title choices', () 
     resolveThemeSongSelectionAnswer('Japanese Denim', pendingSong),
     'Japanese Denim by Daniel Caesar'
   );
+});
+
+test('asks which Celebration recording to use and resolves the chosen track', () => {
+  const pendingSong = {
+    status: 'needs-selection', reason: 'title-only', query: 'Celebration',
+    suggestions: [
+      { id: 'kool', name: 'Celebration', artistLabel: 'Kool & The Gang' },
+      { id: 'madonna', name: 'Celebration', artistLabel: 'Madonna' },
+    ],
+  };
+  const feedback = buildThemeSongLookupFeedback(pendingSong);
+  assert.match(feedback, /first, Celebration by Kool & The Gang; second, Celebration by Madonna/i);
+  assert.match(feedback, /Which one would you like/i);
+  assert.equal(resolveThemeSongSelectedTrack('the second one', pendingSong)?.id, 'madonna');
+  assert.equal(resolveThemeSongSelectedTrack('the one by Kool and the Gang', pendingSong)?.id, 'kool');
+  assert.equal(resolveThemeSongSelectedTrack('Celebration', pendingSong), null);
+});
+
+test('every interactive game has first-entry guidance without repeating it on the next matching slide', () => {
+  const scriptIds = [
+    'cst_childhood', 'cst_physical_games', 'cst_sounds', 'cst_food', 'cst_current_affairs',
+    'cst_faces_scenes', 'cst_word_associations', 'cst_categorizing_objects',
+    'cst_orientation', 'cst_using_money', 'cst_number_games', 'cst_word_games',
+  ];
+  const gameTypes = new Set([
+    'questionWheel', 'activityReveal', 'triviaChoice', 'phraseCards', 'matching',
+    'realOrAi', 'mealBuilder', 'objectSelection', 'pronunciation', 'wordGuess',
+    'audioClips', 'choiceQuestion',
+  ]);
+  for (const scriptId of scriptIds) {
+    const steps = getScript(scriptId);
+    for (const [index, step] of steps.entries()) {
+      const type = step.interaction?.type;
+      if (!gameTypes.has(type)) continue;
+      assert.ok(buildInteractiveGameGuidance(step), `${scriptId}: ${step.id}`);
+      if (steps[index - 1]?.interaction?.type === type && steps[index - 1]?.interaction?.mode === step.interaction?.mode) {
+        assert.equal(buildInteractiveGameGuidance(step, steps[index - 1]), '', `${scriptId}: ${step.id}`);
+      }
+    }
+  }
+});
+
+test('object selection explains pairs after odd-one-out even though the interaction type matches', () => {
+  const odd = { interaction: { type: 'objectSelection', mode: 'odd' } };
+  const pairs = { interaction: { type: 'objectSelection', mode: 'pairs' } };
+  assert.match(buildInteractiveGameGuidance(pairs, odd), /Check pair/i);
+  assert.equal(buildInteractiveGameGuidance(pairs, pairs), '');
+});
+
+test('spoken game guidance appears on entry and is omitted on the next matching slide', () => {
+  const first = getScriptStep('cst_sounds', getScriptStepIndex('cst_sounds', 'sounds_trivia_1')).step;
+  const second = getScriptStep('cst_sounds', getScriptStepIndex('cst_sounds', 'sounds_trivia_2')).step;
+  const prior = getScriptStep('cst_sounds', getScriptStepIndex('cst_sounds', 'sounds_trivia_1') - 1).step;
+  const firstLine = getProgressScriptLine({ step: prior, nextStep: first, currentTurnIndex: 1, stepTurns: 1, context: {} });
+  const secondLine = getProgressScriptLine({ step: first, nextStep: second, currentTurnIndex: 1, stepTurns: 1, context: {} });
+  assert.match(firstLine, /tap one answer on the slide/i);
+  assert.doesNotMatch(secondLine, /tap one answer on the slide/i);
+  assert.match(secondLine, /sound bounces/i);
+});
+
+test('spoken media instructions explain automatic continuation and early Done', () => {
+  const songStep = getScriptStep('cst_childhood', getScriptStepIndex('cst_childhood', 'childhood_summary_song')).step;
+  const songLine = getProgressScriptLine({ step: songStep, currentTurnIndex: 0, stepTurns: 1, context: {
+    themeSong: { status: 'available', track: { name: 'Celebration', artistLabel: 'Kool & The Gang' } },
+  } });
+  assert.match(songLine, /continue when the music pauses/i);
+  assert.match(songLine, /Press Done if you want to continue sooner/i);
 });
 
 test('asks for a preferred name and favourite song before Session 1 introductions', () => {

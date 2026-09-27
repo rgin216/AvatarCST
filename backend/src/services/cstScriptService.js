@@ -327,6 +327,7 @@ const scripts = {
     {
       id: 'childhood_welcome_back',
       turns: 1,
+      interaction: { type: 'autoAdvance' },
       deckSlide: 1,
       title: 'AI-supported Individual Cognitive Stimulation Therapy',
       subtitle: 'Session 2: Getting to Know You (Childhood)',
@@ -335,7 +336,7 @@ const scripts = {
       visualHint: 'Source deck: NZ02. Getting to Know You (Childhood), slide 1',
       accent: '#00AEEF',
       reply: ({ name }) =>
-        `Welcome back, ${name}. It is lovely to see you again. Today our theme is getting to know you, especially memories from childhood. When you are ready, say "I'm ready" to begin.`,
+        `Welcome back, ${name}. It is lovely to see you again. Today our theme is getting to know you, especially memories from childhood.`,
     },
     {
       id: 'childhood_check_in',
@@ -668,7 +669,7 @@ const scripts = {
         sessionNumber: 6,
         sessionTitle: 'Current Affairs',
         reply: ({ name }) =>
-          `Welcome back, ${name}. It is lovely to see you again. Today is our sixth session, and our theme is Current Affairs. We will look at how news reaches us and explore a few photographs together. There are no tests, and your ideas are what matter. When you are ready, say "I'm ready" to begin.`,
+          `Welcome back, ${name}. It is lovely to see you again. Today is our sixth session, and our theme is Current Affairs. We will look at how news reaches us and explore a few photographs together. There are no tests, and your ideas are what matter.`,
       },
       themeSong: {
         title: 'Welcome Back',
@@ -1037,7 +1038,7 @@ const scripts = {
         sessionNumber: 3,
         sessionTitle: 'Physical Games',
         reply: ({ name }) =>
-          `Welcome back, ${name}. It is lovely to see you again. Today is our third session, and our theme will be Physical Games. When you are ready, say "I'm ready" to begin.`,
+          `Welcome back, ${name}. It is lovely to see you again. Today is our third session, and our theme will be Physical Games.`,
       },
       themeSong: {
         title: 'Theme Song',
@@ -1442,7 +1443,7 @@ const scripts = {
         sessionNumber: 4,
         sessionTitle: 'Sounds',
         reply: ({ name }) =>
-          `Welcome back, ${name}. It is lovely to see you again. Today is our fourth session, and our theme will be Sounds. When you are ready, say "I'm ready" to begin.`,
+          `Welcome back, ${name}. It is lovely to see you again. Today is our fourth session, and our theme will be Sounds.`,
       },
       themeSong: {
         title: 'Theme Song',
@@ -1781,7 +1782,7 @@ const scripts = {
         sessionNumber: 5,
         sessionTitle: 'Food',
         reply: ({ name }) =>
-          `Welcome back, ${name}. It is lovely to see you again. Today is our fifth session, and our theme will be Food. When you are ready, say "I'm ready" to begin.`,
+          `Welcome back, ${name}. It is lovely to see you again. Today is our fifth session, and our theme will be Food.`,
       },
       themeSong: {
         title: 'Theme Song',
@@ -2026,7 +2027,7 @@ const scripts = {
         sessionNumber: 8,
         sessionTitle: 'Word Associations',
         reply: ({ name }) =>
-          `Welcome back, ${name}. It is lovely to see you again. Today is our eighth session, and our theme will be Word Associations. When you are ready, say "I'm ready" to begin.`,
+          `Welcome back, ${name}. It is lovely to see you again. Today is our eighth session, and our theme will be Word Associations.`,
       },
       themeSong: {
         title: 'Theme Song',
@@ -2304,7 +2305,7 @@ const scripts = {
         sessionNumber: 12,
         sessionTitle: 'Using Money',
         reply: ({ name }) =>
-          `Welcome back, ${name}. It is lovely to see you again. Today is our twelfth session, and our theme will be Using Money. When you are ready, say "I'm ready" to begin.`,
+          `Welcome back, ${name}. It is lovely to see you again. Today is our twelfth session, and our theme will be Using Money.`,
       },
       themeSong: {
         title: 'Theme Song',

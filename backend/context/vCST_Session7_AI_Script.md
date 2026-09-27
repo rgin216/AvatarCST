@@ -6,7 +6,7 @@ Use the executable script as the source of truth. Reuse shared media, NZ orienta
 
 ## faces_scenes_welcome (slide 1)
 
-Welcome back, the participant. Today is our seventh session: Faces and Scenes. We will look at familiar faces, compare places, and try a few picture activities together. Take your time. Say ready when you would like to begin.
+Welcome back the participant. Today is our seventh session: Faces and Scenes. We will look at familiar faces, compare places, and try a few picture activities together. Take your time. The app moves on automatically after the welcome narration.
 
 
 
