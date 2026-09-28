@@ -1111,6 +1111,11 @@ body {
   font-weight: 800;
 }
 
+.slide-news-meta a {
+  color: inherit;
+  text-decoration: underline;
+}
+
 .slide-news-image {
   min-width: 0;
   margin: 0;

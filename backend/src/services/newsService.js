@@ -1,4 +1,5 @@
 import { capNewsExcerpt, cleanNewsExcerpt } from './newsConversationService.js';
+import { fetchDocArticles } from './docNewsService.js';
 const NEWS_API_URL = process.env.NEWS_API_URL || 'https://newsapi.org/v2/top-headlines';
 const NEWS_API_EVERYTHING_URL =
   process.env.NEWS_API_EVERYTHING_URL || 'https://newsapi.org/v2/everything';
@@ -6,6 +7,7 @@ const DEFAULT_CACHE_MINUTES = 30;
 const UNAVAILABLE_CACHE_MS = 2 * 60 * 1000;
 const REQUEST_TIMEOUT_MS = 6_000;
 const RECENT_NEWS_DAYS = 7;
+const MAX_FULL_CONTENT_CHARS = 8000;
 const DEFAULT_NZ_NEWS_DOMAINS = [
   'rnz.co.nz',
   'nzherald.co.nz',
@@ -35,6 +37,7 @@ const POSITIVE_PATTERNS = [
   /\blaunch(?:es|ed)?\b/i,
   /\bmilestone\b/i,
   /\bopen(?:s|ed|ing)\b/i,
+  /\bplant(?:s|ed|ing)?\b/i,
   /\brare\b/i,
   /\brecord\b/i,
   /\brecover(?:s|ed|y|ies|ing)\b/i,
@@ -148,6 +151,11 @@ const cleanText = (value = '', maxLength = 240) =>
 
 const cleanArticleContent = (value = '') => cleanNewsExcerpt(value);
 
+const cleanFullContent = (value = '') => String(value || '')
+  .replace(/<[^>]*>/g, ' ')
+  .replace(/\s+/g, ' ')
+  .trim();
+
 const cleanArticleContentForScoring = (value = '') =>
   cleanText(
     String(value).replace(/\s*(?:\u2026|\.\.\.)?\s*\[\+\d+\s+chars\]\s*$/i, ''),
@@ -174,7 +182,9 @@ const countMatches = (patterns, text) =>
 export const scorePositiveArticle = (article = {}) => {
   const title = cleanText(article.title, 180);
   const description = cleanText(article.description, 300);
-  const content = cleanArticleContentForScoring(article.content);
+  const content = article.fullContent
+    ? cleanFullContent(article.fullContent)
+    : cleanArticleContentForScoring(article.content);
   if (!title || title === '[Removed]') return Number.NEGATIVE_INFINITY;
 
   const combinedText = `${title} ${description} ${content}`;
@@ -193,8 +203,11 @@ const normalizeArticle = (article) => ({
   title: cleanText(article.title, 180),
   description: capNewsExcerpt(article.description),
   content: cleanArticleContent(article.content),
+  ...(article.fullContent ? { fullContent: cleanFullContent(article.fullContent).slice(0, MAX_FULL_CONTENT_CHARS) } : {}),
   url: safeHttpUrl(article.url),
-  imageUrl: safeHttpUrl(article.urlToImage),
+  imageUrl: safeHttpUrl(article.urlToImage || article.imageUrl),
+  imageCredit: cleanText(article.imageCredit || '', 120),
+  imageAlt: cleanText(article.imageAlt || '', 200),
   source: cleanText(article.source?.name || 'New Zealand news', 80),
   publishedAt: safePublishedAt(article.publishedAt),
 });
@@ -240,6 +253,25 @@ const fetchArticles = async ({ endpoint, params, apiKey, signal }) => {
     throw new Error(`News API request failed: ${payload.code || 'unknown error'}`);
   }
   return Array.isArray(payload.articles) ? payload.articles : [];
+};
+
+const fetchPositiveDocNews = async (now) => {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 12_000);
+  try {
+    const rawArticles = await fetchDocArticles({ now, signal: controller.signal,
+      isCandidate: (article) => scorePositiveArticle(article) >= 3 });
+    const articles = selectPositiveArticles(rawArticles);
+    return articles.length > 0
+      ? { status: 'available', articles, fetchedAt: new Date(now).toISOString(),
+          filter: 'strict-positive-full-text', sourceScope: 'doc-releases' }
+      : unavailableResult('no-suitable-headline');
+  } catch (error) {
+    console.warn('[news] DOC releases unavailable:', error.message);
+    return unavailableResult('request-failed');
+  } finally {
+    clearTimeout(timeout);
+  }
 };
 
 const fetchPositiveNzNews = async ({ apiKey, now }) => {
@@ -309,10 +341,25 @@ const getPositiveNzNewsCandidates = async () => {
   if (cachedNews && cacheExpiresAt > now) return cachedNews;
   if (pendingNewsRequest) return pendingNewsRequest;
 
-  const apiKey = process.env.NEWS_API_KEY?.trim();
-  if (!apiKey) return cacheNewsResult(unavailableResult('not-configured'), now);
+  const newsApiKey = process.env.NEWS_API_KEY?.trim();
+  const docEnabled = process.env.NZ_DOC_NEWS_ENABLED !== 'false';
+  if (!docEnabled && !newsApiKey) return cacheNewsResult(unavailableResult('not-configured'), now);
 
-  pendingNewsRequest = fetchPositiveNzNews({ apiKey, now })
+  pendingNewsRequest = Promise.all([
+    docEnabled ? fetchPositiveDocNews(now) : unavailableResult('not-configured'),
+    newsApiKey ? fetchPositiveNzNews({ apiKey: newsApiKey, now }) : unavailableResult('not-configured'),
+  ])
+    .then(([docResult, newsApiResult]) => {
+      const articles = [
+        ...(docResult.status === 'available' ? docResult.articles.map((article) => ({ ...article, sourceScope: docResult.sourceScope })) : []),
+        ...(newsApiResult.status === 'available' ? newsApiResult.articles.map((article) => ({ ...article, sourceScope: newsApiResult.sourceScope })) : []),
+      ];
+      return articles.length > 0
+        ? { status: 'available', articles, fetchedAt: new Date(now).toISOString(),
+            filter: 'strict-positive', sourceScope: docResult.status === 'available' ? 'doc-releases' : newsApiResult.sourceScope }
+        : unavailableResult(docResult.reason === 'request-failed' || newsApiResult.reason === 'request-failed'
+          ? 'request-failed' : 'no-suitable-headline');
+    })
     .then((result) => cacheNewsResult(result, now))
     .finally(() => {
       pendingNewsRequest = null;
@@ -338,7 +385,7 @@ export const getPositiveNzNews = async ({ excludeUrls = [], excludeTitles = [] }
     article,
     fetchedAt: result.fetchedAt,
     filter: result.filter,
-    sourceScope: result.sourceScope,
+    sourceScope: article.sourceScope || result.sourceScope,
   };
 };
 

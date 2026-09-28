@@ -59,7 +59,7 @@ import {
   buildCstInstrumentGuessInstructions,
   buildCstTriviaChoiceInstructions,
 } from './promptService.js';
-import { getScript, getScriptStep, getScriptStepIndex, renderScriptFollowUp, renderScriptReply } from './cstScriptService.js';
+import { getScript, getScriptDeckSlideStepIndex, getScriptStep, getScriptStepIndex, renderScriptFollowUp, renderScriptReply } from './cstScriptService.js';
 import Message from '../models/Message.js';
 import Session from '../models/Session.js';
 import User from '../models/User.js';
@@ -1277,6 +1277,9 @@ test('recognises button, typed, and spoken video completion answers', () => {
 
 test('recognises requests for more news and elaborates only from vetted details', () => {
   assert.equal(isNewsElaborationRequest('Can you tell me more?'), true);
+  assert.equal(isNewsElaborationRequest('tell me what happened'), true);
+  assert.equal(isNewsElaborationRequest('Tell me about the story'), true);
+  assert.equal(isNewsElaborationRequest('tell me more about the bird and population'), true);
   assert.equal(isNewsElaborationRequest('how long has the cat been lost'), true);
   assert.equal(isNewsElaborationRequest('Where was the cat found'), true);
   assert.equal(isNewsElaborationRequest('I wonder whether the cat is safe'), true);
@@ -1321,6 +1324,21 @@ test('recognises requests for more news and elaborates only from vetted details'
     }),
     'Volunteers welcomed native birds back.'
   );
+  const kakapo = buildNewsElaboration({ status: 'available', article: {
+    title: 'Kākāpō population reaches new milestone',
+    description: 'The kākāpō population reached 325 birds.',
+    fullContent: 'Ninety chicks joined the population in September. DOC and Ngāi Tahu rebuilt the population from 51 birds in 1995. The programme also protects breeding habitat.',
+  } }, 'tell me more about the bird and population');
+  assert.match(kakapo, /325 birds/);
+  assert.match(kakapo, /Ninety chicks/);
+  assert.match(kakapo, /51 birds/);
+});
+
+test('deck slide skip numbers map to the first script step on that slide', () => {
+  const scriptId = 'cst_current_affairs';
+  const stepIndex = getScriptDeckSlideStepIndex(scriptId, 17);
+  assert.equal(getScriptStep(scriptId, stepIndex).step.id, 'current_affairs_moon_notice');
+  assert.equal(getScriptDeckSlideStepIndex(scriptId, 999), -1);
 });
 
 test('keeps the music and summary as separate 30-second turns', () => {
@@ -2080,7 +2098,7 @@ test('news elaboration stays on the slide, then a brief reaction advances across
       save: async () => session,
     };
 
-    const elaboration = await respondToSessionTurn({ sessionId: session._id, content: 'Please tell me more.' });
+    const elaboration = await respondToSessionTurn({ sessionId: session._id, content: 'tell me what happened' });
     assert.match(elaboration.assistantText, /accessible garden beds/i);
     assert.match(elaboration.assistantText, /What do you think about that story/i);
     assert.equal(elaboration.scriptStep.id, stepId);
@@ -2092,6 +2110,48 @@ test('news elaboration stays on the slide, then a brief reaction advances across
     assert.equal(reaction.scriptStep.nextIndex, index + 1, scriptId);
     assert.equal(session.scriptStepIndex, index + 1, scriptId);
   }
+});
+
+test('a developer skip to the Spring deck slide speaks Spring before Weather', async (t) => {
+  const originals = {
+    sessionFindOneAndUpdate: Session.findOneAndUpdate,
+    userFindById: User.findById,
+    memoryFindOne: Memory.findOne,
+    messageFind: Message.find,
+    messageCreate: Message.create,
+  };
+  t.after(() => {
+    Session.findOneAndUpdate = originals.sessionFindOneAndUpdate;
+    User.findById = originals.userFindById;
+    Memory.findOne = originals.memoryFindOne;
+    Message.find = originals.messageFind;
+    Message.create = originals.messageCreate;
+  });
+  const scriptId = 'cst_physical_games';
+  const springIndex = getScriptStepIndex(scriptId, 'physical_games_season_spring');
+  const session = {
+    _id: 'session-skip-spring', userId: 'user-skip-spring', status: 'active',
+    pipelineMode: 'free', scriptId, scriptStepIndex: springIndex,
+    scriptStepTurnIndex: 0, scriptStepRetryCount: 0, activityRevision: 1,
+    interactionState: { sessionAnswers: [], devSkipPending: true },
+    save: async () => session,
+  };
+  Session.findOneAndUpdate = async () => session;
+  User.findById = () => ({ lean: async () => ({ _id: session.userId, name: 'Test User' }) });
+  Memory.findOne = () => ({ lean: async () => null });
+  Message.find = () => ({ sort() { return this; }, limit() { return this; },
+    lean: async () => [{ role: 'assistant', content: 'An earlier slide was spoken.' }] });
+  Message.create = async (message) => ({ _id: `${message.role}-message`, ...message });
+
+  const spring = await respondToSessionTurn({ sessionId: session._id, content: '' });
+  assert.equal(spring.slide.deckSlide, 11);
+  assert.match(spring.assistantText, /spring/i);
+  assert.doesNotMatch(spring.assistantText, /weather like out your window/i);
+  assert.equal(session.interactionState.devSkipPending, undefined);
+
+  const weather = await respondToSessionTurn({ sessionId: session._id, content: '[[auto-advance]]' });
+  assert.equal(weather.slide.deckSlide, 12);
+  assert.match(weather.assistantText, /weather like out your window/i);
 });
 
 test('gives Session 5 a 26-step script aligned one-to-one with its markdown sections', () => {

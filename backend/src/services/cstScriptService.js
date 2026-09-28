@@ -2690,6 +2690,9 @@ export const getScript = (scriptId = 'cst_intro_reminiscence') =>
 export const getScriptStepIndex = (scriptId, stepId) =>
   getScript(scriptId).findIndex((step) => step.id === stepId);
 
+export const getScriptDeckSlideStepIndex = (scriptId, deckSlide) =>
+  getScript(scriptId).findIndex((step) => step.deckSlide === deckSlide);
+
 export const getScriptStep = (scriptId, stepIndex = 0) => {
   const script = getScript(scriptId);
   const boundedIndex = Math.min(Math.max(stepIndex, 0), script.length - 1);
