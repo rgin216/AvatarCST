@@ -1,7 +1,7 @@
 import { evaluateCategorizingTurn } from './categorizingObjectsService.js';
 import { hasCompletedPronunciation, matchesWordGameAnswer, wordGameTriviaFeedback } from './wordGamesService.js';
 import { personalizeCategorizingReply } from './categorizingAcknowledgementService.js';
-import { answerNewsQuestion, newsContext } from './newsConversationService.js';
+import { answerNewsQuestion, isNewsOverviewRequest, newsContext } from './newsConversationService.js';
 import { orientationPracticeContext } from './orientationContext.js';
 import { recallChildhoodPlace } from './childhoodRecallService.js';
 import { parseMatchingAnswer } from './matchingService.js';
@@ -36,7 +36,6 @@ import { normalizeSongQuery, searchSpotifyTrack } from './spotifyService.js';
 import { isOpenAIFastScriptedPipeline, usesOpenAITextPipeline } from '../config/pipeline.js';
 
 const RECENT_MESSAGE_LIMIT = 20;
-const PRIOR_NEWS_SESSION_LIMIT = 20;
 const MAX_UNANSWERED_ATTEMPTS = 3;
 const MAX_MEMORY_SUGGESTIONS = 4;
 const MAX_SELECTED_MEMORIES = 4;
@@ -1093,6 +1092,7 @@ const evaluateVideoCompletionAnswer = ({ step, content, effectiveTurnIndex }) =>
 export const isNewsElaborationRequest = (content = '') => {
   const request = String(content).trim();
   if (!request) return false;
+  if (isNewsOverviewRequest(request)) return true;
 
   if (
     /\b(tell me more|more about|more detail|more information|what happened|what else|elaborate|go on)\b/i.test(
@@ -1207,13 +1207,23 @@ const evaluateThemeSongChoiceAnswer = ({ step, content }) =>
     ? { answered: true, response: '' }
     : null;
 
-export const buildNewsElaboration = (currentAffairs) => {
+export const buildNewsElaboration = (currentAffairs, question = '') => {
   const article = currentAffairs?.status === 'available' ? currentAffairs.article : null;
   if (!article) {
     return 'I do not have a vetted story with more detail available right now.';
   }
 
-  const detail = newsContext(article);
+  const context = newsContext(article);
+  const sentences = context.split(/(?<=[.!?])\s+/).filter(Boolean);
+  const topicWords = String(question).toLowerCase().match(/[\p{L}]{4,}/gu)?.filter((word) =>
+    !['tell', 'more', 'about', 'what', 'happened', 'story', 'article', 'please', 'could', 'would'].includes(word)) || [];
+  const selected = topicWords.length
+    ? sentences.map((sentence, index) => ({ sentence, index,
+      score: topicWords.reduce((score, word) => score + (sentence.toLowerCase().includes(word) ? 1 : 0), 0) }))
+      .filter(({ score }) => score > 0).sort((a, b) => b.score - a.score || a.index - b.index)
+      .slice(0, 3).sort((a, b) => a.index - b.index).map(({ sentence }) => sentence)
+    : [];
+  const detail = (selected.length ? selected : sentences.slice(0, 3)).join(' ').slice(0, 600);
   if (!detail) {
     return `The verified information I have only gives the headline, ${article.title}.`;
   }
@@ -2795,7 +2805,6 @@ export const getPreviouslyShownNews = async (userId, currentSessionId) => {
   })
     .select('shownNewsUrls shownNewsTitles')
     .sort({ createdAt: -1 })
-    .limit(PRIOR_NEWS_SESSION_LIMIT)
     .lean();
 
   const urls = sessions.flatMap((priorSession) => priorSession.shownNewsUrls || []);
@@ -3020,7 +3029,8 @@ const respondToSessionTurnWrite = async ({ sessionId, content, activitySession }
 
   const stepTurns = step.turns || 1;
   const currentTurnIndex = session.scriptStepTurnIndex || 0;
-  const effectiveTurnIndex = currentTurnIndex || (hasPriorAssistantTurn(recentMessages) ? 1 : 0);
+  const effectiveTurnIndex = currentTurnIndex ||
+    (!session.interactionState?.devSkipPending && hasPriorAssistantTurn(recentMessages) ? 1 : 0);
   const isActivityInteractionEvent = Boolean(
     activityRevealEvent || hasActivityCompletionProtocol
   );
@@ -3517,10 +3527,11 @@ const respondToSessionTurnWrite = async ({ sessionId, content, activitySession }
     }
 
     if (newsElaborationRequested && !emotionalSupportTurn) {
-      const asksForOverview = /^(?:can you |could you |please )?(?:tell me more|say more|more details|go on)[?.! ]*$/i.test(userContent);
-      adaptiveText = asksForOverview ? buildNewsElaboration(currentAffairs) : await answerNewsQuestion({
+      const asksForOverview = isNewsOverviewRequest(userContent);
+      adaptiveText = await answerNewsQuestion({
         currentAffairs, question: userContent, recentMessages, provider: llmProvider,
         model: useFastScriptedTurn ? process.env.OPENAI_FAST_TEXT_MODEL : undefined,
+        fallbackAnswer: asksForOverview ? buildNewsElaboration(currentAffairs, userContent) : '',
       });
       adaptiveFollowUpQuestion = null;
     }
@@ -4016,6 +4027,7 @@ const respondToSessionTurnWrite = async ({ sessionId, content, activitySession }
     ...(session.scriptId === 'cst_orientation' ? { orientationPractice } : {}),
     ...(categorizingTurn && !emotionalSupportTurn ? { categorizing: categorizingTurn.state } : {}),
   };
+  delete nextInteractionState.devSkipPending;
   if (themeSong) {
     nextInteractionState.themeSong = themeSong;
   }
@@ -4153,7 +4165,9 @@ const respondToSessionTurnWrite = async ({ sessionId, content, activitySession }
     slideTransition: shouldDeferSlideTransition
       ? { deferUntilAcknowledgementEnds: true, from: slide, to: displaySlide }
       : null,
-    currentAffairs: displaySlide.interaction?.type === 'positiveNews' ? currentAffairs : null,
+    currentAffairs: displaySlide.interaction?.type === 'positiveNews' && currentAffairs?.status === 'available'
+      ? { ...currentAffairs, article: { ...currentAffairs.article, fullContent: undefined } }
+      : displaySlide.interaction?.type === 'positiveNews' ? currentAffairs : null,
     exercisePlayback:
       displaySlide.interaction?.type === 'youtubeShort'
         ? session.interactionState?.exercisePlayback || null

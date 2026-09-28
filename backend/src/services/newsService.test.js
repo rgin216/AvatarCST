@@ -8,6 +8,8 @@ import {
   selectPositiveArticles,
 } from './newsService.js';
 
+process.env.NZ_DOC_NEWS_ENABLED = 'false';
+
 const article = (overrides = {}) => ({
   title: 'Community celebrates native bird conservation milestone',
   description: 'Volunteers welcomed record numbers of birds back to the sanctuary.',
@@ -15,6 +17,67 @@ const article = (overrides = {}) => ({
   source: { name: 'Example News' },
   publishedAt: '2026-07-30T08:00:00Z',
   ...overrides,
+});
+
+test('uses DOC full text first and rotates into NewsAPI stories', async (t) => {
+  resetPositiveNewsCacheForTests();
+  process.env.NZ_DOC_NEWS_ENABLED = 'true';
+  const previousNewsApiKey = process.env.NEWS_API_KEY;
+  process.env.NEWS_API_KEY = 'newsapi-key';
+  const published = new Date().toISOString();
+  const docUrl = 'https://www.doc.govt.nz/news/media-releases/2026-media-releases/native-tree-planting/';
+  const feed = `<feed><entry><title>Community celebrates native tree planting</title><summary>Volunteers planted trees.</summary><published>${published}</published><link href="${docUrl}" /></entry></feed>`;
+  const body = 'Volunteers planted native trees in the community garden. '.repeat(12);
+  const fetchMock = t.mock.method(globalThis, 'fetch', async (url) => {
+    const target = String(url);
+    if (target.includes('rss-feed-to-govtnz')) return { ok: true, url: target, headers: { get: () => null }, text: async () => feed };
+    if (target === docUrl) return { ok: true, url: target, headers: { get: () => null },
+      text: async () => `<section class="doc-main-layout__hero"><doc-image-caption caption="Native trees"><div>Image: Jane Doe | <a href="/footer-links/copyright/">DOC</a></div></doc-image-caption><img class="hero__image" src="/thumbs/hero/planting.jpg" /></section><doc-content-box><div class="pagedoc"><p>Date: 28 September 2026</p><p>${body}</p></doc-content-box>` };
+    return mockNewsResponse([article()]);
+  });
+  try {
+    const first = await getPositiveNzNews();
+    const second = await getPositiveNzNews({ excludeUrls: [first.article.url] });
+    assert.equal(first.sourceScope, 'doc-releases');
+    assert.match(first.article.fullContent, /community garden/);
+    assert.equal(first.article.imageUrl, 'https://www.doc.govt.nz/thumbs/hero/planting.jpg');
+    assert.equal(first.article.imageCredit, 'Jane Doe / DOC');
+    assert.equal(second.sourceScope, 'nz-top-headlines');
+    assert.notEqual(second.article.url, first.article.url);
+    assert.equal(fetchMock.mock.callCount(), 3);
+  } finally {
+    process.env.NZ_DOC_NEWS_ENABLED = 'false';
+    if (previousNewsApiKey === undefined) delete process.env.NEWS_API_KEY;
+    else process.env.NEWS_API_KEY = previousNewsApiKey;
+    resetPositiveNewsCacheForTests();
+  }
+});
+
+test('DOC news works without an API key', async (t) => {
+  resetPositiveNewsCacheForTests();
+  process.env.NZ_DOC_NEWS_ENABLED = 'true';
+  const previousNewsApiKey = process.env.NEWS_API_KEY;
+  delete process.env.NEWS_API_KEY;
+  const docUrl = 'https://www.doc.govt.nz/news/media-releases/2026-media-releases/community-garden/';
+  const feed = `<feed><entry><title>Community celebrates native planting</title><summary>Volunteers planted trees.</summary><published>${new Date().toISOString()}</published><link href="${docUrl}" /></entry></feed>`;
+  const body = 'Volunteers planted native trees in a local garden. '.repeat(12);
+  const fetchMock = t.mock.method(globalThis, 'fetch', async (url) => ({ ok: true, url: String(url),
+    headers: { get: () => null },
+    text: async () => String(url) === docUrl
+      ? `<doc-content-box><div class="pagedoc"><p>Date: 28 September 2026</p><p>${body}</p></doc-content-box>`
+      : feed }));
+  try {
+    const result = await getPositiveNzNews();
+    assert.equal(result.status, 'available');
+    assert.equal(result.sourceScope, 'doc-releases');
+    assert.equal(result.article.fullContent, body.trim());
+    assert.equal(fetchMock.mock.callCount(), 2);
+  } finally {
+    process.env.NZ_DOC_NEWS_ENABLED = 'false';
+    if (previousNewsApiKey === undefined) delete process.env.NEWS_API_KEY;
+    else process.env.NEWS_API_KEY = previousNewsApiKey;
+    resetPositiveNewsCacheForTests();
+  }
 });
 
 test('accepts a clearly positive story', () => {
