@@ -257,6 +257,7 @@ const fetchArticles = async ({ endpoint, params, apiKey, signal }) => {
 
 const fetchPositiveDocNews = async (now) => {
   const controller = new AbortController();
+  // DOC loads the feed and several article pages within one request budget.
   const timeout = setTimeout(() => controller.abort(), 12_000);
   try {
     const rawArticles = await fetchDocArticles({ now, signal: controller.signal,

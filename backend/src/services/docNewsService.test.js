@@ -26,11 +26,34 @@ test('article lookup fetches only the original DOC release', async () => {
   const originalFetch = globalThis.fetch;
   const url = 'https://www.doc.govt.nz/news/media-releases/2026-media-releases/example/';
   const body = 'The population reached 325 birds. '.repeat(10);
-  globalThis.fetch = async (requested) => ({ ok: true, url: requested,
-    headers: { get: () => null }, text: async () => `<doc-content-box><div class="pagedoc">${body}</div></doc-content-box>` });
+  globalThis.fetch = async (requested, options) => {
+    assert.equal(options.redirect, 'error');
+    return { ok: true, url: requested, headers: { get: () => null },
+      body: new Response(`<doc-content-box><div class="pagedoc">${body}</div></doc-content-box>`).body };
+  };
   try {
     assert.match(await fetchDocArticleByUrl(url), /325 birds/);
     assert.equal(await fetchDocArticleByUrl('https://example.test/story'), '');
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('DOC article lookup cancels a stream as soon as its byte limit is exceeded', async () => {
+  const originalFetch = globalThis.fetch;
+  const url = 'https://www.doc.govt.nz/news/media-releases/2026-media-releases/example/';
+  let cancelled = false;
+  globalThis.fetch = async (_requested, options) => {
+    assert.equal(options.redirect, 'error');
+    return { ok: true, url, headers: { get: () => null }, body: { getReader: () => ({
+      read: async () => ({ done: false, value: new TextEncoder().encode('é'.repeat(500_001)) }),
+      cancel: async () => { cancelled = true; },
+      releaseLock: () => {},
+    }) } };
+  };
+  try {
+    await assert.rejects(fetchDocArticleByUrl(url), /DOC response too large/);
+    assert.equal(cancelled, true);
   } finally {
     globalThis.fetch = originalFetch;
   }

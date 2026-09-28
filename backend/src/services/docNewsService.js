@@ -82,13 +82,39 @@ export const extractDocImage = (html = '') => {
 };
 
 const fetchText = async (url, signal) => {
-  const response = await fetch(url, { signal, headers: { Accept: 'text/html, application/atom+xml, application/xml' } });
+  const response = await fetch(url, { signal, redirect: 'error',
+    headers: { Accept: 'text/html, application/atom+xml, application/xml' } });
   if (!response.ok) throw new Error(`DOC request failed with ${response.status}`);
+  const reader = response.body?.getReader();
+  if (!reader) throw new Error('DOC response has no body');
   const contentLength = Number(response.headers?.get?.('content-length') || 0);
-  if (contentLength > MAX_DOC_HTML_BYTES) throw new Error('DOC response too large');
-  const text = await response.text();
-  if (text.length > MAX_DOC_HTML_BYTES) throw new Error('DOC response too large');
-  return { text, finalUrl: response.url || url };
+  try {
+    if (contentLength > MAX_DOC_HTML_BYTES) {
+      await reader.cancel();
+      throw new Error('DOC response too large');
+    }
+    const chunks = [];
+    let byteLength = 0;
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      byteLength += value.byteLength;
+      if (byteLength > MAX_DOC_HTML_BYTES) {
+        await reader.cancel();
+        throw new Error('DOC response too large');
+      }
+      chunks.push(value);
+    }
+    const bytes = new Uint8Array(byteLength);
+    let offset = 0;
+    for (const chunk of chunks) {
+      bytes.set(chunk, offset);
+      offset += chunk.byteLength;
+    }
+    return { text: new TextDecoder().decode(bytes), finalUrl: response.url || url };
+  } finally {
+    reader.releaseLock();
+  }
 };
 
 export const fetchDocArticleByUrl = async (url, signal = AbortSignal.timeout(6_000)) => {

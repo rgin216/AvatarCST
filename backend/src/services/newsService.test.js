@@ -19,6 +19,10 @@ const article = (overrides = {}) => ({
   ...overrides,
 });
 
+const mockDocResponse = (url, text) => ({
+  ok: true, url, headers: { get: () => null }, body: new Response(text).body,
+});
+
 test('uses DOC full text first and rotates into NewsAPI stories', async (t) => {
   resetPositiveNewsCacheForTests();
   process.env.NZ_DOC_NEWS_ENABLED = 'true';
@@ -28,11 +32,14 @@ test('uses DOC full text first and rotates into NewsAPI stories', async (t) => {
   const docUrl = 'https://www.doc.govt.nz/news/media-releases/2026-media-releases/native-tree-planting/';
   const feed = `<feed><entry><title>Community celebrates native tree planting</title><summary>Volunteers planted trees.</summary><published>${published}</published><link href="${docUrl}" /></entry></feed>`;
   const body = 'Volunteers planted native trees in the community garden. '.repeat(12);
-  const fetchMock = t.mock.method(globalThis, 'fetch', async (url) => {
+  const fetchMock = t.mock.method(globalThis, 'fetch', async (url, options) => {
     const target = String(url);
-    if (target.includes('rss-feed-to-govtnz')) return { ok: true, url: target, headers: { get: () => null }, text: async () => feed };
-    if (target === docUrl) return { ok: true, url: target, headers: { get: () => null },
-      text: async () => `<section class="doc-main-layout__hero"><doc-image-caption caption="Native trees"><div>Image: Jane Doe | <a href="/footer-links/copyright/">DOC</a></div></doc-image-caption><img class="hero__image" src="/thumbs/hero/planting.jpg" /></section><doc-content-box><div class="pagedoc"><p>Date: 28 September 2026</p><p>${body}</p></doc-content-box>` };
+    if (target.includes('rss-feed-to-govtnz')) {
+      assert.equal(options.redirect, 'error');
+      return mockDocResponse(target, feed);
+    }
+    if (target === docUrl) return mockDocResponse(target,
+      `<section class="doc-main-layout__hero"><doc-image-caption caption="Native trees"><div>Image: Jane Doe | <a href="/footer-links/copyright/">DOC</a></div></doc-image-caption><img class="hero__image" src="/thumbs/hero/planting.jpg" /></section><doc-content-box><div class="pagedoc"><p>Date: 28 September 2026</p><p>${body}</p></doc-content-box>`);
     return mockNewsResponse([article()]);
   });
   try {
@@ -61,11 +68,10 @@ test('DOC news works without an API key', async (t) => {
   const docUrl = 'https://www.doc.govt.nz/news/media-releases/2026-media-releases/community-garden/';
   const feed = `<feed><entry><title>Community celebrates native planting</title><summary>Volunteers planted trees.</summary><published>${new Date().toISOString()}</published><link href="${docUrl}" /></entry></feed>`;
   const body = 'Volunteers planted native trees in a local garden. '.repeat(12);
-  const fetchMock = t.mock.method(globalThis, 'fetch', async (url) => ({ ok: true, url: String(url),
-    headers: { get: () => null },
-    text: async () => String(url) === docUrl
+  const fetchMock = t.mock.method(globalThis, 'fetch', async (url) => mockDocResponse(String(url),
+    String(url) === docUrl
       ? `<doc-content-box><div class="pagedoc"><p>Date: 28 September 2026</p><p>${body}</p></doc-content-box>`
-      : feed }));
+      : feed));
   try {
     const result = await getPositiveNzNews();
     assert.equal(result.status, 'available');
