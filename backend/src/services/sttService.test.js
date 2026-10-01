@@ -30,7 +30,7 @@ test('English settings constrain transcription for both providers', async (t) =>
   }
 });
 
-test('other language settings allow language detection', async (t) => {
+test('other selected languages are pinned instead of auto-detected', async (t) => {
   const oldKey = process.env.OPENAI_API_KEY;
   process.env.OPENAI_API_KEY = 'test-key';
   t.after(() => {
@@ -45,6 +45,62 @@ test('other language settings allow language detection', async (t) => {
   });
 
   await transcribeAudio('test.webm', 'test.webm', { provider: 'openai', language: 'fr' });
-  assert.equal(body.get('language'), null);
-  assert.equal(body.get('prompt'), null);
+  assert.equal(body.get('language'), 'fr');
+  assert.match(body.get('prompt'), /French/);
+});
+
+function mockOpenAi(t, outputs) {
+  const oldKey = process.env.OPENAI_API_KEY;
+  const oldModel = process.env.OPENAI_TRANSCRIBE_MODEL;
+  process.env.OPENAI_API_KEY = 'test-key';
+  delete process.env.OPENAI_TRANSCRIBE_MODEL;
+  t.after(() => {
+    if (oldKey === undefined) delete process.env.OPENAI_API_KEY;
+    else process.env.OPENAI_API_KEY = oldKey;
+    if (oldModel === undefined) delete process.env.OPENAI_TRANSCRIBE_MODEL;
+    else process.env.OPENAI_TRANSCRIBE_MODEL = oldModel;
+  });
+  t.mock.method(fs, 'readFileSync', () => Buffer.from('original recording'));
+  const bodies = [];
+  t.mock.method(globalThis, 'fetch', async (_url, options) => {
+    bodies.push(options.body);
+    assert.ok(bodies.length <= outputs.length, 'unexpected extra retry');
+    return Response.json({ text: outputs[bodies.length - 1] });
+  });
+  return bodies;
+}
+
+test('missing language defaults to English and accepts accented Latin letters', async (t) => {
+  const bodies = mockOpenAi(t, ['I visited a café in Tāmaki Makaurau.']);
+  assert.equal(await transcribeAudio('test.webm', 'answer.webm', { provider: 'openai' }), 'I visited a café in Tāmaki Makaurau.');
+  assert.equal(bodies.length, 1);
+  assert.equal(bodies[0].get('language'), 'en');
+});
+
+for (const foreignText of ['안녕하세요', '你好', 'Hello 世界', 'Привет', 'مرحبا']) {
+  test(`English script drift is recovered from the original audio: ${foreignText}`, async (t) => {
+    const bodies = mockOpenAi(t, [foreignText, 'Hello there']);
+    assert.equal(await transcribeAudio('test.webm', 'answer.webm', { provider: 'openai', language: 'en' }), 'Hello there');
+    assert.equal(bodies.length, 2);
+    assert.equal(bodies[1].get('model'), 'gpt-4o-transcribe');
+    for (const body of bodies) {
+      assert.equal(body.get('language'), 'en');
+      assert.equal(body.get('file').name, 'answer.webm');
+      assert.equal(await body.get('file').text(), 'original recording');
+    }
+  });
+}
+
+test('persistent script drift fails before a transcript can reach the session', async (t) => {
+  const bodies = mockOpenAi(t, ['你好', '안녕하세요']);
+  await assert.rejects(transcribeAudio('test.webm', 'test.webm', { provider: 'openai', language: 'en' }),
+    err => err.status === 422 && /recording your answer again/.test(err.message));
+  assert.equal(bodies.length, 2);
+});
+
+test('explicit Chinese selection keeps Chinese speech without an English retry', async (t) => {
+  const bodies = mockOpenAi(t, ['你好']);
+  assert.equal(await transcribeAudio('test.webm', 'test.webm', { provider: 'openai', language: 'zh' }), '你好');
+  assert.equal(bodies.length, 1);
+  assert.equal(bodies[0].get('language'), 'zh');
 });

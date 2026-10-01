@@ -1331,8 +1331,9 @@ export default function SessionPage({
       applyTurn(data);
     } catch (err) {
       console.error("Failed to send audio:", err);
+      voicePlaceholderIdRef.current = null;
       setMessages((items) => [
-        ...items,
+        ...items.filter((msg) => msg._id !== placeholderId),
         { from: "avatar", text: "I could not hear that clearly. Please try again or type your response." },
       ]);
     } finally {
