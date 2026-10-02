@@ -32,9 +32,18 @@ import { createEvaluationAssignment } from '../evaluation/liveConfig.js';
 import { EvaluationTurn, SessionEvaluation } from '../models/Evaluation.js';
 import { getSessionAccess, INTRO_SCRIPT_ID } from '../services/sessionAccessService.js';
 import { nowMs, timeAsync } from '../services/turnTiming.js';
+import { getScriptDeckSlideStepIndex } from '../services/cstScriptService.js';
 
 const AVATAR_MODES = new Set(['male', 'female', 'visualizer']);
 const LIP_SYNC_MODES = new Set(['rhubarb', 'energy']);
+
+const publicSession = (session) => {
+  const result = session?.toObject ? session.toObject() : { ...session };
+  if (result?.interactionState?.currentAffairs?.article) {
+    delete result.interactionState.currentAffairs.article.fullContent;
+  }
+  return result;
+};
 
 export const createSession = async (req, res, next) => {
   try {
@@ -66,7 +75,7 @@ export const getSession = async (req, res, next) => {
   try {
     const session = await Session.findById(req.params.id);
     if (!session) return res.status(404).json({ error: 'Session not found' });
-    res.json(session);
+    res.json(publicSession(session));
   } catch (err) {
     next(err);
   }
@@ -75,7 +84,7 @@ export const getSession = async (req, res, next) => {
 export const getUserSessions = async (req, res, next) => {
   try {
     const sessions = await Session.find({ userId: req.params.userId }).sort({ createdAt: -1 });
-    res.json(sessions);
+    res.json(sessions.map(publicSession));
   } catch (err) {
     next(err);
   }
@@ -85,18 +94,29 @@ export const updateSession = async (req, res, next) => {
   try {
     // Assignments and progression are server-owned, including dotted/operator updates.
     const progressionKeys = ['scriptStepIndex', 'scriptStepTurnIndex', 'scriptStepRetryCount'];
-    const allowed = ['title', 'theme', ...progressionKeys];
+    const allowed = ['title', 'theme', 'skipToDeckSlide', ...progressionKeys];
     if (Object.keys(req.body || {}).some(key => !allowed.includes(key))) {
       return res.status(400).json({ error: 'Unsupported session update' });
     }
-    if (progressionKeys.some(key => key in (req.body || {}))) {
+    if (progressionKeys.some(key => key in (req.body || {})) || 'skipToDeckSlide' in (req.body || {})) {
       const existing = await Session.findById(req.params.id).lean();
+      if (!existing) return res.status(404).json({ error: 'Session not found' });
       if (existing?.evaluation) return res.status(409).json({ error: 'Skipping slides is disabled during evaluation' });
       if (existing?.unlocksSessions) return res.status(409).json({ error: 'Complete Session 1 without skipping slides to unlock the other sessions.' });
+      if ('skipToDeckSlide' in req.body) {
+        const deckSlide = req.body.skipToDeckSlide;
+        if (!Number.isInteger(deckSlide) || deckSlide < 1 || progressionKeys.some(key => key in req.body)) {
+          return res.status(400).json({ error: 'Invalid deck slide number' });
+        }
+        const stepIndex = getScriptDeckSlideStepIndex(existing.scriptId, deckSlide);
+        if (stepIndex < 0) return res.status(400).json({ error: 'Deck slide is not in this session' });
+        req.body = { scriptStepIndex: stepIndex, scriptStepTurnIndex: 0, scriptStepRetryCount: 0,
+          'interactionState.devSkipPending': true };
+      }
     }
     const session = await Session.findByIdAndUpdate(req.params.id, { $set: req.body }, { new: true, runValidators: true });
     if (!session) return res.status(404).json({ error: 'Session not found' });
-    res.json(session);
+    res.json(publicSession(session));
   } catch (err) {
     next(err);
   }
@@ -106,7 +126,7 @@ export const endSession = async (req, res, next) => {
   try {
     const session = await endSessionAndQueueEvaluation(req.params.id);
     if (!session) return res.status(404).json({ error: 'Session not found' });
-    res.json(session);
+    res.json(publicSession(session));
 
     // Fire-and-forget: generate summary in background after responding
     const sessionId = session._id;

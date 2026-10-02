@@ -1639,21 +1639,16 @@ export default function SessionPage({
 
   async function handleSkipToSlide() {
     const requestedSlide = Number.parseInt(skipSlideInput, 10);
-    const totalSlides = slide.total || 1;
     if (!sessionId || Number.isNaN(requestedSlide) || typing) return;
 
-    const targetSlide = Math.min(Math.max(requestedSlide, 1), totalSlides);
+    const targetSlide = requestedSlide;
     setTyping(true);
 
     try {
-      await api.patch(`/sessions/${sessionId}`, {
-        scriptStepIndex: targetSlide - 1,
-        scriptStepTurnIndex: 0,
-        scriptStepRetryCount: 0,
-      });
+      await api.patch(`/sessions/${sessionId}`, { skipToDeckSlide: targetSlide });
       setMessages((items) => [
         ...items,
-        { from: "avatar", text: `Skipped to slide ${targetSlide} for testing.` },
+        { from: "avatar", text: `Skipped to deck slide ${targetSlide} for testing.` },
       ]);
       const { data } = await api.post(`/sessions/${sessionId}/respond`, {
         content: "",
@@ -1691,6 +1686,7 @@ export default function SessionPage({
                 title={import.meta.env.DEV && slide.deckSlide ? `Deck slide ${slide.deckSlide}` : undefined}
               >
                 Step {slide.index + 1} of {slide.total}
+                {import.meta.env.DEV && slide.deckSlide ? ` · Deck slide ${slide.deckSlide}` : ""}
               </span>
             )}
             <span className="session-meta-chip" aria-label="Time elapsed">{formatElapsed(elapsed)}</span>
@@ -1699,16 +1695,15 @@ export default function SessionPage({
         <div className="session-actions">
           {showDevSkip && !evaluationFacilitator && (
             <div className="session-skip-control" aria-label="Skip to slide for testing">
-              <span>Skip</span>
+              <span>Deck slide</span>
               <input
                 type="number"
                 min="1"
-                max={slide.total || 1}
                 value={skipSlideInput}
                 onChange={(event) => setSkipSlideInput(event.target.value)}
                 onKeyDown={(event) => event.key === "Enter" && handleSkipToSlide()}
                 placeholder="#"
-                aria-label="Slide number"
+                aria-label="Deck slide number"
                 disabled={sessionInputDisabled}
               />
               <button type="button" onClick={handleSkipToSlide} disabled={sessionInputDisabled}>
@@ -1914,6 +1909,11 @@ export default function SessionPage({
                           }).format(new Date(currentAffairs.article.publishedAt))}
                         </time>
                       )}
+                      {currentAffairs.article.url && (
+                        <a href={currentAffairs.article.url} target="_blank" rel="noopener noreferrer">
+                          Read original
+                        </a>
+                      )}
                     </div>
                   </>
                 ) : (
@@ -1928,8 +1928,8 @@ export default function SessionPage({
               </article>
               {currentAffairs?.article?.imageUrl && (
                 <figure className="slide-news-image">
-                  <img src={currentAffairs.article.imageUrl} alt="" />
-                  <figcaption>{currentAffairs.article.source}</figcaption>
+                  <img src={currentAffairs.article.imageUrl} alt={currentAffairs.article.imageAlt || ""} />
+                  <figcaption>{currentAffairs.article.imageCredit || currentAffairs.article.source}</figcaption>
                 </figure>
               )}
             </div>
