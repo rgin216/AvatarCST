@@ -6,6 +6,8 @@ import TriviaChoiceActivity from "../components/TriviaChoiceActivity.jsx";
 import { useEffect, useRef, useState } from "react";
 import AvatarViewer from "../components/avatar/AvatarViewer";
 import api from "../services/api.js";
+import DeploymentLatencyControls from "../components/DeploymentLatencyControls.jsx";
+import { deploymentLatency } from "../utils/deploymentLatency.js";
 import OrientationActivity from "../components/OrientationActivity.jsx";
 import PronunciationActivity from "../components/PronunciationActivity.jsx";
 import WordGuessActivity from "../components/WordGuessActivity.jsx";
@@ -639,6 +641,7 @@ export default function SessionPage({
       setPendingPlay(false);
     } catch (err) {
       if (err.name === "NotAllowedError") {
+        deploymentLatency.blocked();
         // Autoplay blocked — show manual play button
         setPendingPlay(true);
       } else {
@@ -709,6 +712,7 @@ export default function SessionPage({
   }
 
   function handleAvatarAudioUnavailable() {
+    deploymentLatency.unavailable();
     setPendingPlay(false);
     handleAudioPause();
     continueNarrationSequence();
@@ -759,6 +763,7 @@ export default function SessionPage({
   }
 
   function finishNarrationSequence() {
+    deploymentLatency.finished();
     activeNarrationSegmentRef.current = null;
     narrationQueueRef.current = [];
     avatarNarrationActiveRef.current = false;
@@ -1298,6 +1303,7 @@ export default function SessionPage({
 
   function stopRecording() {
     if (recordingStopTimeoutRef.current || mediaRecorderRef.current?.state !== "recording") return;
+    deploymentLatency.recordingStopped();
     const elapsedRecordingMs = Date.now() - recordingStartedAtRef.current;
     const stopDelayMs = Math.max(RECORDING_TAIL_MS, MIN_RECORDING_MS - elapsedRecordingMs);
     recordingStopTimeoutRef.current = window.setTimeout(() => {
@@ -2177,9 +2183,10 @@ export default function SessionPage({
             ref={audioRef}
             crossOrigin="anonymous"
             onPlay={handleAudioPlay}
+            onPlaying={() => deploymentLatency.playing()}
             onPause={handleAudioPause}
             onEnded={handleAvatarAudioEnded}
-            onError={handleAvatarAudioUnavailable}
+            onError={() => { deploymentLatency.unavailable(); handleAvatarAudioUnavailable(); }}
             onSeeked={() => publishLipSyncFrame(Boolean(audioRef.current && !audioRef.current.paused))}
             preload="auto"
             hidden
@@ -2187,6 +2194,9 @@ export default function SessionPage({
         </section>
 
         <aside className="session-side-panel" aria-label="Session conversation">
+          <DeploymentLatencyControls sessionId={sessionId} avatarMode={avatarMode} lipSyncMode={lipSyncMode}
+            busy={typing || avatarNarrationActive || isRecording || pendingPlay}
+            applyTurn={applyTurn} onRequestState={setTyping} />
           <div className="session-focus-panel">
             <span>Now discussing</span>
             <strong>{slide.title}</strong>
