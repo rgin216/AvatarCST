@@ -12,11 +12,11 @@ import SettingsPage from "./pages/SettingsPage";
 import { toTitleCase } from "./utils/formatName";
 import { LanguageProvider } from "./language/LanguageContext.jsx";
 
-const DEFAULT_USER_SETTINGS = { personality: "default", language: "en", avatarMode: "visualizer", speechRate: 1 };
+const DEFAULT_USER_SETTINGS = { personality: "default", language: "en", avatarMode: "male", speechRate: 1 };
 
 const devParams = new URLSearchParams(window.location.search);
 const devSessionEnabled = import.meta.env.DEV && devParams.get("devSession") === "1";
-const pipelineModes = new Set(["free", "openai-fast-scripted"]);
+const pipelineModes = new Set(import.meta.env.DEV ? ["free", "openai-fast-scripted"] : ["openai-fast-scripted"]);
 const getInitialPipelineMode = () => {
   const requestedMode = devParams.get("pipeline");
   return pipelineModes.has(requestedMode) ? requestedMode : "openai-fast-scripted";

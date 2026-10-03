@@ -20,9 +20,9 @@ const savedThemeSongSchema = new Schema({
 }, { _id: false });
 
 const userSettingsSchema = new Schema({
-  personality: { type: String, enum: ['default', 'optimistic'], default: 'default' },
+  personality: { type: String, enum: ['default', 'optimistic', 'calm'], default: 'default' },
   language: { type: String, enum: ['en', 'zh', 'es', 'fr', 'mi'], default: 'en' },
-  avatarMode: { type: String, enum: ['male', 'female', 'visualizer'], default: 'visualizer' },
+  avatarMode: { type: String, enum: ['male', 'female', 'visualizer'], default: 'male' },
   // Browser playback multiplier for Aria's speech; 1 is the synthesised pace.
   speechRate: { type: Number, min: 0.75, max: 1.25, default: 1 },
 }, { _id: false });
