@@ -24,6 +24,7 @@ export default function SettingsPage({ userId, userName, settings, onBack, onSet
   const personalityOptions = [
     { id: "default", label: t("settings.personality.default") },
     { id: "optimistic", label: t("settings.personality.optimistic") },
+    { id: "calm", label: t("settings.personality.calm") },
   ];
 
   const avatarOptions = [
@@ -156,6 +157,12 @@ export default function SettingsPage({ userId, userName, settings, onBack, onSet
         boxShadow: "0 -14px 36px rgba(122,157,173,0.14)",
       }}>
         <div style={{ maxWidth: contentMaxWidth, margin: "0 auto", padding: isDesktop ? "28px 32px 32px" : "22px 24px 24px" }}>
+          <aside style={{ background: theme.sand, borderRadius: 20, padding: "20px 22px", marginBottom: 16 }}>
+            <h2 style={{ fontSize: 18, margin: "0 0 10px" }}>{t("settings.guide.title")}</h2>
+            <p>{t("settings.guide.avatar")}</p>
+            <p>{t("settings.guide.speed")}</p>
+            <p>{t("settings.guide.orb")}</p>
+          </aside>
           {section("settings.personality", "personality", personalityOptions)}
           {section("settings.language", "language", SUPPORTED_LANGUAGES)}
           {section("settings.avatar", "avatarMode", avatarOptions)}

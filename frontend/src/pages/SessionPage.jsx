@@ -43,7 +43,7 @@ const defaultSlide = {
 const avatarModes = [
   { id: "male", label: "Male" },
   { id: "female", label: "Female" },
-  { id: "visualizer", label: "Audio visual" },
+  { id: "visualizer", label: "Voice Orb" },
 ];
 const avatarModeIds = new Set(avatarModes.map((mode) => mode.id));
 const lipSyncModes = [
@@ -152,12 +152,12 @@ function loadYouTubeIframeApi() {
   return youtubeIframeApiPromise;
 }
 
-function getInitialAvatarMode(defaultAvatarMode = "visualizer") {
+function getInitialAvatarMode(defaultAvatarMode = "male") {
   if (import.meta.env.DEV) {
     const requestedMode = new URLSearchParams(window.location.search).get("avatar");
     if (avatarModeIds.has(requestedMode)) return requestedMode;
   }
-  return avatarModeIds.has(defaultAvatarMode) ? defaultAvatarMode : "visualizer";
+  return avatarModeIds.has(defaultAvatarMode) ? defaultAvatarMode : "male";
 }
 
 function formatPlaybackDuration(seconds) {
@@ -213,7 +213,7 @@ export default function SessionPage({
   pipelineMode: initialPipelineMode = "openai-fast-scripted",
   evaluationFacilitator,
   introductionRequired = false,
-  defaultAvatarMode = "visualizer",
+  defaultAvatarMode = "male",
   defaultSpeechRate = 1,
   onSpeechRateChange,
 }) {

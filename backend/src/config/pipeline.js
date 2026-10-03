@@ -4,7 +4,9 @@
 //   openai-fast-scripted -> OpenAI transcription -> OpenAI text model -> OpenAI TTS -> Rhubarb for avatars / energy for visualizer
 export const PIPELINE_MODE = process.env.PIPELINE_MODE ?? 'openai-fast-scripted';
 
-export const SESSION_PIPELINE_MODES = ['free', 'openai-fast-scripted'];
+export const SESSION_PIPELINE_MODES = process.env.NODE_ENV === 'production'
+  ? ['openai-fast-scripted']
+  : ['free', 'openai-fast-scripted'];
 
 export const DEFAULT_PIPELINE_MODE = SESSION_PIPELINE_MODES.includes(PIPELINE_MODE)
   ? PIPELINE_MODE
@@ -13,6 +15,7 @@ export const DEFAULT_PIPELINE_MODE = SESSION_PIPELINE_MODES.includes(PIPELINE_MO
 export const getSessionPipelineMode = (mode) =>
   SESSION_PIPELINE_MODES.includes(mode) ? mode : DEFAULT_PIPELINE_MODE;
 
-export const isOpenAIFastScriptedPipeline = (mode) => mode === 'openai-fast-scripted';
+export const isOpenAIFastScriptedPipeline = (mode) =>
+  process.env.NODE_ENV === 'production' || mode === 'openai-fast-scripted';
 
 export const usesOpenAITextPipeline = (mode) => isOpenAIFastScriptedPipeline(mode);
