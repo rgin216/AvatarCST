@@ -1,5 +1,7 @@
 # LLM evaluation pilot
 
+A dedicated automatic latency benchmark provides warmups, percentiles, failure analysis and research CSV exports. See [latency collection protocol](LATENCY.md); run `npm run eval:latency` for a dry run.
+
 The offline runner rotates each configured model through facilitator and critic roles. It uses the real `buildCstAdaptiveResponseInstructions` prompt builder and LLM service, without a database or live participant session.
 
 ## Run

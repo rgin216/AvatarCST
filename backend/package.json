@@ -11,7 +11,9 @@
     "test": "node --test src/",
     "eval:llm": "node scripts/evaluate-llms.js",
     "eval:calibrate": "node scripts/compare-human-review.js",
-    "eval:sessions": "node scripts/evaluate-sessions.js"
+    "eval:sessions": "node scripts/evaluate-sessions.js",
+    "eval:latency": "node scripts/evaluate-latency.js",
+    "eval:latency:deployed": "node scripts/evaluate-deployed-latency.js"
   },
   "keywords": [],
   "author": "",

@@ -31,9 +31,9 @@ import Summary from '../models/Summary.js';
 import { createEvaluationAssignment } from '../evaluation/liveConfig.js';
 import { EvaluationTurn, SessionEvaluation } from '../models/Evaluation.js';
 import { getSessionAccess, INTRO_SCRIPT_ID } from '../services/sessionAccessService.js';
+import { nowMs, timeAsync } from '../services/turnTiming.js';
 import { getScriptDeckSlideStepIndex } from '../services/cstScriptService.js';
 
-const nowMs = () => Number(process.hrtime.bigint() / 1_000_000n);
 const AVATAR_MODES = new Set(['male', 'female', 'visualizer']);
 const LIP_SYNC_MODES = new Set(['rhubarb', 'energy']);
 
@@ -44,15 +44,6 @@ const publicSession = (session) => {
   }
   return result;
 };
-
-async function timeAsync(label, fn, timings) {
-  const start = nowMs();
-  try {
-    return await fn();
-  } finally {
-    timings[label] = nowMs() - start;
-  }
-}
 
 export const createSession = async (req, res, next) => {
   try {
@@ -306,6 +297,7 @@ async function attachAudioToTurn(turn, pipelineMode, avatarMode, lipSyncMode, ti
 
 export const respondToSession = async (req, res, next) => {
   const timings = {};
+  const turnId = uuidv4();
   const startedAtMs = nowMs();
   try {
     const avatarMode = getAvatarMode(req.body?.avatarMode);
@@ -323,8 +315,11 @@ export const respondToSession = async (req, res, next) => {
       await attachAudioToTurn(turn, turn.pipelineMode, avatarMode, lipSyncMode, timings);
     } catch (ttsErr) {
       console.error('[tts] Skipping audio for this turn:', ttsErr.message);
+      turn.audioStatus = 'error';
     }
 
+    turn.turnId = turnId;
+    turn.audioStatus ||= 'ok';
     turn.timings = { ...timings, totalMs: nowMs() - startedAtMs };
     res.status(201).json(turn);
   } catch (err) {
@@ -381,6 +376,7 @@ export const getPipelineInfo = (_req, res) => {
 export const respondAudioToSession = async (req, res, next) => {
   const uploadedFilePath = req.file?.path;
   const timings = {};
+  const turnId = uuidv4();
   const startedAtMs = nowMs();
 
   try {
@@ -414,8 +410,11 @@ export const respondAudioToSession = async (req, res, next) => {
       await attachAudioToTurn(turn, session.pipelineMode, avatarMode, lipSyncMode, timings);
     } catch (ttsErr) {
       console.error('[tts] Skipping audio for this turn:', ttsErr.message);
+      turn.audioStatus = 'error';
     }
 
+    turn.turnId = turnId;
+    turn.audioStatus ||= 'ok';
     turn.transcript = transcript;
     turn.timings = { ...timings, totalMs: nowMs() - startedAtMs };
     res.status(201).json(turn);
