@@ -64,7 +64,9 @@ Deploy the backend update to accumulate `ttsMs` and `rhubarbMs` across all speec
 
 - `sttMs`: transcription call; audio requests only.
 - `orchestratorMs`: full session turn orchestration, including database, prompting and any LLM work. It is not an isolated inference duration.
-- `ttsMs` and `rhubarbMs`: accumulated durations for speech/lip-sync generation, including a failing stage's elapsed time.
+- `ttsMs` and `rhubarbMs`: accumulated durations for speech/lip-sync generation performed by this request, including a failing stage's elapsed time. Segments run in parallel, so the sum can exceed wall time. Audio already prefetched or cached from an earlier turn is not counted here.
+- `audioMs`: wall time this request spent waiting for all speech segments, including waits on an in-flight prefetch.
+- `speechCacheHits`: segments served from the speech cache rather than synthesized by this request. Script lines are prefetched while the patient responds, so hit rates depend on think time and must be reported with the pipeline settings.
 - `totalMs`: response-controller processing up to preparing the JSON response. It excludes Express upload parsing before the controller, response transmission, audio download and browser playback.
 
 Client and server clocks are separate. Compare durations; do not subtract absolute timestamps across machines. `requestMs - totalMs` contains several kinds of overhead and is not a pure network measurement. The server ID joins the returned stage timings to a browser attempt, not a persisted server telemetry store.

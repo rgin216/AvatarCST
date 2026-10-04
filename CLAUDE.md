@@ -76,6 +76,8 @@ For recorded microphone input:
 
 For typed input, the flow skips STT and starts at `POST /api/sessions/:id/respond`.
 
+In both pipelines, speech segments are synthesized in parallel and cached by text and voice in `speechCacheService.js`. The orchestrator returns `nextScriptLinePrediction`, which the controller prefetches while the patient responds, and it also prefetches the planned script line during the LLM call. Fresh acknowledgement segments use Rhubarb's faster `phonetic` recognizer, while script segments keep the default `pocketSphinx` recognizer.
+
 ### `PIPELINE_MODE=openai-fast-scripted` (lower-latency paid path)
 
 For recorded microphone input:

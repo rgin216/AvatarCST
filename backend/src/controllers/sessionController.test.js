@@ -1,14 +1,50 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import Session from '../models/Session.js';
-import { updateSession } from './sessionController.js';
+import User from '../models/User.js';
+import { respondAudioToSession, updateSession } from './sessionController.js';
 
 const makeRes = () => {
-  const res = { statusCode: 200, body: undefined };
+  const res = { statusCode: 200, body: undefined, headers: {}, chunks: [], headersSent: false, writableEnded: false };
   res.status = (code) => { res.statusCode = code; return res; };
-  res.json = (body) => { res.body = body; return res; };
+  res.json = (body) => { res.body = body; res.headersSent = true; res.writableEnded = true; return res; };
+  res.setHeader = (name, value) => { res.headers[name.toLowerCase()] = value; };
+  res.write = (chunk) => { res.chunks.push(chunk); res.headersSent = true; return true; };
+  res.end = () => { res.writableEnded = true; };
   return res;
 };
+
+const mockClosedSession = (t) => {
+  const session = { _id: '64b000000000000000000001', userId: '64b000000000000000000002', status: 'completed', pipelineMode: 'free' };
+  const query = (value) => ({ select() { return this; }, lean: async () => value });
+  t.mock.method(Session, 'findById', () => query(session));
+  t.mock.method(Session, 'findOneAndUpdate', async () => null);
+  t.mock.method(User, 'findById', () => query({ settings: { language: 'en' } }));
+  return session;
+};
+
+test('streamed audio turns send the transcript first and report later failures in-band', async (t) => {
+  const session = mockClosedSession(t);
+  const res = makeRes();
+  await respondAudioToSession({ params: { id: session._id }, query: { stream: 'transcript' }, body: {} }, res,
+    () => assert.fail('a streamed failure must not reach the JSON error handler'));
+  assert.equal(res.statusCode, 201);
+  assert.match(res.headers['content-type'], /application\/x-ndjson/);
+  const lines = res.chunks.join('').trim().split('\n').map((line) => JSON.parse(line));
+  assert.deepEqual(lines[0], { type: 'transcript', transcript: '' });
+  assert.equal(lines[1].type, 'error');
+  assert.equal(lines[1].status, 409);
+  assert.equal(res.writableEnded, true);
+});
+
+test('audio turns without the stream flag keep the JSON error contract', async (t) => {
+  const session = mockClosedSession(t);
+  const res = makeRes();
+  let forwarded;
+  await respondAudioToSession({ params: { id: session._id }, query: {}, body: {} }, res, (error) => { forwarded = error; });
+  assert.equal(forwarded.status, 409);
+  assert.equal(res.chunks.length, 0);
+});
 
 test('developer skip maps a deck slide to its first script step', async (t) => {
   t.mock.method(Session, 'findById', () => ({ lean: async () => ({ scriptId: 'cst_current_affairs' }) }));
