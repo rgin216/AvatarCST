@@ -1,7 +1,7 @@
 import { useState } from "react";
 import api from "../services/api.js";
 import theme from "../utils/theme";
-import useIsDesktop from "../hooks/useIsDesktop";
+import useViewport from "../hooks/useViewport";
 import { useLanguage } from "../language/useLanguage.js";
 import { SUPPORTED_LANGUAGES } from "../language/translations.js";
 import {
@@ -13,7 +13,8 @@ import {
 } from "../utils/speechRate.js";
 
 export default function SettingsPage({ userId, userName, settings, onBack, onSettingsChange }) {
-  const isDesktop = useIsDesktop();
+  const { isPhone, isTablet } = useViewport();
+  const isDesktop = !isPhone;
   const { t } = useLanguage();
   const [savingFields, setSavingFields] = useState(() => new Set());
   const [error, setError] = useState(null);
@@ -51,8 +52,9 @@ export default function SettingsPage({ userId, userName, settings, onBack, onSet
 
   const contentMaxWidth = isDesktop ? 720 : 480;
 
+  // An even grid that fills the card, so options never wrap into a lopsided pill.
   const segmentedControl = (field, options) => (
-    <div style={{ display: "inline-flex", flexWrap: "wrap", gap: 6, background: theme.sand, borderRadius: 999, padding: 4 }}>
+    <div style={{ display: "grid", gridTemplateColumns: `repeat(auto-fit, minmax(${isPhone ? 80 : 110}px, 1fr))`, gap: 4, background: theme.sand, borderRadius: 16, padding: 4 }}>
       {options.map((option) => {
         const active = settings[field] === option.id;
         return (
@@ -64,9 +66,10 @@ export default function SettingsPage({ userId, userName, settings, onBack, onSet
             disabled={isSaving}
             style={{
               border: "none",
-              borderRadius: 999,
-              padding: "9px 18px",
-              fontSize: 14,
+              borderRadius: 12,
+              padding: isTablet ? "13px 12px" : isPhone ? "11px 4px" : "10px 8px",
+              fontSize: isTablet ? 16 : isPhone ? 13 : 14,
+              lineHeight: 1.2,
               fontWeight: 700,
               fontFamily: "'Nunito', sans-serif",
               cursor: isSaving ? "default" : "pointer",
@@ -116,7 +119,7 @@ export default function SettingsPage({ userId, userName, settings, onBack, onSet
   );
 
   const section = (titleKey, field, content) => (
-    <div style={{ background: theme.white, borderRadius: 20, padding: "20px 22px", marginBottom: 16, boxShadow: "0 4px 20px rgba(0,0,0,0.05)" }}>
+    <div style={{ background: theme.white, borderRadius: 20, padding: isPhone ? "18px" : "20px 22px", marginBottom: isPhone ? 12 : 16, boxShadow: "0 4px 20px rgba(0,0,0,0.05)" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
         <div style={{ fontSize: 13, fontWeight: 700, color: theme.textLight, textTransform: "uppercase", letterSpacing: "0.07em" }}>
           {t(titleKey)}
@@ -135,9 +138,9 @@ export default function SettingsPage({ userId, userName, settings, onBack, onSet
         background: `linear-gradient(160deg, ${theme.cream} 0%, ${theme.sand} 60%, ${theme.blush}30 100%)`,
         paddingBottom: isDesktop ? 40 : 32,
       }}>
-        <div style={{ maxWidth: contentMaxWidth, margin: "0 auto", padding: isDesktop ? "40px 32px 0" : "32px 24px 0" }}>
+        <div style={{ maxWidth: contentMaxWidth, margin: "0 auto", padding: isDesktop ? "40px 32px 0" : "28px 16px 0" }}>
           <div className="fade-up" style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <button onClick={onBack} style={{ background: "none", border: "none", fontSize: 22, cursor: "pointer" }}>←</button>
+            <button onClick={onBack} aria-label="Back to home" title="Back to home" className="carousel-arrow" style={{ width: 40, height: 40, fontSize: 18, flexShrink: 0 }}>←</button>
             <div>
               <div style={{ fontFamily: "'Playfair Display', serif", fontSize: isDesktop ? 30 : 26, fontWeight: 700, color: theme.text }}>
                 {t("settings.title")}
@@ -155,7 +158,7 @@ export default function SettingsPage({ userId, userName, settings, onBack, onSet
         borderRadius: isDesktop ? "36px 36px 0 0" : "24px 24px 0 0",
         boxShadow: "0 -14px 36px rgba(122,157,173,0.14)",
       }}>
-        <div style={{ maxWidth: contentMaxWidth, margin: "0 auto", padding: isDesktop ? "28px 32px 32px" : "22px 24px 24px" }}>
+        <div style={{ maxWidth: contentMaxWidth, margin: "0 auto", padding: isDesktop ? "28px 32px 32px" : "20px 16px 24px" }}>
           {section("settings.personality", "personality", personalityOptions)}
           {section("settings.language", "language", SUPPORTED_LANGUAGES)}
           {section("settings.avatar", "avatarMode", avatarOptions)}

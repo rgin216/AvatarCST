@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import api from "../services/api.js";
 import theme from "../utils/theme";
-import useIsDesktop from "../hooks/useIsDesktop";
+import useViewport from "../hooks/useViewport";
 import { useLanguage } from "../language/useLanguage.js";
 import { toneLabel, levelLabel } from "../language/summaryLabels.js";
 
@@ -53,7 +53,11 @@ function SaveToMemoryButton({ saved, onClick }) {
 }
 
 export default function CaregiverPage({ userId, onBack, onLogout, userName }) {
-  const isDesktop = useIsDesktop();
+  const { isPhone, isWide } = useViewport();
+  const isDesktop = !isPhone;
+  // Wide screens get the sidebar; phones and tablets use top tabs.
+  const showSidebar = isWide;
+  const columnMaxWidth = isWide ? 960 : isPhone ? "none" : 760;
   const navigate = useNavigate();
   const { t, language } = useLanguage();
   const CAREGIVER_TABS = [
@@ -215,6 +219,18 @@ export default function CaregiverPage({ userId, onBack, onLogout, userName }) {
     return `${mins} min`;
   };
 
+  // On phones the save button drops under the text so the point keeps the full width.
+  const talkingPoint = (p, key, isLast, fontSize) => (
+    <div key={key} style={{ display: "flex", flexWrap: isPhone ? "wrap" : "nowrap", alignItems: "flex-start", justifyContent: "space-between", gap: isPhone ? "6px 10px" : 10, marginBottom: isLast ? 0 : 12 }}>
+      <div style={{ display: "flex", gap: 10, flex: isPhone ? "1 1 100%" : 1, fontSize, color: theme.text, lineHeight: 1.5 }}>
+        <span style={{ color: theme.mistDark, fontWeight: 700 }}>•</span> {p}
+      </div>
+      <div style={{ marginLeft: isPhone ? 18 : 0 }}>
+        <SaveToMemoryButton saved={isPointSaved(p)} onClick={() => addPointToMemory(p)} />
+      </div>
+    </div>
+  );
+
   const tabContent = (
     <>
       {tab === "summary" && (
@@ -244,9 +260,9 @@ export default function CaregiverPage({ userId, onBack, onLogout, userName }) {
                 { label: t("caregiver.stat.score"), value: levelLabel(t, latestSummary.sessionScore), color: "#B8CDD8" },
               ];
               return (
-                <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: isPhone ? 8 : 16 }}>
                   {stats.map(s => (
-                    <div key={s.label} style={{ flex: "1 1 120px", background: s.color + "33", borderRadius: 14, padding: "14px" }}>
+                    <div key={s.label} style={{ background: s.color + "33", borderRadius: 14, padding: isPhone ? "12px 10px" : "14px" }}>
                       <div style={{ fontSize: 11, color: theme.textLight, marginBottom: 4 }}>{s.label}</div>
                       <div style={{ fontSize: 15, fontWeight: 700, color: theme.text }}>{s.value}</div>
                     </div>
@@ -263,14 +279,7 @@ export default function CaregiverPage({ userId, onBack, onLogout, userName }) {
             {!loadingSummary && (!latestSummary || !latestSummary.keyTalkingPoints?.length) && (
               <div style={{ fontSize: 14, color: theme.textLight }}>{t("caregiver.noSummaryYet")}</div>
             )}
-            {!loadingSummary && latestSummary?.keyTalkingPoints?.map((p, i, arr) => (
-              <div key={i} style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 10, marginBottom: i < arr.length - 1 ? 12 : 0 }}>
-                <div style={{ display: "flex", gap: 10, flex: 1, fontSize: 15, color: theme.text, lineHeight: 1.5 }}>
-                  <span style={{ color: theme.mistDark, fontWeight: 700 }}>•</span> {p}
-                </div>
-                <SaveToMemoryButton saved={isPointSaved(p)} onClick={() => addPointToMemory(p)} />
-              </div>
-            ))}
+            {!loadingSummary && latestSummary?.keyTalkingPoints?.map((p, i, arr) => talkingPoint(p, i, i === arr.length - 1, 15))}
           </div>
         </div>
       )}
@@ -361,9 +370,10 @@ export default function CaregiverPage({ userId, onBack, onLogout, userName }) {
             const messages = sessionMessages[s._id];
             return (
               <div key={s._id} style={{ background: theme.white, borderRadius: 18, marginBottom: 12, boxShadow: "0 2px 12px rgba(0,0,0,0.05)", overflow: "hidden" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "14px 12px 14px 18px" }}>
+                {/* On phones the details and chevron fill the first line and the summary button wraps below. */}
+                <div style={{ display: "flex", flexWrap: isPhone ? "wrap" : "nowrap", alignItems: "center", gap: 10, padding: "14px 12px 14px 18px" }}>
                   {/* Mouse shortcut for the chevron button, which is the accessible toggle. */}
-                  <div onClick={() => toggleSession(s._id)} style={{ flex: 1, minWidth: 0, cursor: "pointer" }}>
+                  <div onClick={() => toggleSession(s._id)} style={{ flex: isPhone ? "1 1 calc(100% - 44px)" : 1, minWidth: 0, cursor: "pointer" }}>
                     <div style={{ fontSize: 15, fontWeight: 700, color: theme.text, marginBottom: 4 }}>{formatSessionDate(s)}</div>
                     <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "4px 14px", fontSize: 13, color: theme.textLight }}>
                       <span>⏱ {formatDuration(s)}</span>
@@ -380,7 +390,7 @@ export default function CaregiverPage({ userId, onBack, onLogout, userName }) {
                       onClick={() => toggleSummary(s._id)}
                       aria-expanded={expandedSummaryId === s._id}
                       className="btn-outline"
-                      style={{ flexShrink: 0, padding: "6px 12px", fontSize: 13, fontWeight: 700, color: theme.mistDark, borderRadius: 10, whiteSpace: "nowrap" }}
+                      style={{ flexShrink: 0, order: isPhone ? 1 : 0, padding: "6px 12px", fontSize: 13, fontWeight: 700, color: theme.mistDark, borderRadius: 10, whiteSpace: "nowrap" }}
                     >
                       {expandedSummaryId === s._id ? t("caregiver.hideSummary") : t("caregiver.viewSummary")}
                     </button>
@@ -408,14 +418,7 @@ export default function CaregiverPage({ userId, onBack, onLogout, userName }) {
                       <div style={{ fontSize: 12, fontWeight: 700, color: theme.textLight, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 10 }}>{t("caregiver.sessionSummary")}</div>
                       {sum === 'loading' && <div style={{ fontSize: 13, color: theme.textLight }}>{t("caregiver.loading")}</div>}
                       {sum !== 'loading' && points.length === 0 && <div style={{ fontSize: 13, color: theme.textLight }}>{t("caregiver.noSummaryForSession")}</div>}
-                      {points.map((p, i, arr) => (
-                        <div key={i} style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 10, marginBottom: i < arr.length - 1 ? 10 : 0 }}>
-                          <div style={{ display: "flex", gap: 8, flex: 1, fontSize: 14, color: theme.text, lineHeight: 1.5 }}>
-                            <span style={{ color: theme.mistDark, fontWeight: 700 }}>•</span> {p}
-                          </div>
-                          <SaveToMemoryButton saved={isPointSaved(p)} onClick={() => addPointToMemory(p)} />
-                        </div>
-                      ))}
+                      {points.map((p, i, arr) => talkingPoint(p, i, i === arr.length - 1, 14))}
                     </div>
                   );
                 })()}
@@ -457,46 +460,46 @@ export default function CaregiverPage({ userId, onBack, onLogout, userName }) {
     <div style={{
       minHeight: "100vh",
       background: `linear-gradient(160deg, #E8EDF5 0%, #FDF6EE 50%)`,
-      display: isDesktop ? "grid" : "block",
-      gridTemplateColumns: isDesktop ? "220px 1fr" : undefined,
-      gridTemplateRows: isDesktop ? "auto 1fr" : undefined,
-      maxWidth: isDesktop ? "none" : 480,
-      margin: isDesktop ? 0 : "0 auto",
+      display: showSidebar ? "grid" : "block",
+      gridTemplateColumns: showSidebar ? "220px 1fr" : undefined,
+      gridTemplateRows: showSidebar ? "auto 1fr" : undefined,
     }}>
-      <div style={{ gridColumn: isDesktop ? "1 / -1" : undefined, padding: isDesktop ? "24px 32px 0" : "24px 24px 0", background: "linear-gradient(135deg, #B8CDD866, #7A9DAD33)", borderBottom: "1px solid #B8CDD888" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: isDesktop ? 20 : 20 }}>
-          <button onClick={onBack} aria-label="Back to home" title="Back to home" className="carousel-arrow" style={{ width: 40, height: 40, fontSize: 18, flexShrink: 0 }}>←</button>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontFamily: "'Playfair Display', serif", fontSize: 22, fontWeight: 600, color: theme.text }}>{t("caregiver.title")}</div>
-            <div style={{ fontSize: 13, color: theme.textLight }}>{t("caregiver.profileSubtitle", { name: userName })}</div>
+      <div style={{ gridColumn: showSidebar ? "1 / -1" : undefined, padding: showSidebar ? "24px 32px 0" : isPhone ? "20px 16px 0" : "28px 32px 0", background: "linear-gradient(135deg, #B8CDD866, #7A9DAD33)", borderBottom: "1px solid #B8CDD888" }}>
+        <div style={{ maxWidth: showSidebar ? "none" : columnMaxWidth, margin: "0 auto" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}>
+            <button onClick={onBack} aria-label="Back to home" title="Back to home" className="carousel-arrow" style={{ width: 40, height: 40, fontSize: 18, flexShrink: 0 }}>←</button>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontFamily: "'Playfair Display', serif", fontSize: 22, fontWeight: 600, color: theme.text }}>{t("caregiver.title")}</div>
+              <div style={{ fontSize: 13, color: theme.textLight }}>{t("caregiver.profileSubtitle", { name: userName })}</div>
+            </div>
+            {onLogout && (
+              <button
+                onClick={onLogout}
+                style={{ background: "none", border: `1.5px solid ${theme.mistDark}88`, borderRadius: 12, padding: "7px 14px", fontSize: 13, color: theme.mistDark, cursor: "pointer", fontFamily: "'Nunito', sans-serif", fontWeight: 600 }}
+              >
+                {t("caregiver.signOut")}
+              </button>
+            )}
           </div>
-          {onLogout && (
-            <button
-              onClick={onLogout}
-              style={{ background: "none", border: `1.5px solid ${theme.mistDark}88`, borderRadius: 12, padding: "7px 14px", fontSize: 13, color: theme.mistDark, cursor: "pointer", fontFamily: "'Nunito', sans-serif", fontWeight: 600 }}
-            >
-              {t("caregiver.signOut")}
-            </button>
+          {!showSidebar && (
+            <div style={{ display: "flex" }}>
+              {tabs.map(tb => (
+                <button key={tb.id} onClick={() => setTab(tb.id)} aria-current={tab === tb.id ? "page" : undefined} style={{
+                  flex: 1, background: "none", border: "none", padding: isPhone ? "10px 0 14px" : "12px 0 16px", fontSize: isPhone ? 14 : 16,
+                  fontWeight: tab === tb.id ? 700 : 500,
+                  color: tab === tb.id ? theme.mistDark : theme.textLight,
+                  cursor: "pointer", fontFamily: "'Nunito', sans-serif",
+                  borderBottom: `3px solid ${tab === tb.id ? theme.mistDark : "transparent"}`,
+                  transition: "all 0.2s",
+                }}>{tb.label}</button>
+              ))}
+            </div>
           )}
+          {showSidebar && <div style={{ height: 20 }} />}
         </div>
-        {!isDesktop && (
-          <div style={{ display: "flex" }}>
-            {tabs.map(tb => (
-              <button key={tb.id} onClick={() => setTab(tb.id)} aria-current={tab === tb.id ? "page" : undefined} style={{
-                flex: 1, background: "none", border: "none", padding: "10px 0 14px", fontSize: 14,
-                fontWeight: tab === tb.id ? 700 : 500,
-                color: tab === tb.id ? theme.mistDark : theme.textLight,
-                cursor: "pointer", fontFamily: "'Nunito', sans-serif",
-                borderBottom: `3px solid ${tab === tb.id ? theme.mistDark : "transparent"}`,
-                transition: "all 0.2s",
-              }}>{tb.label}</button>
-            ))}
-          </div>
-        )}
-        {isDesktop && <div style={{ height: 20 }} />}
       </div>
 
-      {isDesktop && (
+      {showSidebar && (
         <div style={{ borderRight: "1px solid #B8CDD888", padding: "32px 0", background: "#F8F2EC" }}>
           {tabs.map(tb => (
             <button key={tb.id} onClick={() => setTab(tb.id)} aria-current={tab === tb.id ? "page" : undefined} style={{
@@ -512,8 +515,8 @@ export default function CaregiverPage({ userId, onBack, onLogout, userName }) {
         </div>
       )}
 
-      <div style={{ padding: isDesktop ? "32px 40px" : "24px", overflowY: isDesktop ? "auto" : undefined }}>
-        <div style={{ maxWidth: 960, margin: "0 auto" }}>
+      <div style={{ padding: showSidebar ? "32px 40px" : isPhone ? "20px 16px" : "28px 32px", overflowY: showSidebar ? "auto" : undefined }}>
+        <div style={{ maxWidth: columnMaxWidth, margin: "0 auto" }}>
           {tabContent}
         </div>
       </div>

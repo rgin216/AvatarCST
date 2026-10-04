@@ -3,7 +3,7 @@ import api from "../services/api.js";
 import EvaluationControls from '../components/EvaluationControls.jsx';
 import LandingTour from "../components/LandingTour.jsx";
 import theme from "../utils/theme";
-import useIsDesktop from "../hooks/useIsDesktop";
+import useViewport from "../hooks/useViewport";
 import { useLanguage } from "../language/useLanguage.js";
 
 const pipelineOptions = [
@@ -51,7 +51,8 @@ export default function LandingPage({
   landingTourPending = false,
   onLandingTourComplete = () => {},
 }) {
-  const isDesktop = useIsDesktop();
+  const { isPhone, isTablet, isWide } = useViewport();
+  const isDesktop = !isPhone;
   const { t, language } = useLanguage();
   const [lastSession, setLastSession] = useState(null);
   const [tourReplayOpen, setTourReplayOpen] = useState(false);
@@ -116,19 +117,23 @@ export default function LandingPage({
   const heroIcon = lastSession ? (lastSessionOption?.icon || lastSessionPalette?.icon || "🕰️") : "👋";
   const heroChip = lastSession ? (lastSessionPalette?.chip || defaultHeroChip) : defaultHeroChip;
 
-  const contentMaxWidth = isDesktop ? 1180 : 480;
+  const contentMaxWidth = isWide ? 1180 : isTablet ? 860 : 480;
 
-  const pageSize = 3;
+  // Phones stack three cards, tablets show a 2×2 grid, wide screens a row of three.
+  const cardColumns = isWide ? 3 : isTablet ? 2 : 1;
+  const pageSize = isTablet ? 4 : 3;
   const totalPages = Math.max(1, Math.ceil(sessions.length / pageSize));
-  const pageStart = pageIndex * pageSize;
+  // Rotating a tablet changes the page size, so keep the page in range.
+  const currentPage = Math.min(pageIndex, totalPages - 1);
+  const pageStart = currentPage * pageSize;
   const visibleSessions = sessions.slice(pageStart, pageStart + pageSize);
   const goToPrevPage = () => {
     setPageDirection("prev");
-    setPageIndex((p) => (p - 1 + totalPages) % totalPages);
+    setPageIndex((p) => (Math.min(p, totalPages - 1) - 1 + totalPages) % totalPages);
   };
   const goToNextPage = () => {
     setPageDirection("next");
-    setPageIndex((p) => (p + 1) % totalPages);
+    setPageIndex((p) => (Math.min(p, totalPages - 1) + 1) % totalPages);
   };
   const showCarouselNav = totalPages > 1;
   const carouselArrow = (direction) => (
@@ -161,7 +166,7 @@ export default function LandingPage({
         <div style={{
           maxWidth: contentMaxWidth,
           margin: "0 auto",
-          padding: isDesktop ? "40px 56px 0" : "36px 28px 0",
+          padding: isWide ? "40px 56px 0" : isTablet ? "40px 40px 0" : "32px 20px 0",
           position: "relative",
         }}>
           <div className="fade-up" style={{
@@ -173,15 +178,15 @@ export default function LandingPage({
               <div style={{ fontFamily: "'Playfair Display', serif", fontSize: isDesktop ? 38 : 30, fontWeight: 700, color: theme.text }}>AvatarCST</div>
               <div style={{ fontSize: 13, color: theme.textLight, marginTop: 2 }}>Your therapy companion</div>
             </div>
-            <div style={{ display: "flex", gap: 10 }}>
+            {/* Phones: three equal tiles across the full width, icon above label. */}
+            <div className={isPhone ? "landing-nav-tiles" : undefined} style={isPhone ? undefined : { display: "flex", gap: 10 }}>
               <button
                 type="button"
                 onClick={() => setTourReplayOpen(true)}
                 className="btn-outline btn-nav"
-                aria-label={isDesktop ? undefined : t("tour.replay")}
                 title={t("tour.replay")}
               >
-                <NavIcon name="help" />{isDesktop && t("tour.replay")}
+                <NavIcon name="help" />{t("tour.replay")}
               </button>
               <button ref={settingsButtonRef} onClick={onSettings} className="btn-outline btn-nav"><NavIcon name="settings" />{t("landing.settings")}</button>
               <button ref={caregiverButtonRef} onClick={onCaregiver} className="btn-outline btn-nav"><NavIcon name="caregiver" />{t("landing.caregiver")}</button>
@@ -189,9 +194,9 @@ export default function LandingPage({
           </div>
 
           <div style={{
-            display: isDesktop ? "grid" : "block",
-            gridTemplateColumns: isDesktop ? "1.15fr 0.85fr" : undefined,
-            columnGap: isDesktop ? 32 : undefined,
+            display: isWide ? "grid" : "block",
+            gridTemplateColumns: isWide ? "1.15fr 0.85fr" : undefined,
+            columnGap: isWide ? 32 : undefined,
           }}>
             <div className="fade-up delay-1" style={{ display: "flex", flexDirection: "column", justifyContent: "center" }}>
               <div style={{ fontSize: 15, color: theme.textLight, fontWeight: 500, marginBottom: 4 }}>{timeOfDay()},</div>
@@ -200,8 +205,8 @@ export default function LandingPage({
             </div>
 
             <div className="fade-up delay-2" style={{
-              background: theme.white, borderRadius: 24, padding: "26px 28px",
-              marginTop: isDesktop ? 0 : 24,
+              background: theme.white, borderRadius: 24, padding: isPhone ? "20px 22px" : "26px 28px",
+              marginTop: isWide ? 0 : 24,
               boxShadow: "0 10px 40px rgba(139,107,90,0.10)",
             }}>
               <div key={lastSession?._id || "welcome"} className="soft-fade-in" style={{ display: "flex", alignItems: "center", gap: 14 }}>
@@ -248,7 +253,7 @@ export default function LandingPage({
         <div style={{
           maxWidth: contentMaxWidth,
           margin: "0 auto",
-          padding: isDesktop ? "28px 56px 32px" : "22px 28px 24px",
+          padding: isWide ? "28px 56px 32px" : isTablet ? "28px 40px 32px" : "22px 20px 24px",
         }}>
           <div className="fade-up delay-3" style={{
             display: "flex", justifyContent: "space-between", alignItems: isDesktop ? "center" : "flex-start",
@@ -299,16 +304,16 @@ export default function LandingPage({
             </p>
           )}
           <div ref={sessionsRef} className="fade-up delay-4" style={{ display: "flex", alignItems: "center", gap: 14 }}>
-            {isDesktop && showCarouselNav && carouselArrow("prev")}
+            {isWide && showCarouselNav && carouselArrow("prev")}
 
             <div
-              key={pageIndex}
+              key={`${currentPage}-${pageSize}`}
               className={pageDirection === "next" ? "carousel-slide-next" : "carousel-slide-prev"}
               style={{
                 flex: 1,
                 display: "grid",
-                gridTemplateColumns: isDesktop ? "repeat(3, minmax(0, 1fr))" : "minmax(0, 1fr)",
-                gap: 18,
+                gridTemplateColumns: `repeat(${cardColumns}, minmax(0, 1fr))`,
+                gap: isPhone ? 14 : 18,
               }}
             >
               {visibleSessions.map((session, i) => {
@@ -332,10 +337,10 @@ export default function LandingPage({
                   >
                     <div>
                       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10, marginBottom: 12 }}>
-                        <div style={{ width: 44, height: 44, flexShrink: 0, borderRadius: 14, background: palette.chip, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20 }}>
+                        <div style={{ width: isTablet ? 52 : 44, height: isTablet ? 52 : 44, flexShrink: 0, borderRadius: 14, background: palette.chip, display: "flex", alignItems: "center", justifyContent: "center", fontSize: isTablet ? 24 : 20 }}>
                           {palette.icon}
                         </div>
-                        <div style={{ fontSize: 12, fontWeight: 700, color: theme.textLight, textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                        <div style={{ fontSize: isTablet ? 13 : 12, fontWeight: 700, color: theme.textLight, textTransform: "uppercase", letterSpacing: "0.06em" }}>
                           {session.label}
                         </div>
                       </div>
@@ -345,7 +350,7 @@ export default function LandingPage({
                         {session.title}
                       </div>
                     </div>
-                    <div style={{ marginTop: 18, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, fontSize: 13, fontWeight: 700, color: palette.accent }}>
+                    <div style={{ marginTop: 18, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, fontSize: isTablet ? 15 : 13, fontWeight: 700, color: palette.accent }}>
                       {session.prerequisiteLocked ? 'Complete Session 1 to unlock' : session.disabled ? t("landing.comingSoon") : <>{t("landing.startSession")} <span aria-hidden="true">→</span></>}
                     </div>
                   </button>
@@ -353,14 +358,14 @@ export default function LandingPage({
               })}
             </div>
 
-            {isDesktop && showCarouselNav && carouselArrow("next")}
+            {isWide && showCarouselNav && carouselArrow("next")}
           </div>
 
           {showCarouselNav && (
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 16, marginTop: isDesktop ? 14 : 18 }}>
-              {!isDesktop && carouselArrow("prev")}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 16, marginTop: isWide ? 14 : 18 }}>
+              {!isWide && carouselArrow("prev")}
               {pageCounter}
-              {!isDesktop && carouselArrow("next")}
+              {!isWide && carouselArrow("next")}
             </div>
           )}
         </div>

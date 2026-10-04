@@ -147,6 +147,29 @@ body {
 .btn-nav svg { flex-shrink: 0; color: #A07E6B; }
 .btn-nav:hover { border-color: #E8A090; }
 
+.landing-nav-tiles {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  width: 100%;
+}
+.landing-nav-tiles .btn-nav {
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  padding: 10px 6px;
+  border-radius: 16px;
+  font-size: 13px;
+}
+
+/* Touch screens: bigger header buttons and roomier session cards. */
+@media (pointer: coarse) and (min-width: 768px) {
+  .btn-nav { padding: 11px 18px; font-size: 15px; }
+}
+@media (min-width: 768px) and (max-width: 1099px) {
+  .session-card { padding: 28px 24px 24px; }
+}
+
 .session-card {
   display: flex;
   flex-direction: column;
