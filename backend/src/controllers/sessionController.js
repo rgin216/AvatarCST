@@ -18,6 +18,7 @@ import {
 import { generateLipSync, getRhubarbStatus } from '../services/rhubarbService.js';
 import { buildAvatarResponse } from '../services/avatarService.js';
 import { getSpeechStream } from '../services/speechStreamService.js';
+import { getOrCreateSpeech, prefetchSpeech, speechCacheKey } from '../services/speechCacheService.js';
 import { GENERATED_AUDIO_DIR } from '../config/storage.js';
 import {
   getSessionPipelineMode,
@@ -189,7 +190,7 @@ function getSpeechOptions(pipelineMode, avatarMode) {
   };
 }
 
-async function createRhubarbAudioForTurn(assistantText, pipelineMode, avatarMode, timings) {
+async function createRhubarbAudioForTurn(assistantText, pipelineMode, avatarMode, timings, recognizer) {
   const speechOptions = getSpeechOptions(pipelineMode, avatarMode);
   // Rhubarb converts this file to WAV internally, so serve the much smaller MP3
   // to the browser to reduce mid-sentence buffering on long narration.
@@ -204,7 +205,7 @@ async function createRhubarbAudioForTurn(assistantText, pipelineMode, avatarMode
     );
     const rhubarbJson = await timeAsync(
       'rhubarbMs',
-      () => generateLipSync(audioOutputPath),
+      () => generateLipSync(audioOutputPath, { recognizer }),
       timings
     );
 
@@ -246,43 +247,74 @@ async function createBufferedAudioForTurn(assistantText, pipelineMode, avatarMod
   }
 }
 
-async function createAudioForTurn(assistantText, pipelineMode, avatarMode, lipSyncMode, timings) {
-  if (!shouldUseRhubarbForAvatar(avatarMode) || lipSyncMode === 'energy') {
+const usesRhubarb = (avatarMode, lipSyncMode) =>
+  shouldUseRhubarbForAvatar(avatarMode) && lipSyncMode !== 'energy';
+
+async function createAudioForTurn(assistantText, pipelineMode, avatarMode, lipSyncMode, timings, recognizer) {
+  if (!usesRhubarb(avatarMode, lipSyncMode)) {
     // Fully buffer narration before responding. This trades a little initial latency
     // for uninterrupted playback on slower or variable connections.
     return createBufferedAudioForTurn(assistantText, pipelineMode, avatarMode, timings);
   }
 
-  return createRhubarbAudioForTurn(assistantText, pipelineMode, avatarMode, timings);
+  return createRhubarbAudioForTurn(assistantText, pipelineMode, avatarMode, timings, recognizer);
+}
+
+// Acknowledgements are generated fresh each turn, so they use the faster
+// recognizer; scripted narration is usually prefetched and keeps the default.
+const getRecognizerForSegment = (role) => (role === 'acknowledgement' ? 'phonetic' : 'pocketSphinx');
+
+function getSpeechCacheArgs(text, pipelineMode, avatarMode, lipSyncMode, recognizer) {
+  const { provider, voice } = getSpeechOptions(pipelineMode, avatarMode);
+  const withRhubarb = usesRhubarb(avatarMode, lipSyncMode);
+  const key = speechCacheKey({
+    text, provider, voice, avatarMode, withRhubarb, recognizer: withRhubarb ? recognizer : null,
+    model: provider === 'openai' ? process.env.OPENAI_TTS_MODEL || null : null,
+  });
+  // A missing lip-sync track is retried next time unless Rhubarb is not installed.
+  const isComplete = (audio) => !withRhubarb || Boolean(audio.rhubarbJson) || !getRhubarbStatus().available;
+  return { key, isComplete };
+}
+
+async function getAudioForSegment({ text, role }, pipelineMode, avatarMode, lipSyncMode, timings) {
+  const recognizer = getRecognizerForSegment(role);
+  const { key, isComplete } = getSpeechCacheArgs(text, pipelineMode, avatarMode, lipSyncMode, recognizer);
+  let created = false;
+  const audio = await getOrCreateSpeech(key, () => {
+    created = true;
+    return createAudioForTurn(text, pipelineMode, avatarMode, lipSyncMode, timings, recognizer);
+  }, { isComplete });
+  if (!created) timings.speechCacheHits = (timings.speechCacheHits || 0) + 1;
+  return audio;
+}
+
+// Synthesizes likely upcoming narration in the background so the turn that
+// speaks it can reuse the result instead of waiting for TTS and lip-sync.
+function prefetchSegmentAudio(text, pipelineMode, avatarMode, lipSyncMode) {
+  if (typeof text !== 'string' || !text.trim()) return;
+  const recognizer = getRecognizerForSegment('script');
+  const { key, isComplete } = getSpeechCacheArgs(text, pipelineMode, avatarMode, lipSyncMode, recognizer);
+  prefetchSpeech(key, () => createAudioForTurn(text, pipelineMode, avatarMode, lipSyncMode, {}, recognizer), { isComplete });
 }
 
 async function attachAudioToTurn(turn, pipelineMode, avatarMode, lipSyncMode, timings) {
   const segmentDefinitions = turn.speechSegments?.length
     ? turn.speechSegments
     : [{ text: turn.assistantText, role: 'script' }];
-  const audioSegments = [];
-  const outputPaths = [];
 
-  try {
-    for (const segment of segmentDefinitions) {
-      const audio = await createAudioForTurn(
-        segment.text, pipelineMode, avatarMode, lipSyncMode, timings
-      );
-      outputPaths.push(audio.audioOutputPath);
-      audioSegments.push({
-        text: segment.text,
-        role: segment.role,
-        advanceSlideAfter: Boolean(segment.advanceSlideAfter),
-        url: audio.audioUrl,
-        streaming: Boolean(audio.streaming),
-        lipsyncEngine: audio.lipsyncEngine,
-        rhubarbJson: audio.rhubarbJson || null,
-      });
-    }
-  } catch (error) {
-    await Promise.all(outputPaths.map((filePath) => fs.promises.unlink(filePath).catch(() => {})));
-    throw error;
-  }
+  // Segments are synthesized in parallel; finished audio stays cached for reuse.
+  const audioSegments = await timeAsync('audioMs', () => Promise.all(segmentDefinitions.map(async (segment) => {
+    const audio = await getAudioForSegment(segment, pipelineMode, avatarMode, lipSyncMode, timings);
+    return {
+      text: segment.text,
+      role: segment.role,
+      advanceSlideAfter: Boolean(segment.advanceSlideAfter),
+      url: audio.audioUrl,
+      streaming: Boolean(audio.streaming),
+      lipsyncEngine: audio.lipsyncEngine,
+      rhubarbJson: audio.rhubarbJson || null,
+    };
+  })), timings);
 
   const firstAudio = audioSegments[0];
   turn.avatar = buildAvatarResponse({
@@ -293,6 +325,14 @@ async function attachAudioToTurn(turn, pipelineMode, avatarMode, lipSyncMode, ti
   });
   turn.avatar.audio.segments = audioSegments;
   if (firstAudio?.streaming) turn.avatar.audio.streaming = true;
+}
+
+// Started only after this turn's own audio is ready, so it never competes with it.
+function prefetchNextTurnAudio(turn, pipelineMode, avatarMode, lipSyncMode) {
+  const text = turn.nextScriptLinePrediction;
+  delete turn.nextScriptLinePrediction;
+  if (turn.sessionCompleteAfterResponse || turn.sessionStatus === 'completed') return;
+  prefetchSegmentAudio(text, pipelineMode, avatarMode, lipSyncMode);
 }
 
 export const respondToSession = async (req, res, next) => {
@@ -307,6 +347,7 @@ export const respondToSession = async (req, res, next) => {
       () => respondToSessionTurn({
         sessionId: req.params.id,
         content: req.body?.content,
+        prefetchSpeech: (text, pipelineMode) => prefetchSegmentAudio(text, pipelineMode, avatarMode, lipSyncMode),
       }),
       timings
     );
@@ -317,6 +358,7 @@ export const respondToSession = async (req, res, next) => {
       console.error('[tts] Skipping audio for this turn:', ttsErr.message);
       turn.audioStatus = 'error';
     }
+    prefetchNextTurnAudio(turn, turn.pipelineMode, avatarMode, lipSyncMode);
 
     turn.turnId = turnId;
     turn.audioStatus ||= 'ok';
@@ -402,7 +444,11 @@ export const respondAudioToSession = async (req, res, next) => {
 
     const turn = await timeAsync(
       'orchestratorMs',
-      () => respondToSessionTurn({ sessionId: req.params.id, content: transcript }),
+      () => respondToSessionTurn({
+        sessionId: req.params.id,
+        content: transcript,
+        prefetchSpeech: (text) => prefetchSegmentAudio(text, session.pipelineMode, avatarMode, lipSyncMode),
+      }),
       timings
     );
 
@@ -412,6 +458,7 @@ export const respondAudioToSession = async (req, res, next) => {
       console.error('[tts] Skipping audio for this turn:', ttsErr.message);
       turn.audioStatus = 'error';
     }
+    prefetchNextTurnAudio(turn, session.pipelineMode, avatarMode, lipSyncMode);
 
     turn.turnId = turnId;
     turn.audioStatus ||= 'ok';
