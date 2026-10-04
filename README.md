@@ -46,6 +46,13 @@ avatarcst/
 
 ## LLM evaluation
 
+Automatic text-generation latency collection is available with `npm run eval:latency`
+from `backend`. See [latency research protocol](backend/evaluation/LATENCY.md)
+for live collection, CSV exports and measurement scope.
+
+For measurements against the deployed application, use `npm run eval:latency:deployed`
+or the opt-in browser research panel. See [deployment collection setup](backend/evaluation/DEPLOYED-LATENCY.md).
+
 An offline facilitator/critic rotation benchmark is available. From `backend`, run
 `npm run eval:llm` for a dry run. See [the evaluation guide](backend/evaluation/README.md)
 for models, live runs, output files, and methodological limitations.

@@ -3,7 +3,7 @@ import api from "../services/api.js";
 import EvaluationControls from '../components/EvaluationControls.jsx';
 import LandingTour from "../components/LandingTour.jsx";
 import theme from "../utils/theme";
-import useIsDesktop from "../hooks/useIsDesktop";
+import useViewport from "../hooks/useViewport";
 import { useLanguage } from "../language/useLanguage.js";
 
 const pipelineOptions = [
@@ -17,6 +17,20 @@ const cardPalette = [
   { chip: `linear-gradient(135deg, ${theme.blush}, ${theme.rose})`, icon: "🏅", accent: theme.rose },
   { chip: `linear-gradient(135deg, ${theme.rose}, ${theme.warm})`, icon: "🎵", accent: theme.warm },
 ];
+
+const navIconPaths = {
+  help: <><circle cx="12" cy="12" r="9.5" /><path d="M9.3 9.2a2.8 2.8 0 0 1 5.4 1c0 1.9-2.7 2.5-2.7 2.5" /><path d="M12 16.8h.01" /></>,
+  settings: <><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" /></>,
+  caregiver: <><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></>,
+};
+
+function NavIcon({ name }) {
+  return (
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      {navIconPaths[name]}
+    </svg>
+  );
+}
 
 const fallbackSessions = [
   { id: "cst_intro_reminiscence", label: "Session 1", title: "Introduction & Welcome", theme: "Introduction" },
@@ -37,7 +51,8 @@ export default function LandingPage({
   landingTourPending = false,
   onLandingTourComplete = () => {},
 }) {
-  const isDesktop = useIsDesktop();
+  const { isPhone, isTablet, isWide } = useViewport();
+  const isDesktop = !isPhone;
   const { t, language } = useLanguage();
   const [lastSession, setLastSession] = useState(null);
   const [tourReplayOpen, setTourReplayOpen] = useState(false);
@@ -102,20 +117,41 @@ export default function LandingPage({
   const heroIcon = lastSession ? (lastSessionOption?.icon || lastSessionPalette?.icon || "🕰️") : "👋";
   const heroChip = lastSession ? (lastSessionPalette?.chip || defaultHeroChip) : defaultHeroChip;
 
-  const contentMaxWidth = isDesktop ? 1180 : 480;
+  const contentMaxWidth = isWide ? 1180 : isTablet ? 860 : 480;
 
-  const pageSize = 3;
+  // Phones stack three cards, tablets show a 2×2 grid, wide screens a row of three.
+  const cardColumns = isWide ? 3 : isTablet ? 2 : 1;
+  const pageSize = isTablet ? 4 : 3;
   const totalPages = Math.max(1, Math.ceil(sessions.length / pageSize));
-  const pageStart = pageIndex * pageSize;
+  // Rotating a tablet changes the page size, so keep the page in range.
+  const currentPage = Math.min(pageIndex, totalPages - 1);
+  const pageStart = currentPage * pageSize;
   const visibleSessions = sessions.slice(pageStart, pageStart + pageSize);
   const goToPrevPage = () => {
     setPageDirection("prev");
-    setPageIndex((p) => (p - 1 + totalPages) % totalPages);
+    setPageIndex((p) => (Math.min(p, totalPages - 1) - 1 + totalPages) % totalPages);
   };
   const goToNextPage = () => {
     setPageDirection("next");
-    setPageIndex((p) => (p + 1) % totalPages);
+    setPageIndex((p) => (Math.min(p, totalPages - 1) + 1) % totalPages);
   };
+  const showCarouselNav = totalPages > 1;
+  const carouselArrow = (direction) => (
+    <button
+      type="button"
+      onClick={direction === "prev" ? goToPrevPage : goToNextPage}
+      aria-label={direction === "prev" ? "Show previous sessions" : "Show next sessions"}
+      className="carousel-arrow"
+      style={{ width: 44, height: 44, fontSize: 20, flexShrink: 0 }}
+    >
+      {direction === "prev" ? "‹" : "›"}
+    </button>
+  );
+  const pageCounter = (
+    <div style={{ fontSize: 13, fontWeight: 600, color: theme.textLight, minWidth: 72, textAlign: "center" }}>
+      {pageStart + 1}–{Math.min(pageStart + pageSize, sessions.length)} of {sessions.length}
+    </div>
+  );
 
   return (
     <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", background: theme.cream }}>
@@ -130,7 +166,7 @@ export default function LandingPage({
         <div style={{
           maxWidth: contentMaxWidth,
           margin: "0 auto",
-          padding: isDesktop ? "40px 56px 0" : "36px 28px 0",
+          padding: isWide ? "40px 56px 0" : isTablet ? "40px 40px 0" : "32px 20px 0",
           position: "relative",
         }}>
           <div className="fade-up" style={{
@@ -142,25 +178,25 @@ export default function LandingPage({
               <div style={{ fontFamily: "'Playfair Display', serif", fontSize: isDesktop ? 38 : 30, fontWeight: 700, color: theme.text }}>AvatarCST</div>
               <div style={{ fontSize: 13, color: theme.textLight, marginTop: 2 }}>Your therapy companion</div>
             </div>
-            <div style={{ display: "flex", gap: 10 }}>
+            {/* Phones: three equal tiles across the full width, icon above label. */}
+            <div className={isPhone ? "landing-nav-tiles" : undefined} style={isPhone ? undefined : { display: "flex", gap: 10 }}>
               <button
                 type="button"
                 onClick={() => setTourReplayOpen(true)}
-                className="btn-outline"
-                aria-label={isDesktop ? undefined : t("tour.replay")}
+                className="btn-outline btn-nav"
                 title={t("tour.replay")}
               >
-                ❓{isDesktop && ` ${t("tour.replay")}`}
+                <NavIcon name="help" />{t("tour.replay")}
               </button>
-              <button ref={settingsButtonRef} onClick={onSettings} className="btn-outline">⚙️ {t("landing.settings")}</button>
-              <button ref={caregiverButtonRef} onClick={onCaregiver} className="btn-outline">👨‍👩‍👧 {t("landing.caregiver")}</button>
+              <button ref={settingsButtonRef} onClick={onSettings} className="btn-outline btn-nav"><NavIcon name="settings" />{t("landing.settings")}</button>
+              <button ref={caregiverButtonRef} onClick={onCaregiver} className="btn-outline btn-nav"><NavIcon name="caregiver" />{t("landing.caregiver")}</button>
             </div>
           </div>
 
           <div style={{
-            display: isDesktop ? "grid" : "block",
-            gridTemplateColumns: isDesktop ? "1.15fr 0.85fr" : undefined,
-            columnGap: isDesktop ? 32 : undefined,
+            display: isWide ? "grid" : "block",
+            gridTemplateColumns: isWide ? "1.15fr 0.85fr" : undefined,
+            columnGap: isWide ? 32 : undefined,
           }}>
             <div className="fade-up delay-1" style={{ display: "flex", flexDirection: "column", justifyContent: "center" }}>
               <div style={{ fontSize: 15, color: theme.textLight, fontWeight: 500, marginBottom: 4 }}>{timeOfDay()},</div>
@@ -169,8 +205,8 @@ export default function LandingPage({
             </div>
 
             <div className="fade-up delay-2" style={{
-              background: theme.white, borderRadius: 24, padding: "26px 28px",
-              marginTop: isDesktop ? 0 : 24,
+              background: theme.white, borderRadius: 24, padding: isPhone ? "20px 22px" : "26px 28px",
+              marginTop: isWide ? 0 : 24,
               boxShadow: "0 10px 40px rgba(139,107,90,0.10)",
             }}>
               <div key={lastSession?._id || "welcome"} className="soft-fade-in" style={{ display: "flex", alignItems: "center", gap: 14 }}>
@@ -217,7 +253,7 @@ export default function LandingPage({
         <div style={{
           maxWidth: contentMaxWidth,
           margin: "0 auto",
-          padding: isDesktop ? "28px 56px 32px" : "22px 28px 24px",
+          padding: isWide ? "28px 56px 32px" : isTablet ? "28px 40px 32px" : "22px 20px 24px",
         }}>
           <div className="fade-up delay-3" style={{
             display: "flex", justifyContent: "space-between", alignItems: isDesktop ? "center" : "flex-start",
@@ -258,31 +294,26 @@ export default function LandingPage({
           </div>
 
           <EvaluationControls value={evaluationSelection} onChange={onEvaluationSelectionChange} />
-          {startError && <p role="alert">{startError}</p>}
-          {currentAccess?.introductionRequired && <p role="status">Complete Session 1 fully to unlock all other sessions.</p>}
-          {!currentAccess && <p role="status">Checking available sessions…</p>}
-          {currentAccess?.error && <p role="alert">Could not check session access. <button type="button" onClick={() => setAccessAttempt(value => value + 1)}>Try again</button></p>}
-          <div ref={sessionsRef} className="fade-up delay-4" style={{ display: "flex", alignItems: "center", gap: isDesktop ? 14 : 8 }}>
-            {totalPages > 1 && (
-              <button
-                type="button"
-                onClick={goToPrevPage}
-                aria-label="Show previous sessions"
-                className="carousel-arrow"
-                style={{ width: isDesktop ? 44 : 36, height: isDesktop ? 44 : 36, fontSize: 18, flexShrink: 0 }}
-              >
-                ‹
-              </button>
-            )}
+          {startError && <p role="alert" className="landing-notice is-error">{startError}</p>}
+          {currentAccess?.introductionRequired && <p role="status" className="landing-notice">🔒 Complete Session 1 fully to unlock all other sessions.</p>}
+          {!currentAccess && <p role="status" className="landing-notice">Checking available sessions…</p>}
+          {currentAccess?.error && (
+            <p role="alert" className="landing-notice is-error">
+              Could not check session access.
+              <button type="button" className="btn-outline" onClick={() => setAccessAttempt(value => value + 1)}>Try again</button>
+            </p>
+          )}
+          <div ref={sessionsRef} className="fade-up delay-4" style={{ display: "flex", alignItems: "center", gap: 14 }}>
+            {isWide && showCarouselNav && carouselArrow("prev")}
 
             <div
-              key={pageIndex}
+              key={`${currentPage}-${pageSize}`}
               className={pageDirection === "next" ? "carousel-slide-next" : "carousel-slide-prev"}
               style={{
                 flex: 1,
                 display: "grid",
-                gridTemplateColumns: isDesktop ? "repeat(3, 1fr)" : "1fr",
-                gap: 18,
+                gridTemplateColumns: `repeat(${cardColumns}, minmax(0, 1fr))`,
+                gap: isPhone ? 14 : 18,
               }}
             >
               {visibleSessions.map((session, i) => {
@@ -305,25 +336,21 @@ export default function LandingPage({
                     }}
                   >
                     <div>
-                      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
-                        <div style={{ width: 44, height: 44, flexShrink: 0, borderRadius: 14, background: palette.chip, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20 }}>
+                      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10, marginBottom: 12 }}>
+                        <div style={{ width: isTablet ? 52 : 44, height: isTablet ? 52 : 44, flexShrink: 0, borderRadius: 14, background: palette.chip, display: "flex", alignItems: "center", justifyContent: "center", fontSize: isTablet ? 24 : 20 }}>
                           {palette.icon}
                         </div>
-                        <div style={{ fontSize: 12, fontWeight: 700, color: theme.textLight, textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                        <div style={{ fontSize: isTablet ? 13 : 12, fontWeight: 700, color: theme.textLight, textTransform: "uppercase", letterSpacing: "0.06em" }}>
                           {session.label}
                         </div>
                       </div>
-                      <div style={{
-                        fontSize: 18, fontWeight: 700, color: theme.text, lineHeight: 1.3,
-                        display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden",
+                      <div className="session-card-title" title={session.title} style={{
+                        fontWeight: 700, color: theme.text, lineHeight: 1.3,
                       }}>
                         {session.title}
                       </div>
-                      {session.theme && (
-                        <div style={{ fontSize: 13, color: theme.textLight, marginTop: 6 }}>{session.theme}</div>
-                      )}
                     </div>
-                    <div style={{ marginTop: 18, display: "flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 700, color: palette.accent }}>
+                    <div style={{ marginTop: 18, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, fontSize: isTablet ? 15 : 13, fontWeight: 700, color: palette.accent }}>
                       {session.prerequisiteLocked ? 'Complete Session 1 to unlock' : session.disabled ? t("landing.comingSoon") : <>{t("landing.startSession")} <span aria-hidden="true">→</span></>}
                     </div>
                   </button>
@@ -331,22 +358,14 @@ export default function LandingPage({
               })}
             </div>
 
-            {totalPages > 1 && (
-              <button
-                type="button"
-                onClick={goToNextPage}
-                aria-label="Show next sessions"
-                className="carousel-arrow"
-                style={{ width: isDesktop ? 44 : 36, height: isDesktop ? 44 : 36, fontSize: 18, flexShrink: 0 }}
-              >
-                ›
-              </button>
-            )}
+            {isWide && showCarouselNav && carouselArrow("next")}
           </div>
 
-          {totalPages > 1 && (
-            <div style={{ textAlign: "center", marginTop: 10, fontSize: 12, color: theme.textLight }}>
-              {pageStart + 1}–{Math.min(pageStart + pageSize, sessions.length)} of {sessions.length}
+          {showCarouselNav && (
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 16, marginTop: isWide ? 14 : 18 }}>
+              {!isWide && carouselArrow("prev")}
+              {pageCounter}
+              {!isWide && carouselArrow("next")}
             </div>
           )}
         </div>

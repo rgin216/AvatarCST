@@ -1,0 +1,44 @@
+{
+  "voice": "Microsoft David Desktop",
+  "engine": "Windows System.Speech",
+  "rate": 0,
+  "volume": 100,
+  "fixtures": [
+    {
+      "file": "01-name.wav",
+      "text": "My name is Alex.",
+      "bytes": 87330,
+      "encoding": 1,
+      "channels": 1,
+      "sampleRate": 22050,
+      "byteRate": 44100,
+      "bitsPerSample": 16,
+      "durationSeconds": 1.9792290249433107,
+      "sha256": "0a40401696fed4728f810723976037602c161cf345a9f56c92ff428bc6375145"
+    },
+    {
+      "file": "02-gardening.wav",
+      "text": "I enjoy gardening.",
+      "bytes": 82922,
+      "encoding": 1,
+      "channels": 1,
+      "sampleRate": 22050,
+      "byteRate": 44100,
+      "bitsPerSample": 16,
+      "durationSeconds": 1.8792743764172335,
+      "sha256": "3dabd2bc50da2fd763aecd0361c5046eb7e21f5d4a2204100fa076662eb5ce2a"
+    },
+    {
+      "file": "03-unsure.wav",
+      "text": "I am not sure.",
+      "bytes": 76970,
+      "encoding": 1,
+      "channels": 1,
+      "sampleRate": 22050,
+      "byteRate": 44100,
+      "bitsPerSample": 16,
+      "durationSeconds": 1.7443083900226757,
+      "sha256": "2e07e9a327817e1e699796cba5cc781de7fa3b73eefb8ea4c9b9b516d8ed8a01"
+    }
+  ]
+}

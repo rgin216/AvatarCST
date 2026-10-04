@@ -44,7 +44,9 @@ function convertToWav(inputPath, outputPath) {
   });
 }
 
-export async function generateLipSync(audioFilePath) {
+// The phonetic recognizer is roughly three times faster than the default
+// PocketSphinx one, with slightly less precise mouth shapes.
+export async function generateLipSync(audioFilePath, { recognizer = 'pocketSphinx' } = {}) {
   const rhubarbPath = resolveRhubarbPath();
 
   if (!getRhubarbStatus().available) {
@@ -66,7 +68,7 @@ export async function generateLipSync(audioFilePath) {
   const jsonOutputPath = audioFilePath.replace(/\.[^.]+$/, '.rhubarb.json');
 
   return new Promise((resolve) => {
-    const args = ['--machineReadable', '-f', 'json', '-o', jsonOutputPath, inputPath];
+    const args = ['--machineReadable', '-r', recognizer, '-f', 'json', '-o', jsonOutputPath, inputPath];
     const proc = spawn(rhubarbPath, args);
 
     let stderr = '';

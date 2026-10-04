@@ -2947,8 +2947,33 @@ export const getSessionInactivityReminder = (sessionId, expectedActivityRevision
     getSessionInactivityReminderWrite(sessionId, expectedActivityRevision)
   );
 
+// The scripted line the next turn will speak if the patient answers, so its
+// audio can be prepared while they respond. A wrong guess is only a cache miss.
+const predictNextProgressLine = ({ session, user, stepIndex, turnIndex, context }) => {
+  try {
+    const { step, boundedIndex, isFinalStep, totalSteps } = getScriptStep(session.scriptId, stepIndex);
+    const stepTurns = step.turns || 1;
+    if (isFinalStep && turnIndex >= stepTurns) return '';
+    const nextStep = isFinalStep
+      ? null
+      : getScriptStep(
+          session.scriptId,
+          getRoutedNextStepIndex({ scriptId: session.scriptId, step, boundedIndex, totalSteps, user })
+        ).step;
+    return getProgressScriptLine({
+      step,
+      nextStep,
+      currentTurnIndex: turnIndex,
+      stepTurns,
+      context: { ...context, previousAnswer: '' },
+    }) || '';
+  } catch {
+    return '';
+  }
+};
+
 // TODO: wrap writes in a MongoDB transaction when upgrading to Atlas M10+ (replica set required)
-const respondToSessionTurnWrite = async ({ sessionId, content, activitySession }) => {
+const respondToSessionTurnWrite = async ({ sessionId, content, activitySession, prefetchSpeech }) => {
   const userContent = content?.trim();
   const repeatRequest = isRepeatQuestionRequest(userContent);
 
@@ -3326,6 +3351,9 @@ const respondToSessionTurnWrite = async ({ sessionId, content, activitySession }
     stepTurns,
     context: scriptContext,
   });
+  // Usually the line this turn ends up speaking, so its audio can be prepared
+  // while the adaptive acknowledgement is generated.
+  try { prefetchSpeech?.(plannedNextLine, session.pipelineMode); } catch { /* best effort */ }
   const selectedMemoryEntries = selectRelevantMemoryEntries({
     memoryEntries,
     currentQuestion: expectedQuestion,
@@ -4203,6 +4231,15 @@ const respondToSessionTurnWrite = async ({ sessionId, content, activitySession }
       selectionReason: entry.selectionReason,
     })),
     suggestedMemoryUpdates,
+    nextScriptLinePrediction: sessionCompleteAfterResponse
+      ? ''
+      : predictNextProgressLine({
+          session,
+          user,
+          stepIndex: nextStepIndex,
+          turnIndex: nextTurnIndex,
+          context: scriptContext,
+        }),
   };
 };
 
@@ -4227,18 +4264,18 @@ export const endSessionAndQueueEvaluation = sessionId =>
     return session;
   });
 
-export const respondToSessionTurn = ({ sessionId, content }) =>
+export const respondToSessionTurn = ({ sessionId, content, prefetchSpeech }) =>
   serializeSessionWrite(sessionId, async () => {
     const activitySession = await registerSessionActivityWrite(sessionId);
     const assignment = activitySession.evaluation;
     if (!assignment?.facilitator) {
-      const turn = await respondToSessionTurnWrite({ sessionId, content, activitySession });
+      const turn = await respondToSessionTurnWrite({ sessionId, content, activitySession, prefetchSpeech });
       await unlockAfterIntroduction(activitySession, turn);
       return turn;
     }
     const calls = [];
     const turn = await withSessionLlm(assignment.facilitator, calls,
-      () => respondToSessionTurnWrite({ sessionId, content, activitySession }), assignment.requestPolicy);
+      () => respondToSessionTurnWrite({ sessionId, content, activitySession, prefetchSpeech }), assignment.requestPolicy);
     // Persist what was actually delivered, after application filtering and fallback handling.
     await captureEvaluationTurn(activitySession, turn, content, calls);
     await unlockAfterIntroduction(activitySession, turn);

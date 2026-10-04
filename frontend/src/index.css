@@ -134,16 +134,51 @@ body {
 }
 .btn-outline:hover { background: #F2E8D9; }
 
+.btn-nav {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 16px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #6B4E3D;
+  box-shadow: 0 2px 8px rgba(139, 107, 90, 0.08);
+}
+.btn-nav svg { flex-shrink: 0; color: #A07E6B; }
+.btn-nav:hover { border-color: #E8A090; }
+
+.landing-nav-tiles {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  width: 100%;
+}
+.landing-nav-tiles .btn-nav {
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  padding: 10px 6px;
+  border-radius: 16px;
+  font-size: 13px;
+}
+
+/* Touch screens: bigger header buttons and roomier session cards. */
+@media (pointer: coarse) and (min-width: 768px) {
+  .btn-nav { padding: 11px 18px; font-size: 15px; }
+}
+@media (min-width: 768px) and (max-width: 1099px) {
+  .session-card { padding: 28px 24px 24px; }
+}
+
 .session-card {
   display: flex;
   flex-direction: column;
   justify-content: space-between;
   width: 100%;
-  min-height: 214px;
   border: none;
   border-radius: 22px;
   padding: 22px 24px;
-  text-align: left;
+  text-align: center;
   cursor: pointer;
   font-family: 'Nunito', sans-serif;
   transition: transform 0.18s ease, box-shadow 0.18s ease;
@@ -151,6 +186,17 @@ body {
 .session-card:hover {
   transform: translateY(-4px);
   box-shadow: 0 18px 44px rgba(139, 107, 90, 0.18);
+}
+
+/* Titles stay on one line: the font shrinks with the card so the longest
+   title, "Getting to Know You: Childhood", fits down to ~1024px wide. */
+.session-card { container-type: inline-size; }
+.session-card-title {
+  font-size: clamp(13px, 6.4cqi, 18px);
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .carousel-slide-next { animation: carouselSlideNext 0.32s cubic-bezier(0.22, 0.68, 0.32, 1) both; }
@@ -199,6 +245,88 @@ body {
   cursor: pointer;
   font-family: 'Nunito', sans-serif;
   box-shadow: 0 6px 24px #B8CDD855;
+}
+
+.btn-primary:focus-visible,
+.btn-outline:focus-visible,
+.btn-mist:focus-visible,
+.session-card:focus-visible,
+.carousel-arrow:focus-visible,
+.caregiver-icon-btn:focus-visible {
+  outline: 3px solid #7A9DAD;
+  outline-offset: 3px;
+}
+
+.landing-notice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+  padding: 12px 16px;
+  border-radius: 14px;
+  background: #F2E8D9;
+  color: #7A5C4A;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+.landing-notice.is-error {
+  background: #FDE8E8;
+  color: #A8433F;
+}
+
+.caregiver-icon-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  border: none;
+  border-radius: 50%;
+  background: none;
+  color: #7A5C4A;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.caregiver-icon-btn:hover { background: rgba(122, 92, 74, 0.08); }
+
+.memory-remove-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  border: 1.5px solid rgba(122, 92, 74, 0.2);
+  border-radius: 10px;
+  padding: 5px 10px;
+  background: none;
+  color: #7A5C4A;
+  cursor: pointer;
+  font: 700 12px 'Nunito', sans-serif;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+.memory-remove-btn:hover {
+  border-color: #E8A090;
+  background: #FDE8E8;
+  color: #C0504D;
+}
+.memory-remove-btn:focus-visible {
+  outline: 3px solid #7A9DAD;
+  outline-offset: 2px;
+}
+
+.caregiver-field {
+  width: 100%;
+  border: 1px solid #F4C8B0;
+  border-radius: 10px;
+  background: #FDF6EE;
+  color: #3D2B1F;
+  font-family: 'Nunito', sans-serif;
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.caregiver-field:focus {
+  border-color: #7A9DAD;
+  box-shadow: 0 0 0 3px #B8CDD855;
 }
 
 /* ── Session specific ── */
