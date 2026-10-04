@@ -8,6 +8,7 @@ import AvatarViewer from "../components/avatar/AvatarViewer";
 import api from "../services/api.js";
 import DeploymentLatencyControls from "../components/DeploymentLatencyControls.jsx";
 import { deploymentLatency } from "../utils/deploymentLatency.js";
+import { readStreamedTranscript, transformTranscriptStreamResponse } from "../utils/transcriptStream.js";
 import OrientationActivity from "../components/OrientationActivity.jsx";
 import PronunciationActivity from "../components/PronunciationActivity.jsx";
 import WordGuessActivity from "../components/WordGuessActivity.jsx";
@@ -1330,8 +1331,24 @@ export default function SessionPage({
       formData.append("avatarMode", avatarModeRef.current);
       formData.append("lipSyncMode", lipSyncMode);
 
+      // The transcript streams back ahead of the reply, so show it as soon as it
+      // arrives instead of leaving "Transcribing..." up until Aria is ready.
+      let transcriptShown = false;
       const { data } = await api.post(`/sessions/${sessionId}/respond-audio`, formData, {
         headers: { "Content-Type": "multipart/form-data" },
+        params: { stream: "transcript" },
+        adapter: "xhr",
+        responseType: "text",
+        transformResponse: [transformTranscriptStreamResponse],
+        onDownloadProgress: (event) => {
+          if (transcriptShown || voicePlaceholderIdRef.current !== placeholderId) return;
+          const transcript = readStreamedTranscript(event.event?.target?.responseText);
+          if (!transcript) return;
+          transcriptShown = true;
+          setMessages((items) =>
+            items.map((msg) => msg._id === placeholderId ? { ...msg, text: transcript } : msg)
+          );
+        },
       });
 
       applyTurn(data);

@@ -415,11 +415,29 @@ export const getPipelineInfo = (_req, res) => {
   res.json(info);
 };
 
+// Opt-in newline-delimited JSON: the transcript is written as soon as speech-to-text
+// finishes so the patient sees their words while the reply is still being prepared,
+// then the full turn (or an error) follows on the final line.
+const TRANSCRIPT_STREAM_CONTENT_TYPE = 'application/x-ndjson; charset=utf-8';
+
+function writeStreamLine(res, value) {
+  if (!res.destroyed && !res.writableEnded) res.write(`${JSON.stringify(value)}\n`);
+}
+
+function startTranscriptStream(res, transcript) {
+  res.status(201);
+  res.setHeader('Content-Type', TRANSCRIPT_STREAM_CONTENT_TYPE);
+  res.setHeader('Cache-Control', 'no-cache, no-transform');
+  res.setHeader('X-Accel-Buffering', 'no');
+  writeStreamLine(res, { type: 'transcript', transcript });
+}
+
 export const respondAudioToSession = async (req, res, next) => {
   const uploadedFilePath = req.file?.path;
   const timings = {};
   const turnId = uuidv4();
   const startedAtMs = nowMs();
+  const streamTranscript = req.query?.stream === 'transcript';
 
   try {
     const avatarMode = getAvatarMode(req.body?.avatarMode);
@@ -441,6 +459,7 @@ export const respondAudioToSession = async (req, res, next) => {
         timings
       );
     }
+    if (streamTranscript) startTranscriptStream(res, transcript);
 
     const turn = await timeAsync(
       'orchestratorMs',
@@ -464,9 +483,15 @@ export const respondAudioToSession = async (req, res, next) => {
     turn.audioStatus ||= 'ok';
     turn.transcript = transcript;
     turn.timings = { ...timings, totalMs: nowMs() - startedAtMs };
-    res.status(201).json(turn);
+    if (!streamTranscript) return res.status(201).json(turn);
+    writeStreamLine(res, { type: 'turn', turn });
+    res.end();
   } catch (err) {
-    next(err);
+    if (!res.headersSent) return next(err);
+    // The 201 status has already gone out with the transcript, so report in-band.
+    console.error(`[${err.status || 500}] POST respond-audio stream — ${err.message}`);
+    writeStreamLine(res, { type: 'error', status: err.status || 500, error: err.message || 'Internal server error' });
+    res.end();
   } finally {
     if (uploadedFilePath) fs.unlink(uploadedFilePath, () => {});
   }
