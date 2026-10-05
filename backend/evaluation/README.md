@@ -16,7 +16,9 @@ npm run eval:llm -- --live --repeats 3
 
 The default command is a dry run: validates configuration and prints call counts without contacting providers. `--live` uses keys from backend/.env and incurs provider usage. Start with one scenario to check access and limits.
 
-Options: `--models path.json`, `--scenarios path.json`, `--limit N`, `--repeats N` (1–20), `--out directory`. Relative paths resolve from the current directory. There are 30 synthetic Session 1 scenarios; one repetition of three models makes 90 generation calls and 180 critic calls, before truncation retries. No real participant records are read.
+Options: `--models path.json`, `--scenarios path.json`, `--limit N`, `--repeats N` (1–20), `--out directory`, `--delay-ms N` (0–300000; default 61000 per provider/model), `--quota-retries N` (0–5; default 2). Relative paths resolve from the current directory. There are 30 synthetic Session 1 scenarios; one repetition of three models makes 90 generation calls and 180 critic calls, before retries. No real participant records are read.
+
+Ordinary requests use the configured interval between starts for the same model, defaulting to 61 seconds, across facilitator and critic roles. HTTP 429 failures receive at most two retries, waiting the longer of the configured interval or the provider's stated retry time plus one second (61 seconds when no timing is supplied). Quota events, including recovered failures, are retained in `report.json`. Ordinary pacing happens before generation timing; retry waits remain included in generation latency. Run benchmarks separately so they do not compete for account quotas. Pacing does not guarantee success if a single request exceeds a quota or daily limits are exhausted. A full 30-scenario run can take several hours depending on request order and retries.
 
 ## Model research, checked 22 September 2026
 
@@ -83,7 +85,7 @@ npm run eval:calibrate -- --report evaluation/results/RUN/report.json --review e
 
 Replace RUN with the generated directory name. This command makes no API calls. It reports exact agreement, agreement within one point, mean absolute error and mean signed error for each judge/criterion, with sample counts. Positive signed error means the judge scores more generously than the reviewer. Blank ratings and failed judgments are excluded; duplicate IDs, mismatched source text and invalid ratings fail validation. The output path must be new to prevent overwriting a report/review. These are descriptive comparisons with one reviewer, not reliability estimates or clinical validation. Human critical-failure annotations remain for manual review; the comparison currently measures numeric rubric scores only.
 
-An API failure or invalid critique makes the command exit nonzero after saving completed results. Runs are sequential to reduce bursts. Rate-limit errors remain visible; there is no automatic throttling/resume or provider substitution. The underlying Groq client may retry a truncated generation once. A process interruption retains completed rows, but may lose the current row. Treat incomplete panels as incomplete experiments.
+An unrecovered API failure or invalid critique makes the command exit nonzero after saving completed results. Runs are sequential and paced. Rate-limit events remain visible; there is no automatic resume or provider substitution. The underlying Groq client may retry a truncated generation once. A process interruption retains completed rows, but may lose the current row. Treat incomplete panels as incomplete experiments.
 
 ## Scope and next steps
 
