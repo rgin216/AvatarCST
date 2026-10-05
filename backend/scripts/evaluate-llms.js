@@ -13,6 +13,8 @@ const { values } = parseArgs({ options: {
   models: { type: 'string', default: resolve(root, 'evaluation/models.json') },
   scenarios: { type: 'string', default: resolve(root, 'evaluation/scenarios.json') },
   repeats: { type: 'string', default: '1' },
+  'delay-ms': { type: 'string', default: '61000' },
+  'quota-retries': { type: 'string', default: '2' },
   limit: { type: 'string' },
   out: { type: 'string', default: resolve(root, 'evaluation/results') },
 } });
@@ -20,6 +22,10 @@ try {
   dotenv.config({ path: resolve(root, '.env'), quiet: true });
   const { runEvaluation, validateInputs, RUBRIC } = await import('../src/evaluation/runner.js');
   const { findDisagreements } = await import('../src/evaluation/analysis.js');
+  const { createPacedGenerator } = await import('../src/evaluation/pacing.js');
+  const { generateResponse } = await import('../src/services/llmService.js');
+  const requestPolicy = { intervalMs: Number(values['delay-ms']), maxRetries: Number(values['quota-retries']) };
+  const generate = createPacedGenerator(generateResponse, { ...requestPolicy, onWait: event => console.log(`${event.model}: waiting ${Math.ceil(event.waitMs / 1000)}s (${event.reason})`) });
   const models = JSON.parse(await readFile(values.models, 'utf8'));
   let scenarios = JSON.parse(await readFile(values.scenarios, 'utf8'));
   if (values.limit !== undefined) {
@@ -32,6 +38,7 @@ try {
   const generations = models.length * scenarios.length * repeats;
   console.log(JSON.stringify({ mode: values.live ? 'live' : 'dry-run', models, scenarios: scenarios.length, repeats,
     generationCalls: generations, judgeCalls: generations * (models.length - 1),
+    requestPolicy,
     note: 'Generation truncation may cause one additional API call. Live calls incur provider usage.' }, null, 2));
   if (values.live) {
     assertProviderCredentials(models);
@@ -40,14 +47,17 @@ try {
     let revision = 'unknown';
     try { revision = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim(); } catch {}
     await writeFile(resolve(out, 'manifest.json'), JSON.stringify({
-      startedAt: new Date().toISOString(), revision, models, scenarios, repeats,
+      startedAt: new Date().toISOString(), revision, models, scenarios, repeats, requestPolicy,
+      latencyDefinition: 'Pre-call pacing excluded; quota retry waits and service retries included.',
       fixtureHash: createHash('sha256').update(JSON.stringify(scenarios)).digest('hex'),
     }, null, 2));
     console.log('Saving results to ' + out);
-    const result = await runEvaluation({ models, scenarios, repeats, onRow: async row => {
+    const result = await runEvaluation({ models, scenarios, repeats, generate, onRow: async row => {
       await appendFile(resolve(out, 'rows.jsonl'), JSON.stringify(row) + '\n');
       console.log(row.scenario + ' / ' + row.facilitator + ': ' + row.status);
     } });
+    result.requestPolicy = requestPolicy;
+    result.quotaEvents = generate.events;
     await writeFile(resolve(out, 'report.json'), JSON.stringify(result, null, 2));
     await writeFile(resolve(out, 'disagreements.json'), JSON.stringify(findDisagreements(result.rows), null, 2));
     // Blinded rows contain neither model IDs nor automated scores.

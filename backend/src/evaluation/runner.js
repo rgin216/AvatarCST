@@ -107,6 +107,7 @@ export async function runEvaluation({ models, scenarios, repeats = 1, generate =
           prompt: scenario.prompt, input: scenario.input, context: scenario.context,
           status: 'ok', judgments: [],
         };
+        await generate.beforeCall?.(facilitator);
         const started = performance.now();
         try {
           row.acknowledgement = await generate([
@@ -128,6 +129,7 @@ export async function runEvaluation({ models, scenarios, repeats = 1, generate =
           for (const critic of ordered.filter(m => m.id !== facilitator.id)) {
             const judgment = { judge: critic.id, status: 'ok' };
             try {
+              await generate.beforeCall?.(critic);
               judgment.raw = await generate([
                 { role: 'system', content: JUDGE_PROMPT },
                 { role: 'user', content: JSON.stringify({
