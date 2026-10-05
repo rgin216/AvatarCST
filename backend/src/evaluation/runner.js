@@ -107,9 +107,10 @@ export async function runEvaluation({ models, scenarios, repeats = 1, generate =
           prompt: scenario.prompt, input: scenario.input, context: scenario.context,
           status: 'ok', judgments: [],
         };
-        await generate.beforeCall?.(facilitator);
-        const started = performance.now();
+        let started;
         try {
+          await generate.beforeCall?.(facilitator);
+          started = performance.now();
           row.acknowledgement = await generate([
             { role: 'system', content: scenario.prompt },
             { role: 'user', content: scenario.input },
@@ -123,7 +124,7 @@ export async function runEvaluation({ models, scenarios, repeats = 1, generate =
             noQuestion: !row.acknowledgement.includes('?'),
           };
         } catch (error) {
-          row.status = 'error'; row.error = error.message; row.latencyMs = Math.round(performance.now() - started);
+          row.status = 'error'; row.error = error.message; row.latencyMs = started === undefined ? 0 : Math.round(performance.now() - started);
         }
         if (row.status === 'ok') {
           for (const critic of ordered.filter(m => m.id !== facilitator.id)) {

@@ -17,7 +17,7 @@ export function createPacedGenerator(generate, { intervalMs = 61000, maxRetries 
       due.set(key, now() + intervalMs);
       try { return await generate(messages, options); }
       catch (error) {
-        if (!/error 429\b/i.test(error.message)) throw error;
+        if (!/(?:error|HTTP) 429\b/i.test(error.message)) throw error;
         const seconds = /try again in ([\d.]+)s/i.exec(error.message);
         const waitMs = Math.max(intervalMs, seconds ? Math.ceil(Number(seconds[1]) * 1000) + 1000 : 61000);
         events.push({ model: key, attempt: attempt + 1, error: error.message, retry: attempt < maxRetries, waitMs });

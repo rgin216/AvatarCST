@@ -1,6 +1,34 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createPacedGenerator } from './pacing.js';
+import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+
+test('Anthropic HTTP 429 uses the bounded quota retry path', async () => {
+  let calls = 0;
+  const waits = [];
+  const generate = createPacedGenerator(async () => {
+    if (++calls === 1) throw new Error('Anthropic HTTP 429');
+    return 'ok';
+  }, { sleep: async ms => waits.push(ms) });
+  assert.equal(await generate([], { provider: 'anthropic', model: 'test' }), 'ok');
+  assert.deepEqual(waits, [61000]);
+  assert.equal(generate.events.length, 1);
+});
+
+test('CLI rejects blank pacing operands but accepts scientific notation and zero', () => {
+  const script = fileURLToPath(new URL('../../scripts/evaluate-llms.js', import.meta.url));
+  for (const option of ['delay-ms', 'quota-retries']) {
+    for (const value of ['', '   ']) {
+      const result = spawnSync(process.execPath, [script, `--${option}=${value}`], { encoding: 'utf8' });
+      assert.equal(result.status, 1);
+      assert.match(result.stderr, new RegExp(`${option} must not be blank`));
+    }
+  }
+  const result = spawnSync(process.execPath, [script, '--delay-ms=1e3', '--quota-retries=0', '--limit=1'], { encoding: 'utf8' });
+  assert.equal(result.status, 0, result.stderr);
+  assert.deepEqual(JSON.parse(result.stdout).requestPolicy, { intervalMs: 1000, maxRetries: 0 });
+});
 
 test('paces each model independently before the measured request', async () => {
   let clock = 0;

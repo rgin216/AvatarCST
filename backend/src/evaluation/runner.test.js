@@ -7,6 +7,26 @@ const models = ['a', 'b', 'c'].map(id => ({ id, provider: 'groq', model: id }));
 const scenarios = JSON.parse(await readFile(new URL('../../evaluation/scenarios.json', import.meta.url), 'utf8')).slice(0, 2);
 const verdict = JSON.stringify({ scores: Object.fromEntries(Object.keys(RUBRIC).map(k => [k, { score: 4, evidence: 'A concrete acknowledgement.' }])), criticalFailures: [] });
 
+test('rejected facilitator pacing hook checkpoints a zero-latency error and continues', async () => {
+  const calls = [], saved = [];
+  const generate = async (_, options) => {
+    calls.push(options);
+    return options.json ? verdict : 'Thank you.';
+  };
+  let first = true;
+  generate.beforeCall = async () => {
+    if (first) { first = false; throw new Error('Pacing hook failed'); }
+  };
+  const report = await runEvaluation({ models, scenarios: scenarios.slice(0, 1), generate, onRow: async row => saved.push(row) });
+  assert.equal(saved.length, 3);
+  assert.equal(report.rows[0].status, 'error');
+  assert.equal(report.rows[0].error, 'Pacing hook failed');
+  assert.equal(report.rows[0].latencyMs, 0);
+  assert.deepEqual(report.rows[0].judgments, []);
+  assert.equal(calls.filter(c => !c.json).length, 2);
+  assert.ok(report.rows.slice(1).every(row => row.status === 'ok'));
+});
+
 test('rotates all facilitators, uses identical contexts and blinds independent critics', async () => {
   const generationCalls = [], judgeCalls = [];
   const report = await runEvaluation({ models, scenarios, generate: async (messages, options) => {

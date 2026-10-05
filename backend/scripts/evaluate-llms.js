@@ -24,6 +24,9 @@ try {
   const { findDisagreements } = await import('../src/evaluation/analysis.js');
   const { createPacedGenerator } = await import('../src/evaluation/pacing.js');
   const { generateResponse } = await import('../src/services/llmService.js');
+  for (const option of ['delay-ms', 'quota-retries']) {
+    if (!values[option].trim()) throw new Error(`${option} must not be blank`);
+  }
   const requestPolicy = { intervalMs: Number(values['delay-ms']), maxRetries: Number(values['quota-retries']) };
   const generate = createPacedGenerator(generateResponse, { ...requestPolicy, onWait: event => console.log(`${event.model}: waiting ${Math.ceil(event.waitMs / 1000)}s (${event.reason})`) });
   const models = JSON.parse(await readFile(values.models, 'utf8'));
