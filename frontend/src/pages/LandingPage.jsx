@@ -7,7 +7,7 @@ import useViewport from "../hooks/useViewport";
 import { useLanguage } from "../language/useLanguage.js";
 
 const pipelineOptions = [
-  { id: "free", label: "Free", detail: "Groq + streamed Edge TTS" },
+  ...(import.meta.env.DEV ? [{ id: "free", label: "Free", detail: "Groq + streamed Edge TTS" }] : []),
   { id: "openai-fast-scripted", label: "OpenAI fast", detail: "Script-locked streaming" },
 ];
 
@@ -262,7 +262,7 @@ export default function LandingPage({
             <div style={{ fontSize: 14, fontWeight: 600, color: theme.textLight, textTransform: "uppercase", letterSpacing: "0.08em" }}>
               {t("landing.yourSessions")}
             </div>
-            <div style={{ display: "inline-flex", gap: 4, background: theme.sand, borderRadius: 999, padding: 4 }}>
+            {import.meta.env.DEV && <div style={{ display: "inline-flex", gap: 4, background: theme.sand, borderRadius: 999, padding: 4 }}>
               {pipelineOptions.map((option) => {
                 const active = pipelineMode === option.id;
                 return (
@@ -290,7 +290,7 @@ export default function LandingPage({
                   </button>
                 );
               })}
-            </div>
+            </div>}
           </div>
 
           <EvaluationControls value={evaluationSelection} onChange={onEvaluationSelectionChange} />

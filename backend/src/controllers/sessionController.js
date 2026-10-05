@@ -175,7 +175,7 @@ const getSpeechProviderForPipeline = (mode) => {
   return 'edge';
 };
 
-const getAvatarMode = (value) => (AVATAR_MODES.has(value) ? value : 'visualizer');
+const getAvatarMode = (value) => (AVATAR_MODES.has(value) ? value : 'male');
 const getLipSyncMode = (value) => (LIP_SYNC_MODES.has(value) ? value : 'rhubarb');
 
 const shouldUseRhubarbForAvatar = (avatarMode) => avatarMode === 'male' || avatarMode === 'female';
