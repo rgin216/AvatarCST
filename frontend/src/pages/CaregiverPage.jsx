@@ -52,7 +52,7 @@ function SaveToMemoryButton({ saved, onClick }) {
   );
 }
 
-export default function CaregiverPage({ userId, onBack, onLogout, userName }) {
+export default function CaregiverPage({ userId, onBack, userName }) {
   const { isPhone, isWide } = useViewport();
   const isDesktop = !isPhone;
   // Wide screens get the sidebar; phones and tablets use top tabs.
@@ -472,14 +472,6 @@ export default function CaregiverPage({ userId, onBack, onLogout, userName }) {
               <div style={{ fontFamily: "'Playfair Display', serif", fontSize: 22, fontWeight: 600, color: theme.text }}>{t("caregiver.title")}</div>
               <div style={{ fontSize: 13, color: theme.textLight }}>{t("caregiver.profileSubtitle", { name: userName })}</div>
             </div>
-            {onLogout && (
-              <button
-                onClick={onLogout}
-                style={{ background: "none", border: `1.5px solid ${theme.mistDark}88`, borderRadius: 12, padding: "7px 14px", fontSize: 13, color: theme.mistDark, cursor: "pointer", fontFamily: "'Nunito', sans-serif", fontWeight: 600 }}
-              >
-                {t("caregiver.signOut")}
-              </button>
-            )}
           </div>
           {!showSidebar && (
             <div style={{ display: "flex" }}>

@@ -17,7 +17,10 @@ The project has moved beyond the old "basic backend foundation" phase. The main 
 ### Implemented
 
 - React/Vite frontend and Express/Mongo backend.
-- Login flow that creates or loads a patient user by name.
+- Username + password sign-in (`POST /api/users/login`) and registration (`POST /api/users/register`) with a "remember me" option (localStorage vs sessionStorage). Registration also asks what Aria should call the user (`name`/`preferredName`), kept separate from the lowercase `username`. Passwords are scrypt-hashed in `passwordService.js`. Legacy accounts with no username sign in with their name, and name-only accounts set their password on their next sign-in.
+- The caregiver area asks for the account password again each time it is opened (`CaregiverGate.jsx`, `POST /api/users/:id/verify-password`).
+- New accounts start with an empty memory bank.
+- The API does not yet authenticate requests: passwords gate the UI only, and routes still trust the `userId` they are given.
 - Landing flow with thirteen test sessions (Sessions 9 and 15 are placeholder "coming soon" entries):
   - `cst_intro_reminiscence` - Session 1: Introduction and Welcome.
   - `cst_childhood` - Session 2: Getting to Know You: Childhood.
@@ -174,7 +177,6 @@ Current frontend:
 
 - `frontend/src/pages/CaregiverPage.jsx` lets a caregiver view, add, and delete memory entries.
 - The caregiver page separates approved memories from pending suggestions, and pending items can be approved or rejected.
-- `frontend/src/pages/LoginPage.jsx` seeds a few starter memories when it creates a new user.
 
 Current orchestrator behavior:
 
