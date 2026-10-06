@@ -2,7 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import Session from '../models/Session.js';
 import User from '../models/User.js';
-import { respondAudioToSession, updateSession } from './sessionController.js';
+import Message from '../models/Message.js';
+import { getMessages, getPipelineInfo, respondAudioToSession, updateSession } from './sessionController.js';
 
 const makeRes = () => {
   const res = { statusCode: 200, body: undefined, headers: {}, chunks: [], headersSent: false, writableEnded: false };
@@ -66,4 +67,35 @@ test('developer skip rejects deck slides absent from the session', async (t) => 
   const res = makeRes();
   await updateSession({ params: { id: 'session' }, body: { skipToDeckSlide: 999 } }, res, (error) => { assert.ifError(error); });
   assert.equal(res.statusCode, 400);
+});
+
+test('session transcripts are served only in development', async (t) => {
+  const originalEnv = process.env.NODE_ENV;
+  t.after(() => {
+    if (originalEnv === undefined) delete process.env.NODE_ENV;
+    else process.env.NODE_ENV = originalEnv;
+  });
+  const transcript = [{ role: 'user', content: 'Hello' }];
+  const find = t.mock.method(Message, 'find', () => ({ sort: async () => transcript }));
+
+  for (const env of ['production', undefined]) {
+    if (env === undefined) delete process.env.NODE_ENV;
+    else process.env.NODE_ENV = env;
+    const res = makeRes();
+    await getMessages({ params: { id: 'session' } }, res, assert.ifError);
+    assert.equal(res.statusCode, 403);
+    const info = makeRes();
+    getPipelineInfo({}, info);
+    assert.equal(info.body.transcriptsAvailable, false);
+  }
+  assert.equal(find.mock.callCount(), 0, 'production must not read the transcript at all');
+
+  process.env.NODE_ENV = 'development';
+  const res = makeRes();
+  await getMessages({ params: { id: 'session' } }, res, assert.ifError);
+  assert.equal(res.statusCode, 200);
+  assert.deepEqual(res.body, transcript);
+  const info = makeRes();
+  getPipelineInfo({}, info);
+  assert.equal(info.body.transcriptsAvailable, true);
 });

@@ -22,6 +22,11 @@ const CATEGORY_COLORS = {
 
 const CAREGIVER_TAB_IDS = new Set(["summary", "memory", "history"]);
 
+// Full conversation logs are a dev debugging aid; production caregivers see
+// summaries only. They need a dev build *and* a backend that serves transcripts
+// (NODE_ENV=development), since a dev frontend may point at a production API.
+const TRANSCRIPTS_IN_BUILD = import.meta.env.DEV;
+
 const SESSION_STATUS = {
   completed: { label: "Completed", color: theme.sageDark },
   active: { label: "In progress", color: "#E0A458" },
@@ -82,8 +87,18 @@ export default function CaregiverPage({ userId, onBack, userName }) {
   const [savingPoints, setSavingPoints] = useState(new Set());
   const [latestSummary, setLatestSummary] = useState(null);
   const [loadingSummary, setLoadingSummary] = useState(false);
+  const [showTranscripts, setShowTranscripts] = useState(false);
 
   const tabs = CAREGIVER_TABS;
+
+  useEffect(() => {
+    if (!TRANSCRIPTS_IN_BUILD) return undefined;
+    let cancelled = false;
+    api.get("/sessions/pipeline")
+      .then(({ data }) => { if (!cancelled) setShowTranscripts(data.transcriptsAvailable === true); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
 
   useEffect(() => {
     if (tabParam && !CAREGIVER_TAB_IDS.has(tabParam)) {
@@ -373,7 +388,10 @@ export default function CaregiverPage({ userId, onBack, userName }) {
                 {/* On phones the details and chevron fill the first line and the summary button wraps below. */}
                 <div style={{ display: "flex", flexWrap: isPhone ? "wrap" : "nowrap", alignItems: "center", gap: 10, padding: "14px 12px 14px 18px" }}>
                   {/* Mouse shortcut for the chevron button, which is the accessible toggle. */}
-                  <div onClick={() => toggleSession(s._id)} style={{ flex: isPhone ? "1 1 calc(100% - 44px)" : 1, minWidth: 0, cursor: "pointer" }}>
+                  <div
+                    onClick={showTranscripts ? () => toggleSession(s._id) : undefined}
+                    style={{ flex: isPhone ? (showTranscripts ? "1 1 calc(100% - 44px)" : "1 1 100%") : 1, minWidth: 0, cursor: showTranscripts ? "pointer" : "default" }}
+                  >
                     <div style={{ fontSize: 15, fontWeight: 700, color: theme.text, marginBottom: 4 }}>{formatSessionDate(s)}</div>
                     <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "4px 14px", fontSize: 13, color: theme.textLight }}>
                       <span>⏱ {formatDuration(s)}</span>
@@ -395,19 +413,21 @@ export default function CaregiverPage({ userId, onBack, userName }) {
                       {expandedSummaryId === s._id ? t("caregiver.hideSummary") : t("caregiver.viewSummary")}
                     </button>
                   )}
-                  <button
-                    type="button"
-                    onClick={() => toggleSession(s._id)}
-                    aria-expanded={isExpanded}
-                    aria-label={isExpanded ? "Hide conversation" : "Show conversation"}
-                    title={isExpanded ? "Hide conversation" : "Show conversation"}
-                    className="caregiver-icon-btn"
-                    style={{ width: 34, height: 34 }}
-                  >
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ transform: isExpanded ? "rotate(180deg)" : "none", transition: "transform 0.2s" }}>
-                      <path d="M6 9l6 6 6-6" />
-                    </svg>
-                  </button>
+                  {showTranscripts && (
+                    <button
+                      type="button"
+                      onClick={() => toggleSession(s._id)}
+                      aria-expanded={isExpanded}
+                      aria-label={isExpanded ? "Hide conversation" : "Show conversation"}
+                      title={isExpanded ? "Hide conversation" : "Show conversation"}
+                      className="caregiver-icon-btn"
+                      style={{ width: 34, height: 34 }}
+                    >
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ transform: isExpanded ? "rotate(180deg)" : "none", transition: "transform 0.2s" }}>
+                        <path d="M6 9l6 6 6-6" />
+                      </svg>
+                    </button>
+                  )}
                 </div>
 
                 {expandedSummaryId === s._id && (() => {
@@ -423,7 +443,7 @@ export default function CaregiverPage({ userId, onBack, userName }) {
                   );
                 })()}
 
-                {isExpanded && (
+                {showTranscripts && isExpanded && (
                   <div style={{ borderTop: `1px solid ${theme.blush}44`, padding: "16px 18px", background: theme.cream }}>
                     {!messages && (
                       <div style={{ textAlign: "center", padding: "12px 0", color: theme.textLight, fontSize: 13 }}>Loading...</div>

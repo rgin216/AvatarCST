@@ -216,7 +216,7 @@ Useful session endpoints:
 - `POST /api/sessions/:id/respond`
 - `POST /api/sessions/:id/respond-audio`
 - `POST /api/sessions/:id/messages`
-- `GET /api/sessions/:id/messages`
+- `GET /api/sessions/:id/messages` (development only: returns 403 unless `NODE_ENV=development`; `GET /api/sessions/pipeline` reports this as `transcriptsAvailable`, and the caregiver History tab shows transcripts only in a Vite dev build talking to such a backend, summaries otherwise)
 
 ## Development Setup
 
