@@ -9,7 +9,7 @@ import {
   respondToSessionTurn,
   endSessionAndQueueEvaluation,
 } from '../services/sessionOrchestratorService.js';
-import { transcribeAudio } from '../services/sttService.js';
+import { transcribeWithFallback } from '../services/sttService.js';
 import {
   getVoiceOptionsForAvatar,
   pipeSpeechStream,
@@ -26,6 +26,7 @@ import {
   DEFAULT_PIPELINE_MODE,
   SESSION_PIPELINE_MODES,
   usesOpenAITextPipeline,
+  getTranscriptionProviders,
 } from '../config/pipeline.js';
 import { generateSummary } from '../services/summaryService.js';
 import Summary from '../models/Summary.js';
@@ -166,9 +167,6 @@ export const getMessages = async (req, res, next) => {
     next(err);
   }
 };
-
-const getTranscriptionProviderForPipeline = (mode) =>
-  usesOpenAITextPipeline(mode) ? 'openai' : undefined;
 
 const getSpeechProviderForPipeline = (mode) => {
   if (usesOpenAITextPipeline(mode)) return 'openai';
@@ -444,7 +442,7 @@ export const respondAudioToSession = async (req, res, next) => {
     const lipSyncMode = getLipSyncMode(req.body?.lipSyncMode);
     const session = await Session.findById(req.params.id).select('pipelineMode userId').lean();
     if (!session) return res.status(404).json({ error: 'Session not found' });
-    const transcriptionProvider = getTranscriptionProviderForPipeline(session.pipelineMode);
+    const transcriptionProviders = getTranscriptionProviders(session.pipelineMode);
     const user = await User.findById(session.userId).select('settings.language').lean();
     const selectedLanguage = user?.settings?.language || 'en';
 
@@ -452,8 +450,8 @@ export const respondAudioToSession = async (req, res, next) => {
     if (uploadedFilePath) {
       transcript = await timeAsync(
         'sttMs',
-        () => transcribeAudio(uploadedFilePath, req.file?.originalname, {
-          provider: transcriptionProvider,
+        () => transcribeWithFallback(uploadedFilePath, req.file?.originalname, {
+          ...transcriptionProviders,
           language: selectedLanguage,
         }),
         timings

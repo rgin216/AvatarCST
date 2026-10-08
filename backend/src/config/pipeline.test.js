@@ -28,6 +28,41 @@ for (const environment of ['production', 'staging', 'test', '', undefined]) {
   });
 }
 
+function transcriptionFor(environment, sttProvider) {
+  const env = { ...process.env, NODE_ENV: environment };
+  if (sttProvider === undefined) delete env.STT_PROVIDER;
+  else env.STT_PROVIDER = sttProvider;
+  const result = spawnSync(process.execPath, ['--input-type=module', '-e', `
+    import { getTranscriptionProviders } from './pipeline.js';
+    console.log(JSON.stringify({
+      free: getTranscriptionProviders('free'),
+      openai: getTranscriptionProviders('openai-fast-scripted'),
+    }));
+  `], { cwd: new URL('.', import.meta.url), env, encoding: 'utf8' });
+  assert.equal(result.status, 0, result.stderr);
+  return JSON.parse(result.stdout);
+}
+
+test('transcription follows the pipeline when STT_PROVIDER is unset or invalid', () => {
+  for (const value of [undefined, '', 'whisper']) {
+    assert.deepEqual(transcriptionFor('development', value), {
+      free: { provider: 'groq', fallbackProvider: null },
+      openai: { provider: 'openai', fallbackProvider: null },
+    });
+  }
+});
+
+test('STT_PROVIDER overrides transcription only, falling back to the pipeline provider', () => {
+  assert.deepEqual(transcriptionFor('production', ' Groq '), {
+    free: { provider: 'groq', fallbackProvider: 'openai' },
+    openai: { provider: 'groq', fallbackProvider: 'openai' },
+  });
+  assert.deepEqual(transcriptionFor('development', 'openai'), {
+    free: { provider: 'openai', fallbackProvider: 'groq' },
+    openai: { provider: 'openai', fallbackProvider: null },
+  });
+});
+
 test('development keeps the Free pipeline available', () => {
   assert.deepEqual(configFor('development', 'free'), {
     modes: ['free', 'openai-fast-scripted'], defaultMode: 'free',

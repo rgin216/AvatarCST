@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { transcribeAudio } from './sttService.js';
+import { transcribeAudio, transcribeWithFallback } from './sttService.js';
 
 test('English settings constrain transcription for both providers', async (t) => {
   const oldOpenAiKey = process.env.OPENAI_API_KEY;
@@ -26,8 +26,38 @@ test('English settings constrain transcription for both providers', async (t) =>
   }
   for (const body of requests) {
     assert.equal(body.get('language'), 'en');
-    assert.match(body.get('prompt'), /strong accent.*English/i);
+    // Instruction prompts were echoed into transcripts of quiet audio (see DementiaBank WER evaluation).
+    assert.equal(body.get('prompt'), null);
   }
+});
+
+test('an explicit prompt option is sent for evaluation comparisons', async (t) => {
+  const bodies = mockOpenAi(t, ['Hello there']);
+  await transcribeAudio('test.webm', 'test.webm', { provider: 'openai', language: 'en', prompt: 'Legacy prompt.' });
+  assert.equal(bodies[0].get('prompt'), 'Legacy prompt.');
+});
+
+test('Groq English script drift retries with the full Whisper model', async (t) => {
+  const oldKey = process.env.GROQ_API_KEY;
+  const oldModel = process.env.GROQ_WHISPER_MODEL;
+  process.env.GROQ_API_KEY = 'test-key';
+  delete process.env.GROQ_WHISPER_MODEL;
+  t.after(() => {
+    if (oldKey === undefined) delete process.env.GROQ_API_KEY;
+    else process.env.GROQ_API_KEY = oldKey;
+    if (oldModel === undefined) delete process.env.GROQ_WHISPER_MODEL;
+    else process.env.GROQ_WHISPER_MODEL = oldModel;
+  });
+  t.mock.method(fs, 'readFileSync', () => Buffer.from('test audio'));
+  const bodies = [];
+  const outputs = ['你好', 'Hello there'];
+  t.mock.method(globalThis, 'fetch', async (_url, options) => {
+    bodies.push(options.body);
+    return Response.json({ text: outputs[bodies.length - 1] });
+  });
+
+  assert.equal(await transcribeAudio('test.webm', 'test.webm', { provider: 'groq', language: 'en' }), 'Hello there');
+  assert.deepEqual(bodies.map(body => body.get('model')), ['whisper-large-v3-turbo', 'whisper-large-v3']);
 });
 
 test('other selected languages are pinned instead of auto-detected', async (t) => {
@@ -96,6 +126,43 @@ test('persistent script drift fails before a transcript can reach the session', 
   await assert.rejects(transcribeAudio('test.webm', 'test.webm', { provider: 'openai', language: 'en' }),
     err => err.status === 422 && /recording your answer again/.test(err.message));
   assert.equal(bodies.length, 2);
+});
+
+function mockProviders(t, responses) {
+  const saved = { OPENAI_API_KEY: process.env.OPENAI_API_KEY, GROQ_API_KEY: process.env.GROQ_API_KEY };
+  process.env.OPENAI_API_KEY = 'test-key';
+  process.env.GROQ_API_KEY = 'test-key';
+  t.after(() => {
+    for (const [key, value] of Object.entries(saved)) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+  });
+  t.mock.method(fs, 'readFileSync', () => Buffer.from('test audio'));
+  t.mock.method(console, 'warn', () => {});
+  const calls = [];
+  t.mock.method(globalThis, 'fetch', async (url) => {
+    calls.push(url.includes('groq') ? 'groq' : 'openai');
+    return responses[calls.length - 1]();
+  });
+  return calls;
+}
+
+test('a failed primary STT provider falls back to the pipeline provider', async (t) => {
+  const calls = mockProviders(t, [() => new Response('rate limited', { status: 429 }), () => Response.json({ text: 'Hello there' })]);
+  assert.equal(await transcribeWithFallback('test.webm', 'test.webm', { provider: 'groq', fallbackProvider: 'openai', language: 'en' }), 'Hello there');
+  assert.deepEqual(calls, ['groq', 'openai']);
+});
+
+test('no fallback without a fallback provider or for English-script rejections', async (t) => {
+  const calls = mockProviders(t, [
+    () => new Response('down', { status: 500 }),
+    () => Response.json({ text: '你好' }), () => Response.json({ text: '你好' }),
+  ]);
+  await assert.rejects(transcribeWithFallback('test.webm', 'test.webm', { provider: 'groq', language: 'en' }), /Groq STT failed 500/);
+  await assert.rejects(transcribeWithFallback('test.webm', 'test.webm', { provider: 'groq', fallbackProvider: 'openai', language: 'en' }),
+    err => err.status === 422);
+  assert.deepEqual(calls, ['groq', 'groq', 'groq']);
 });
 
 test('explicit Chinese selection keeps Chinese speech without an English retry', async (t) => {
