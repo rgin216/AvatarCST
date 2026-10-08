@@ -84,3 +84,15 @@ export async function transcribeAudio(audioFilePath, originalName = 'audio.webm'
   }
   return transcript;
 }
+
+// Retries with the fallback provider when the primary fails (outage, quota, timeout, missing key).
+// An English-script rejection (422) is about the recording itself, so it is not retried elsewhere.
+export async function transcribeWithFallback(audioFilePath, originalName, { fallbackProvider, ...options } = {}) {
+  try {
+    return await transcribeAudio(audioFilePath, originalName, options);
+  } catch (err) {
+    if (!fallbackProvider || err.status === 422) throw err;
+    console.warn(`${options.provider} STT failed, falling back to ${fallbackProvider}: ${err.message}`);
+    return transcribeAudio(audioFilePath, originalName, { ...options, provider: fallbackProvider });
+  }
+}

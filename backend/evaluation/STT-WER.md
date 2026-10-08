@@ -162,6 +162,7 @@ The more promising route is to measure WER on real app recordings first. This wa
 
 - `sttService.js` no longer sends an English instruction prompt. English is still pinned with `language: 'en'`.
 - The non-Latin-script check and retry, previously OpenAI only, now also covers Groq (retrying with `whisper-large-v3`). A transcript that drifts into another script twice is rejected with a request to record again, so it never reaches the session.
+- A new optional `STT_PROVIDER` setting lets transcription use a different provider from the LLM and TTS, e.g. Groq Whisper with OpenAI text and voice. It falls back to the pipeline's own provider if the chosen one fails. The default is unchanged. Whether to switch is a separate decision that also weighs voice quality, end-to-end latency, cost, rate limits and reliability.
 
 ## Limitations
 

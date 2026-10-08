@@ -78,6 +78,10 @@ For typed input, the flow skips STT and starts at `POST /api/sessions/:id/respon
 
 In both pipelines, speech segments are synthesized in parallel and cached by text and voice in `speechCacheService.js`. The orchestrator returns `nextScriptLinePrediction`, which the controller prefetches while the patient responds, and it also prefetches the planned script line during the LLM call. Fresh acknowledgement segments use Rhubarb's faster `phonetic` recognizer, while script segments keep the default `pocketSphinx` recognizer.
 
+### Mixing transcription providers
+
+`STT_PROVIDER=groq` or `STT_PROVIDER=openai` swaps only the speech-to-text step, via `getTranscriptionProviders` in `backend/src/config/pipeline.js`. Example: Groq Whisper transcription with OpenAI text and TTS. When it overrides the pipeline, `transcribeWithFallback` in `sttService.js` retries with the pipeline's own provider on provider errors. It does not retry English-script (422) rejections. See `backend/evaluation/STT-WER.md` for the accuracy comparison behind this option.
+
 ### `PIPELINE_MODE=openai-fast-scripted` (lower-latency paid path)
 
 For recorded microphone input:
@@ -276,6 +280,7 @@ Backend variables from `backend/.env.example`:
 - `GROQ_MODEL`
 - `GROQ_WHISPER_MODEL`
 - `PIPELINE_MODE`
+- `STT_PROVIDER` (optional `groq` or `openai`; overrides only the transcription step, falling back to the pipeline's provider on failure)
 - `TTS_VOICE`
 - `EDGE_TTS_MALE_VOICE`
 - `EDGE_TTS_FEMALE_VOICE`
