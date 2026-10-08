@@ -8,6 +8,7 @@ import SessionInputTutorial from "./components/SessionInputTutorial.jsx";
 import { shouldShowInputTutorial, tutorialStorageKey } from "./utils/inputTutorial.js";
 import EndPage from "./pages/EndPage";
 import CaregiverPage from "./pages/CaregiverPage";
+import CaregiverGate from "./components/CaregiverGate.jsx";
 import SettingsPage from "./pages/SettingsPage";
 import { toTitleCase } from "./utils/formatName";
 import { LanguageProvider } from "./language/LanguageContext.jsx";
@@ -22,11 +23,16 @@ const getInitialPipelineMode = () => {
   return pipelineModes.has(requestedMode) ? requestedMode : "openai-fast-scripted";
 };
 
-const AUTH_STORAGE_KEY = "avatarcst.auth";
+// v2 dates from password sign-in; older name-only logins must sign in again.
+const AUTH_STORAGE_KEY = "avatarcst.auth.v2";
+const LEGACY_AUTH_STORAGE_KEY = "avatarcst.auth";
 
+// "Remember me" keeps the login in localStorage; otherwise it lasts only for
+// this browser tab via sessionStorage.
 function loadStoredAuth() {
   try {
-    const parsed = JSON.parse(localStorage.getItem(AUTH_STORAGE_KEY));
+    localStorage.removeItem(LEGACY_AUTH_STORAGE_KEY);
+    const parsed = JSON.parse(localStorage.getItem(AUTH_STORAGE_KEY) ?? sessionStorage.getItem(AUTH_STORAGE_KEY));
     if (!parsed?.userId || !parsed?.userName) return null;
     return parsed;
   } catch {
@@ -34,9 +40,10 @@ function loadStoredAuth() {
   }
 }
 
-function storeAuth(userId, userName) {
+function storeAuth(userId, userName, rememberMe) {
   try {
-    localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify({ userId, userName }));
+    clearAuth();
+    (rememberMe ? localStorage : sessionStorage).setItem(AUTH_STORAGE_KEY, JSON.stringify({ userId, userName }));
   } catch {
     // Storage may be unavailable (private browsing, quota) — refresh persistence just degrades.
   }
@@ -45,6 +52,7 @@ function storeAuth(userId, userName) {
 function clearAuth() {
   try {
     localStorage.removeItem(AUTH_STORAGE_KEY);
+    sessionStorage.removeItem(AUTH_STORAGE_KEY);
   } catch {
     // Storage may be unavailable (private browsing, quota) — nothing to clean up in that case.
   }
@@ -247,13 +255,13 @@ export default function App() {
       .catch((err) => console.error("Failed to save landing tour completion", err));
   };
 
-  const handleLogin = (id, name) => {
+  const handleLogin = (id, name, rememberMe) => {
     const titled = toTitleCase(name);
     setUserId(id);
     setUserName(titled);
     setUserSettings(DEFAULT_USER_SETTINGS);
     setLandingTourPending(false);
-    storeAuth(id, titled);
+    storeAuth(id, titled, rememberMe);
     navigate("/landing");
   };
 
@@ -364,12 +372,13 @@ export default function App() {
           path="/caregiver/:tab"
           element={
             userId ? (
-              <CaregiverPage
-                userId={userId}
-                onBack={() => navigate("/landing")}
-                onLogout={handleLogout}
-                userName={userName}
-              />
+              <CaregiverGate userId={userId} userName={userName} onBack={() => navigate("/landing")}>
+                <CaregiverPage
+                  userId={userId}
+                  onBack={() => navigate("/landing")}
+                  userName={userName}
+                />
+              </CaregiverGate>
             ) : (
               <Navigate to="/login" replace />
             )
@@ -385,6 +394,7 @@ export default function App() {
                 settings={userSettings}
                 onBack={() => navigate("/landing")}
                 onSettingsChange={handleSettingsChange}
+                onLogout={handleLogout}
               />
             ) : (
               <Navigate to="/login" replace />

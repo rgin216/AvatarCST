@@ -29,6 +29,11 @@ const userSettingsSchema = new Schema({
 
 const userSchema = new Schema({
   name: { type: String, required: true },
+  // Sign-in identifier, stored lowercase. Older accounts without one sign in by name.
+  username: { type: String, trim: true, lowercase: true, index: true },
+  // Never selected by default and stripped from JSON below.
+  // Legacy name-only accounts have no passwordHash until their next sign-in.
+  passwordHash: { type: String, select: false },
   // Only registration opts in; older accounts retain their existing access.
   introductionRequired: { type: Boolean, default: false },
   introductionCompletedAt: Date,
@@ -43,6 +48,16 @@ const userSchema = new Schema({
   patients: [{ type: Schema.Types.ObjectId, ref: 'User' }],
   savedThemeSong: { type: savedThemeSongSchema },
   settings: { type: userSettingsSchema, default: () => ({}) },
-}, { timestamps: true });
+}, {
+  timestamps: true,
+  toJSON: {
+    transform: (_doc, ret) => {
+      delete ret.passwordHash;
+      // Briefly-used field from a separate caregiver password; may linger on test accounts.
+      delete ret.caregiverPasswordHash;
+      return ret;
+    },
+  },
+});
 
 export default model('User', userSchema);

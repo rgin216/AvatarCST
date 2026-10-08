@@ -5,7 +5,7 @@ import Session from '../models/Session.js';
 import Memory from '../models/Memory.js';
 import { getSessionAccess, unlockAfterIntroduction, INTRO_SCRIPT_ID } from './sessionAccessService.js';
 import { createSession, updateSession } from '../controllers/sessionController.js';
-import { createUser, findOrCreateByName } from '../controllers/userController.js';
+import { createUser, register } from '../controllers/userController.js';
 
 const response = () => ({ statusCode: 200, status(value) { this.statusCode = value; return this; }, json(value) { this.body = value; return this; } });
 const next = error => { if (error) throw error; };
@@ -63,7 +63,9 @@ test('registration cannot forge an unlocked profile in either account creation p
   t.mock.method(User, 'findOne', async () => null);
   t.mock.method(Memory, 'create', async () => ({}));
   await createUser({ body: { name: 'New user', introductionRequired: false, introductionCompletedAt: new Date() } }, response(), next);
-  await findOrCreateByName({ params: { name: 'Another user' } }, response(), next);
+  await register({ body: { name: 'Another user', username: 'another', password: 'garden',
+    introductionRequired: false, introductionCompletedAt: new Date() } }, response(), next);
+  assert.equal(created.length, 2);
   assert.ok(created.every(user => user.introductionRequired === true && !user.introductionCompletedAt));
 });
 
