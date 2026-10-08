@@ -26,8 +26,38 @@ test('English settings constrain transcription for both providers', async (t) =>
   }
   for (const body of requests) {
     assert.equal(body.get('language'), 'en');
-    assert.match(body.get('prompt'), /strong accent.*English/i);
+    // Instruction prompts were echoed into transcripts of quiet audio (see DementiaBank WER evaluation).
+    assert.equal(body.get('prompt'), null);
   }
+});
+
+test('an explicit prompt option is sent for evaluation comparisons', async (t) => {
+  const bodies = mockOpenAi(t, ['Hello there']);
+  await transcribeAudio('test.webm', 'test.webm', { provider: 'openai', language: 'en', prompt: 'Legacy prompt.' });
+  assert.equal(bodies[0].get('prompt'), 'Legacy prompt.');
+});
+
+test('Groq English script drift retries with the full Whisper model', async (t) => {
+  const oldKey = process.env.GROQ_API_KEY;
+  const oldModel = process.env.GROQ_WHISPER_MODEL;
+  process.env.GROQ_API_KEY = 'test-key';
+  delete process.env.GROQ_WHISPER_MODEL;
+  t.after(() => {
+    if (oldKey === undefined) delete process.env.GROQ_API_KEY;
+    else process.env.GROQ_API_KEY = oldKey;
+    if (oldModel === undefined) delete process.env.GROQ_WHISPER_MODEL;
+    else process.env.GROQ_WHISPER_MODEL = oldModel;
+  });
+  t.mock.method(fs, 'readFileSync', () => Buffer.from('test audio'));
+  const bodies = [];
+  const outputs = ['你好', 'Hello there'];
+  t.mock.method(globalThis, 'fetch', async (_url, options) => {
+    bodies.push(options.body);
+    return Response.json({ text: outputs[bodies.length - 1] });
+  });
+
+  assert.equal(await transcribeAudio('test.webm', 'test.webm', { provider: 'groq', language: 'en' }), 'Hello there');
+  assert.deepEqual(bodies.map(body => body.get('model')), ['whisper-large-v3-turbo', 'whisper-large-v3']);
 });
 
 test('other selected languages are pinned instead of auto-detected', async (t) => {
