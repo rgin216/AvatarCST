@@ -72,13 +72,16 @@ const readName = (body) => (typeof body?.name === 'string' ? body.name.trim() : 
 const readUsername = (body) => (typeof body?.username === 'string' ? body.username.trim().toLowerCase() : '');
 
 // Accounts made before usernames existed sign in with their name instead,
-// matched case-insensitively.
-const findByUsername = (username) => User.findOne({
-  $or: [
-    { username },
+// matched case-insensitively. A real username always wins over a legacy name.
+const findByUsername = async (username) => (
+  await User.findOne({ username }, '+passwordHash')
+  ?? User.findOne(
     { username: null, name: { $regex: new RegExp(`^${escapeRegExp(username)}$`, 'i') } },
-  ],
-}, '+passwordHash');
+    '+passwordHash'
+  )
+);
+
+const USERNAME_TAKEN = 'That username is already in use. Please pick another.';
 
 export const register = async (req, res, next) => {
   try {
@@ -91,9 +94,7 @@ export const register = async (req, res, next) => {
     }
     const problem = passwordProblem(password);
     if (problem) return res.status(400).json({ error: problem });
-    if (await findByUsername(username)) {
-      return res.status(409).json({ error: 'That username is already in use. Please pick another.' });
-    }
+    if (await findByUsername(username)) return res.status(409).json({ error: USERNAME_TAKEN });
 
     const user = await User.create({
       name, preferredName: name, username, role: 'patient', introductionRequired: true, landingTourRequired: true,
@@ -102,6 +103,8 @@ export const register = async (req, res, next) => {
     await Memory.create({ userId: user._id, entries: [] });
     res.status(201).json({ user });
   } catch (err) {
+    // A concurrent registration can take the username between the check and the insert.
+    if (err?.code === 11000) return res.status(409).json({ error: USERNAME_TAKEN });
     next(err);
   }
 };

@@ -30,7 +30,7 @@ const userSettingsSchema = new Schema({
 const userSchema = new Schema({
   name: { type: String, required: true },
   // Sign-in identifier, stored lowercase. Older accounts without one sign in by name.
-  username: { type: String, trim: true, lowercase: true, index: true },
+  username: { type: String, trim: true, lowercase: true },
   // Never selected by default and stripped from JSON below.
   // Legacy name-only accounts have no passwordHash until their next sign-in.
   passwordHash: { type: String, select: false },
@@ -59,5 +59,8 @@ const userSchema = new Schema({
     },
   },
 });
+
+// Unique only among accounts that have a username, so legacy name-only accounts are unaffected.
+userSchema.index({ username: 1 }, { unique: true, partialFilterExpression: { username: { $type: 'string' } } });
 
 export default model('User', userSchema);

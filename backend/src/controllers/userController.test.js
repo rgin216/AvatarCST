@@ -164,15 +164,39 @@ test('login accepts the right password and rejects a wrong one or unknown userna
   assert.equal(unknown.statusCode, 401);
 });
 
-test('login matches the username, or the name for legacy accounts, with regex escaped', async (t) => {
-  let filter;
-  t.mock.method(User, 'findOne', async (f) => { filter = f; return null; });
+test('login matches the username, then the name for legacy accounts, with regex escaped', async (t) => {
+  const filters = [];
+  t.mock.method(User, 'findOne', async (f) => { filters.push(f); return null; });
   await login({ body: { username: 'A.*', password: 'garden' } }, makeRes(), fail);
-  const [byUsername, byLegacyName] = filter.$or;
+  const [byUsername, byLegacyName] = filters;
   assert.deepEqual(byUsername, { username: 'a.*' });
   assert.equal(byLegacyName.username, null);
   assert.equal(byLegacyName.name.$regex.test('anything'), false);
   assert.equal(byLegacyName.name.$regex.test('A.*'), true);
+});
+
+test('login prefers an exact username over a legacy account with the same name', async (t) => {
+  const passwordHash = await hashPassword('garden');
+  const findOne = t.mock.method(User, 'findOne', async (f) => (
+    f.username === 'margaret' ? { _id: 'new', passwordHash } : { _id: 'legacy', name: 'Margaret' }
+  ));
+
+  const res = makeRes();
+  await login({ body: { username: 'Margaret', password: 'garden' } }, res, fail);
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.user._id, 'new');
+  assert.equal(findOne.mock.callCount(), 1, 'should not fall back to the legacy lookup');
+});
+
+test('register returns 409 when a concurrent registration takes the username first', async (t) => {
+  t.mock.method(User, 'findOne', async () => null);
+  t.mock.method(User, 'create', async () => { throw Object.assign(new Error('E11000 duplicate key'), { code: 11000 }); });
+
+  const res = makeRes();
+  await register({ body: { name: 'Margaret', username: 'margaret', password: 'garden' } }, res, fail);
+
+  assert.equal(res.statusCode, 409);
 });
 
 test('login lets a legacy name-only account claim its first password', async (t) => {
