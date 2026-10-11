@@ -1,6 +1,6 @@
 // Report figures for the STT WER evaluation, as SVG plus 2x PNG (rendered with headless Edge or Chrome if found).
 // Reads aggregate numbers from analyze-stt.js output and per-recording WER from the "after" run.
-// Usage: node scripts/plot-stt.js --analysis analysis-before-vs-after --after <afterRunId>
+// Usage: node scripts/plot-stt.js --analysis analysis-before-vs-after --after <afterRunId> [--before-label before --after-label after]
 import { readFile, writeFile, mkdir, access } from 'node:fs/promises';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -93,6 +93,8 @@ try {
   const { values } = parseArgs({ options: {
     analysis: { type: 'string', default: 'analysis-before-vs-after' },
     after: { type: 'string' },
+    'before-label': { type: 'string', default: 'before' },
+    'after-label': { type: 'string', default: 'after' },
     results: { type: 'string', default: resolve(root, 'evaluation/results') },
     out: { type: 'string', default: resolve(root, 'evaluation/figures') },
   } });
@@ -101,9 +103,28 @@ try {
   const analysis = JSON.parse(await readFile(resolve(analysisDir, 'analysis.json'), 'utf8'));
   const loudness = JSON.parse(await readFile(resolve(analysisDir, 'clip-loudness.json'), 'utf8'));
   const rows = (await readFile(resolve(values.results, values.after, 'rows.jsonl'), 'utf8')).trim().split('\n').map(l => JSON.parse(l));
+  const { 'before-label': before, 'after-label': after } = values;
+  const labels = [...new Set(analysis.runs.map(run => run.label))].join(', ');
+  for (const label of [before, after]) {
+    for (const provider of ['groq', 'openai']) {
+      if (!analysis.summaries.some(s => s.run === label && s.provider === provider && s.group === 'All')) {
+        throw new Error(`No "${label}" ${provider} summary in ${values.analysis} (run labels: ${labels}). Pass --before-label/--after-label.`);
+      }
+    }
+  }
+  for (const provider of ['groq', 'openai']) {
+    for (const name of ['Quietest third', 'Middle third', 'Loudest third']) {
+      if (!analysis.loudness.tiers.some(t => t.run === after && t.provider === provider && t.tier === name)) {
+        throw new Error(`No "${after}" ${provider} loudness tier "${name}" in ${values.analysis}`);
+      }
+    }
+  }
+  if (!analysis.loudness.correlation.some(c => c.run === after && c.provider === 'groq')) {
+    throw new Error(`No "${after}" groq loudness correlation in ${values.analysis}`);
+  }
   const find = (run, provider, group) => analysis.summaries.find(s => s.run === run && s.provider === provider && s.group === group);
-  const tier = (provider, name) => analysis.loudness.tiers.find(t => t.run === 'after' && t.provider === provider && t.tier === name);
-  const leakShare = find('before', 'groq', 'All').promptLeaks / find('before', 'groq', 'All').scored;
+  const tier = (provider, name) => analysis.loudness.tiers.find(t => t.run === after && t.provider === provider && t.tier === name);
+  const leakShare = find(before, 'groq', 'All').promptLeaks / find(before, 'groq', 'All').scored;
   const cuts = analysis.loudness.tierCutsDb;
   const figures = {};
 
@@ -113,8 +134,8 @@ try {
       'Bars: word error rate. Whiskers: 95% confidence interval (speaker-level bootstrap).'],
     categories: ['Groq\nwhisper-large-v3-turbo', 'OpenAI\ngpt-4o-mini-transcribe'],
     series: [
-      { name: 'Before: English instruction prompt', color: C.s1, values: ['groq', 'openai'].map(p => find('before', p, 'All').wer) },
-      { name: 'After: no prompt (current app)', color: C.s2, values: ['groq', 'openai'].map(p => find('after', p, 'All').wer) },
+      { name: 'Before: English instruction prompt', color: C.s1, values: ['groq', 'openai'].map(p => find(before, p, 'All').wer) },
+      { name: 'After: no prompt (current app)', color: C.s2, values: ['groq', 'openai'].map(p => find(after, p, 'All').wer) },
     ],
     max: 0.7, step: 0.1,
   }) };
@@ -137,7 +158,7 @@ try {
     db: clips.reduce((s, r) => s + loudness[`${r.transcript}|${r.clip}`], 0) / clips.length,
     wer: clips.reduce((s, r) => s + r.errors, 0) / clips.reduce((s, r) => s + r.referenceWords, 0),
   }));
-  const rho = analysis.loudness.correlation.find(c => c.run === 'after' && c.provider === 'groq').spearman;
+  const rho = analysis.loudness.correlation.find(c => c.run === after && c.provider === 'groq').spearman;
   {
     const height = 540, top = 128, bottom = height - 64;
     // Pad the domain so edge dots don't sit on the axis.
@@ -187,7 +208,7 @@ try {
       { label: 'Hu et al. 2023: adapted wav2vec 2.0 + Conformer', wer: 0.1817, app: false },
       { label: 'Akinrintoyo et al. 2025: Whisper fine-tuned', wer: 0.24, app: false },
       { label: 'This app: Groq Whisper, loudest third', wer: tier('groq', 'Loudest third').wer.estimate, app: true },
-      { label: 'This app: Groq Whisper, all clips', wer: find('after', 'groq', 'All').wer.estimate, app: true },
+      { label: 'This app: Groq Whisper, all clips', wer: find(after, 'groq', 'All').wer.estimate, app: true },
     ];
     const rowH = 44, top = 128, height = top + items.length * rowH + 52;
     const left = 320, right = W - 72, max = 0.5;

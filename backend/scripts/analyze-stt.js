@@ -1,8 +1,8 @@
 // Summarises evaluate-stt.js runs for reporting: WER with speaker-bootstrap 95% CIs per provider and group,
 // error types and severity, per-speaker spread, failures, prompt leaks, latency, and paired comparisons.
 // Usage: node scripts/analyze-stt.js --runs <beforeRunId>,<afterRunId>
-import { readFile, mkdir, writeFile } from 'node:fs/promises';
-import { resolve, dirname } from 'node:path';
+import { readFile, readdir, mkdir, writeFile } from 'node:fs/promises';
+import { resolve, dirname, basename, extname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs, promisify } from 'node:util';
 import { execFile } from 'node:child_process';
@@ -13,6 +13,7 @@ const execFileAsync = promisify(execFile);
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const LEAK = /do not|latin letters|translate|strong accent|speaking english/i;
+const AUDIO_EXTENSIONS = new Set(['.mp3', '.wav', '.m4a', '.flac', '.ogg']);
 const GROUPS = {
   All: () => true,
   Control: row => row.group === 'Control',
@@ -24,6 +25,15 @@ const pct = value => (value === null || Number.isNaN(value) ? '-' : (100 * value
 const ci = c => `${pct(c.estimate)} [${pct(c.low)}, ${pct(c.high)}]`;
 const quantile = (sorted, q) => sorted.length ? sorted[Math.min(sorted.length - 1, Math.floor(q * sorted.length))] : null;
 const clipKey = row => `${row.provider}|${row.transcript}|${row.clip}`;
+
+async function walk(dir) {
+  const entries = await readdir(dir, { withFileTypes: true });
+  const files = await Promise.all(entries.map(entry => {
+    const path = join(dir, entry.name);
+    return entry.isDirectory() ? walk(path) : [path];
+  }));
+  return files.flat();
+}
 
 function bySpeaker(rows, errorsKey = 'errors', wordsKey = 'referenceWords') {
   const speakers = new Map();
@@ -68,10 +78,15 @@ function summarize(rows) {
 async function clipLoudness(rows, dataDir, cachePath) {
   let cache = {};
   try { cache = JSON.parse(await readFile(cachePath, 'utf8')); } catch {}
+  let audioByPath;
   for (const row of rows) {
     const key = `${row.transcript}|${row.clip}`;
     if (key in cache) continue;
-    const audio = resolve(dataDir, row.transcript.replace(/\.cha$/, '.wav'));
+    // Same lookup as evaluate-stt.js: audio sits next to its transcript, any supported extension, any case.
+    audioByPath ??= new Map((await walk(dataDir)).filter(f => AUDIO_EXTENSIONS.has(extname(f).toLowerCase()))
+      .map(f => [join(dirname(f), basename(f, extname(f))).toLowerCase(), f]));
+    const audio = audioByPath.get(join(dataDir, dirname(row.transcript), basename(row.transcript, extname(row.transcript))).toLowerCase());
+    if (!audio) throw new Error(`No audio next to ${row.transcript} in ${dataDir}`);
     const { stderr } = await execFileAsync(ffmpegPath, ['-hide_banner', '-ss', String(row.startMs / 1000),
       '-t', String((row.endMs - row.startMs) / 1000), '-i', audio, '-af', 'volumedetect', '-f', 'null', '-']);
     cache[key] = Number(stderr.match(/mean_volume: ([-\d.]+) dB/)?.[1] ?? -91);
@@ -126,7 +141,7 @@ try {
   }
 
   const analysis = { generatedAt: new Date().toISOString(), runs: runs.map(({ id, label, manifest }) => ({ id, label,
-    prompt: manifest.prompt ? 'legacy instruction prompt' : 'none', normalize: manifest.normalize, models: manifest.models,
+    prompt: manifest.prompt ?? 'none', normalize: manifest.normalize, models: manifest.models,
     revision: manifest.revision })), summaries: [], paired: [] };
 
   const lines = ['# STT WER analysis', '', `Runs: ${runs.map(run => `${run.label} (${run.id})`).join(', ')}`, '',
