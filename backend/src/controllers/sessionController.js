@@ -159,8 +159,15 @@ export const addMessage = async (req, res, next) => {
   }
 };
 
+// Full transcripts are a development debugging aid; in production caregivers
+// see only the session summary.
+const transcriptsAvailable = () => process.env.NODE_ENV === 'development';
+
 export const getMessages = async (req, res, next) => {
   try {
+    if (!transcriptsAvailable()) {
+      return res.status(403).json({ error: 'Session transcripts are only available in development' });
+    }
     const messages = await Message.find({ sessionId: req.params.id }).sort({ timestamp: 1 });
     res.json(messages);
   } catch (err) {
@@ -409,6 +416,7 @@ export const getPipelineInfo = (_req, res) => {
       lipsync: 'rhubarb-for-avatars/audio-energy-for-visualizer',
     }),
     availableModes: SESSION_PIPELINE_MODES,
+    transcriptsAvailable: transcriptsAvailable(),
   };
   res.json(info);
 };
