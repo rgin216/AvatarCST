@@ -143,3 +143,6 @@ backend/generated-audio/
 backend/temp/
 backend/vendor/
 backend/evaluation/results/
+
+# DementiaBank data is licensed for research use only; never commit or redistribute it
+backend/evaluation/dementiabank/

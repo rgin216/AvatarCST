@@ -17,7 +17,10 @@ The project has moved beyond the old "basic backend foundation" phase. The main 
 ### Implemented
 
 - React/Vite frontend and Express/Mongo backend.
-- Login flow that creates or loads a patient user by name.
+- Username + password sign-in (`POST /api/users/login`) and registration (`POST /api/users/register`) with a "remember me" option (localStorage vs sessionStorage). Registration also asks what Aria should call the user (`name`/`preferredName`), kept separate from the lowercase `username`. Passwords are scrypt-hashed in `passwordService.js`. Legacy accounts with no username sign in with their name, and name-only accounts set their password on their next sign-in.
+- The caregiver area asks for the account password again each time it is opened (`CaregiverGate.jsx`, `POST /api/users/:id/verify-password`).
+- New accounts start with an empty memory bank.
+- The API does not yet authenticate requests: passwords gate the UI only, and routes still trust the `userId` they are given.
 - Landing flow with thirteen test sessions (Sessions 9 and 15 are placeholder "coming soon" entries):
   - `cst_intro_reminiscence` - Session 1: Introduction and Welcome.
   - `cst_childhood` - Session 2: Getting to Know You: Childhood.
@@ -77,6 +80,10 @@ For recorded microphone input:
 For typed input, the flow skips STT and starts at `POST /api/sessions/:id/respond`.
 
 In both pipelines, speech segments are synthesized in parallel and cached by text and voice in `speechCacheService.js`. The orchestrator returns `nextScriptLinePrediction`, which the controller prefetches while the patient responds, and it also prefetches the planned script line during the LLM call. Fresh acknowledgement segments use Rhubarb's faster `phonetic` recognizer, while script segments keep the default `pocketSphinx` recognizer.
+
+### Mixing transcription providers
+
+`STT_PROVIDER=groq` or `STT_PROVIDER=openai` swaps only the speech-to-text step, via `getTranscriptionProviders` in `backend/src/config/pipeline.js`. Example: Groq Whisper transcription with OpenAI text and TTS. When it overrides the pipeline, `transcribeWithFallback` in `sttService.js` retries with the pipeline's own provider on provider errors. It does not retry English-script (422) rejections. See `backend/evaluation/STT-WER.md` for the accuracy comparison behind this option.
 
 ### `PIPELINE_MODE=openai-fast-scripted` (lower-latency paid path)
 
@@ -174,7 +181,6 @@ Current frontend:
 
 - `frontend/src/pages/CaregiverPage.jsx` lets a caregiver view, add, and delete memory entries.
 - The caregiver page separates approved memories from pending suggestions, and pending items can be approved or rejected.
-- `frontend/src/pages/LoginPage.jsx` seeds a few starter memories when it creates a new user.
 
 Current orchestrator behavior:
 
@@ -214,7 +220,7 @@ Useful session endpoints:
 - `POST /api/sessions/:id/respond`
 - `POST /api/sessions/:id/respond-audio`
 - `POST /api/sessions/:id/messages`
-- `GET /api/sessions/:id/messages`
+- `GET /api/sessions/:id/messages` (development only: returns 403 unless `NODE_ENV=development`; `GET /api/sessions/pipeline` reports this as `transcriptsAvailable`, and the caregiver History tab shows transcripts only in a Vite dev build talking to such a backend, summaries otherwise)
 
 ## Development Setup
 
@@ -276,6 +282,7 @@ Backend variables from `backend/.env.example`:
 - `GROQ_MODEL`
 - `GROQ_WHISPER_MODEL`
 - `PIPELINE_MODE`
+- `STT_PROVIDER` (optional `groq` or `openai`; overrides only the transcription step, falling back to the pipeline's provider on failure)
 - `TTS_VOICE`
 - `EDGE_TTS_MALE_VOICE`
 - `EDGE_TTS_FEMALE_VOICE`

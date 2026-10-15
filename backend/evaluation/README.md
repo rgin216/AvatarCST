@@ -2,6 +2,8 @@
 
 A dedicated automatic latency benchmark provides warmups, percentiles, failure analysis and research CSV exports. See [latency collection protocol](LATENCY.md); run `npm run eval:latency` for a dry run.
 
+Speech-to-text accuracy on DementiaBank recordings (word error rate, Groq vs OpenAI, before/after the STT prompt change) is covered in [STT word error rate](STT-WER.md); run `npm run eval:stt` for a dry run.
+
 The offline runner rotates each configured model through facilitator and critic roles. It uses the real `buildCstAdaptiveResponseInstructions` prompt builder and LLM service, without a database or live participant session.
 
 ## Run

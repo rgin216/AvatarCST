@@ -9,7 +9,7 @@ import {
   respondToSessionTurn,
   endSessionAndQueueEvaluation,
 } from '../services/sessionOrchestratorService.js';
-import { transcribeAudio } from '../services/sttService.js';
+import { transcribeWithFallback } from '../services/sttService.js';
 import {
   getVoiceOptionsForAvatar,
   pipeSpeechStream,
@@ -26,6 +26,7 @@ import {
   DEFAULT_PIPELINE_MODE,
   SESSION_PIPELINE_MODES,
   usesOpenAITextPipeline,
+  getTranscriptionProviders,
 } from '../config/pipeline.js';
 import { generateSummary } from '../services/summaryService.js';
 import Summary from '../models/Summary.js';
@@ -158,17 +159,21 @@ export const addMessage = async (req, res, next) => {
   }
 };
 
+// Full transcripts are a development debugging aid; in production caregivers
+// see only the session summary.
+const transcriptsAvailable = () => process.env.NODE_ENV === 'development';
+
 export const getMessages = async (req, res, next) => {
   try {
+    if (!transcriptsAvailable()) {
+      return res.status(403).json({ error: 'Session transcripts are only available in development' });
+    }
     const messages = await Message.find({ sessionId: req.params.id }).sort({ timestamp: 1 });
     res.json(messages);
   } catch (err) {
     next(err);
   }
 };
-
-const getTranscriptionProviderForPipeline = (mode) =>
-  usesOpenAITextPipeline(mode) ? 'openai' : undefined;
 
 const getSpeechProviderForPipeline = (mode) => {
   if (usesOpenAITextPipeline(mode)) return 'openai';
@@ -411,6 +416,7 @@ export const getPipelineInfo = (_req, res) => {
       lipsync: 'rhubarb-for-avatars/audio-energy-for-visualizer',
     }),
     availableModes: SESSION_PIPELINE_MODES,
+    transcriptsAvailable: transcriptsAvailable(),
   };
   res.json(info);
 };
@@ -444,7 +450,7 @@ export const respondAudioToSession = async (req, res, next) => {
     const lipSyncMode = getLipSyncMode(req.body?.lipSyncMode);
     const session = await Session.findById(req.params.id).select('pipelineMode userId').lean();
     if (!session) return res.status(404).json({ error: 'Session not found' });
-    const transcriptionProvider = getTranscriptionProviderForPipeline(session.pipelineMode);
+    const transcriptionProviders = getTranscriptionProviders(session.pipelineMode);
     const user = await User.findById(session.userId).select('settings.language').lean();
     const selectedLanguage = user?.settings?.language || 'en';
 
@@ -452,8 +458,8 @@ export const respondAudioToSession = async (req, res, next) => {
     if (uploadedFilePath) {
       transcript = await timeAsync(
         'sttMs',
-        () => transcribeAudio(uploadedFilePath, req.file?.originalname, {
-          provider: transcriptionProvider,
+        () => transcribeWithFallback(uploadedFilePath, req.file?.originalname, {
+          ...transcriptionProviders,
           language: selectedLanguage,
         }),
         timings

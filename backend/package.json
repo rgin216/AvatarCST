@@ -13,7 +13,8 @@
     "eval:calibrate": "node scripts/compare-human-review.js",
     "eval:sessions": "node scripts/evaluate-sessions.js",
     "eval:latency": "node scripts/evaluate-latency.js",
-    "eval:latency:deployed": "node scripts/evaluate-deployed-latency.js"
+    "eval:latency:deployed": "node scripts/evaluate-deployed-latency.js",
+    "eval:stt": "node scripts/evaluate-stt.js"
   },
   "keywords": [],
   "author": "",

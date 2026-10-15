@@ -12,7 +12,7 @@ import {
   SPEECH_RATE_STEP,
 } from "../utils/speechRate.js";
 
-export default function SettingsPage({ userId, userName, settings, onBack, onSettingsChange }) {
+export default function SettingsPage({ userId, userName, settings, onBack, onSettingsChange, onLogout }) {
   const { isPhone, isTablet } = useViewport();
   const isDesktop = !isPhone;
   const { t } = useLanguage();
@@ -170,6 +170,14 @@ export default function SettingsPage({ userId, userName, settings, onBack, onSet
           {section("settings.language", "language", SUPPORTED_LANGUAGES)}
           {section("settings.avatar", "avatarMode", avatarOptions)}
           {section("settings.speechRate", "speechRate", speechRateControl())}
+          <button
+            type="button"
+            onClick={onLogout}
+            className="btn-outline"
+            style={{ display: "block", width: "100%", marginTop: isPhone ? 20 : 24, padding: "14px", fontSize: 16, fontWeight: 700, borderRadius: 16, color: "#C0504D", borderColor: "#E8A09088" }}
+          >
+            {t("settings.signOut")}
+          </button>
         </div>
       </div>
     </div>

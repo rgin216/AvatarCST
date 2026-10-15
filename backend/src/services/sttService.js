@@ -4,7 +4,8 @@ import path from 'path';
 const GROQ_STT_URL = 'https://api.groq.com/openai/v1/audio/transcriptions';
 const OPENAI_STT_URL = 'https://api.openai.com/v1/audio/transcriptions';
 const TRANSCRIPTION_LANGUAGES = { en: 'English', zh: 'Chinese', es: 'Spanish', fr: 'French', mi: 'Māori' };
-const ENGLISH_PROMPT = 'The speaker is speaking English, possibly with a strong accent. Transcribe the speech in English using Latin letters. Do not translate it into another language. Do not invent words for silence or unclear audio.';
+// Larger model to retry with when an English transcript drifts into another script.
+const RETRY_MODELS = { 'gpt-4o-mini-transcribe': 'gpt-4o-transcribe', 'whisper-large-v3-turbo': 'whisper-large-v3' };
 
 // Keep accents, Māori macrons, numbers and punctuation; reject letters in other scripts.
 function hasUnexpectedScript(text) {
@@ -38,17 +39,19 @@ export async function transcribeAudio(audioFilePath, originalName = 'audio.webm'
   // Providers infer format from the filename extension; use the original browser filename.
   const blob = new Blob([buffer], { type: getMimeType(originalName) });
   const language = options.language || 'en';
+  const retryModel = Object.entries(RETRY_MODELS).find(([prefix]) => model.startsWith(prefix))?.[1] ?? model;
+  // No English prompt: STT models read a prompt as preceding speech and echo it on quiet audio
+  // ("Do not invent words for silence"). The language pin and the script check keep output English.
+  const prompt = options.prompt ?? (language === 'en'
+    ? ''
+    : `The speaker is speaking ${TRANSCRIPTION_LANGUAGES[language]}. Transcribe in that language. Do not translate into another language.`);
 
   const requestTranscript = async (retry = false) => {
     const formData = new FormData();
     formData.append('file', blob, originalName);
-    formData.append('model', retry && model.startsWith('gpt-4o-mini-transcribe') ? 'gpt-4o-transcribe' : model);
-    if (TRANSCRIPTION_LANGUAGES[language]) {
-      formData.append('language', language);
-      formData.append('prompt', language === 'en'
-        ? ENGLISH_PROMPT
-        : `The speaker is speaking ${TRANSCRIPTION_LANGUAGES[language]}. Transcribe in that language. Do not translate into another language.`);
-    }
+    formData.append('model', retry ? retryModel : model);
+    if (TRANSCRIPTION_LANGUAGES[language]) formData.append('language', language);
+    if (prompt) formData.append('prompt', prompt);
     formData.append('response_format', 'json');
 
     const res = await fetch(provider === 'openai' ? OPENAI_STT_URL : GROQ_STT_URL, {
@@ -70,7 +73,7 @@ export async function transcribeAudio(audioFilePath, originalName = 'audio.webm'
   };
 
   let transcript = await requestTranscript();
-  if (provider === 'openai' && language === 'en' && hasUnexpectedScript(transcript)) {
+  if (language === 'en' && hasUnexpectedScript(transcript)) {
     // Re-transcribe the audio, never translate a potentially hallucinated transcript.
     transcript = await requestTranscript(true);
     if (hasUnexpectedScript(transcript)) {
@@ -80,4 +83,16 @@ export async function transcribeAudio(audioFilePath, originalName = 'audio.webm'
     }
   }
   return transcript;
+}
+
+// Retries with the fallback provider when the primary fails (outage, quota, timeout, missing key).
+// An English-script rejection (422) is about the recording itself, so it is not retried elsewhere.
+export async function transcribeWithFallback(audioFilePath, originalName, { fallbackProvider, ...options } = {}) {
+  try {
+    return await transcribeAudio(audioFilePath, originalName, options);
+  } catch (err) {
+    if (!fallbackProvider || err.status === 422) throw err;
+    console.warn(`${options.provider} STT failed, falling back to ${fallbackProvider}: ${err.message}`);
+    return transcribeAudio(audioFilePath, originalName, { ...options, provider: fallbackProvider });
+  }
 }
