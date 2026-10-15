@@ -1,0 +1,880 @@
+[
+  {
+    "label": "Paid (OpenAI)",
+    "dir": "evaluation/results/2026-10-15T10-31-35-894Z-concurrency-8174e113",
+    "runId": "8174e113",
+    "pipelineMode": "openai-fast-scripted",
+    "stages": [
+      {
+        "concurrency": 1,
+        "users": 1,
+        "completedUsers": 1,
+        "failedUsers": 0,
+        "stuckUsers": 0,
+        "stuckSlides": [],
+        "maxTurnUsers": 0,
+        "wallMs": 376212.28380000003,
+        "peakInFlight": 1,
+        "meanInFlightAtStart": 1,
+        "turnsAttempted": 16,
+        "turnsOk": 16,
+        "turnsFailed": 0,
+        "errorRate": 0,
+        "timeouts": 0,
+        "httpStatus": {
+          "201": 17
+        },
+        "degradedTurns": 0,
+        "degradedRate": 0,
+        "missingAudio": 0,
+        "audioFetchFailures": 0,
+        "speechCacheHits": 16,
+        "throughputTurnsPerMin": 2.5517508102163675,
+        "createSessionLatency": {
+          "n": 1,
+          "meanMs": 6.6767000000108965,
+          "sdMs": null,
+          "minMs": 6.6767000000108965,
+          "p50Ms": 6.6767000000108965,
+          "p90Ms": 6.6767000000108965,
+          "p95Ms": 6.6767000000108965,
+          "p99Ms": 6.6767000000108965,
+          "maxMs": 6.6767000000108965
+        },
+        "requestLatency": {
+          "n": 16,
+          "meanMs": 3257.168981250019,
+          "sdMs": 1534.0099539493833,
+          "minMs": 10.804800000041723,
+          "p50Ms": 3094.4292499999865,
+          "p90Ms": 5108.1486500000465,
+          "p95Ms": 6199.807475000067,
+          "p99Ms": 6308.05197499998,
+          "maxMs": 6335.113099999959
+        },
+        "serverTotal": {
+          "n": 16,
+          "meanMs": 3253.25,
+          "sdMs": 1534.2098291954721,
+          "minMs": 8,
+          "p50Ms": 3090,
+          "p90Ms": 5103.5,
+          "p95Ms": 6196.5,
+          "p99Ms": 6305.7,
+          "maxMs": 6333
+        },
+        "orchestrator": {
+          "n": 16,
+          "meanMs": 1175.0625,
+          "sdMs": 535.027285129771,
+          "minMs": 5,
+          "p50Ms": 1303.5,
+          "p90Ms": 1636.5,
+          "p95Ms": 1744.25,
+          "p99Ms": 1965.6499999999999,
+          "maxMs": 2021
+        },
+        "audioWait": {
+          "n": 16,
+          "meanMs": 2078.0625,
+          "sdMs": 1586.1012354722718,
+          "minMs": 0,
+          "p50Ms": 1934.5,
+          "p90Ms": 3610.5,
+          "p95Ms": 4956.25,
+          "p99Ms": 6053.65,
+          "maxMs": 6328
+        },
+        "audioDownload": {
+          "n": 16,
+          "meanMs": 4.44461875001798,
+          "sdMs": 1.1860396706365584,
+          "minMs": 2.6988999999593943,
+          "p50Ms": 3.983550000033574,
+          "p90Ms": 6.382100000046194,
+          "p95Ms": 6.691725000040606,
+          "p99Ms": 6.775785000016913,
+          "maxMs": 6.79680000001099
+        },
+        "criteria": {
+          "checked": true,
+          "passed": true,
+          "failures": []
+        },
+        "slowTurnShare": 0,
+        "host": {
+          "samples": 110,
+          "machineCpuMean": 11.436363636363636,
+          "machineCpuP95": 30,
+          "machineCpuMax": 43,
+          "backendCpuMean": 0.016497754848836046,
+          "backendMemMaxMb": 106,
+          "rhubarbProcessesMax": 1
+        }
+      },
+      {
+        "concurrency": 2,
+        "users": 2,
+        "completedUsers": 2,
+        "failedUsers": 0,
+        "stuckUsers": 0,
+        "stuckSlides": [],
+        "maxTurnUsers": 0,
+        "wallMs": 397418.54249999986,
+        "peakInFlight": 2,
+        "meanInFlightAtStart": 1.1764705882352942,
+        "turnsAttempted": 34,
+        "turnsOk": 34,
+        "turnsFailed": 0,
+        "errorRate": 0,
+        "timeouts": 0,
+        "httpStatus": {
+          "201": 36
+        },
+        "degradedTurns": 0,
+        "degradedRate": 0,
+        "missingAudio": 0,
+        "audioFetchFailures": 0,
+        "speechCacheHits": 32,
+        "throughputTurnsPerMin": 5.133127375404233,
+        "createSessionLatency": {
+          "n": 2,
+          "meanMs": 4.131999999983236,
+          "sdMs": 0.0387494516385256,
+          "minMs": 4.104599999962375,
+          "p50Ms": 4.131999999983236,
+          "p90Ms": 4.153919999999926,
+          "p95Ms": 4.156660000002011,
+          "p99Ms": 4.15885200000368,
+          "maxMs": 4.159400000004098
+        },
+        "requestLatency": {
+          "n": 34,
+          "meanMs": 3470.957467647081,
+          "sdMs": 1664.0629086244662,
+          "minMs": 15.182199999922886,
+          "p50Ms": 3396.064100000018,
+          "p90Ms": 5760.150499999988,
+          "p95Ms": 6479.215304999938,
+          "p99Ms": 7102.2189440000375,
+          "maxMs": 7365.213500000071
+        },
+        "serverTotal": {
+          "n": 34,
+          "meanMs": 3467,
+          "sdMs": 1664.3766509908855,
+          "minMs": 11,
+          "p50Ms": 3393,
+          "p90Ms": 5758.099999999999,
+          "p95Ms": 6475.599999999999,
+          "p99Ms": 7099.330000000002,
+          "maxMs": 7363
+        },
+        "orchestrator": {
+          "n": 34,
+          "meanMs": 1187.9411764705883,
+          "sdMs": 516.6511009097931,
+          "minMs": 6,
+          "p50Ms": 1239.5,
+          "p90Ms": 1763.4,
+          "p95Ms": 1848.1499999999999,
+          "p99Ms": 1967.1000000000001,
+          "maxMs": 2010
+        },
+        "audioWait": {
+          "n": 34,
+          "meanMs": 2278.8823529411766,
+          "sdMs": 1720.312511509145,
+          "minMs": 0,
+          "p50Ms": 2083.5,
+          "p90Ms": 4909.399999999999,
+          "p95Ms": 5577.549999999998,
+          "p99Ms": 6909.850000000002,
+          "maxMs": 7357
+        },
+        "audioDownload": {
+          "n": 34,
+          "meanMs": 4.441700000021442,
+          "sdMs": 1.2105414861799915,
+          "minMs": 2.262899999972433,
+          "p50Ms": 4.534850000112783,
+          "p90Ms": 5.880070000048727,
+          "p95Ms": 6.035450000007404,
+          "p99Ms": 6.173401000141166,
+          "maxMs": 6.183400000212714
+        },
+        "criteria": {
+          "checked": true,
+          "passed": true,
+          "failures": []
+        },
+        "slowTurnShare": 0,
+        "host": {
+          "samples": 116,
+          "machineCpuMean": 13.456896551724139,
+          "machineCpuP95": 31,
+          "machineCpuMax": 59,
+          "backendCpuMean": 0.031032694918328045,
+          "backendMemMaxMb": 109,
+          "rhubarbProcessesMax": 3
+        }
+      },
+      {
+        "concurrency": 4,
+        "users": 4,
+        "completedUsers": 4,
+        "failedUsers": 0,
+        "stuckUsers": 0,
+        "stuckSlides": [],
+        "maxTurnUsers": 0,
+        "wallMs": 410420.12340000016,
+        "peakInFlight": 4,
+        "meanInFlightAtStart": 1.5,
+        "turnsAttempted": 68,
+        "turnsOk": 68,
+        "turnsFailed": 0,
+        "errorRate": 0,
+        "timeouts": 0,
+        "httpStatus": {
+          "201": 72
+        },
+        "degradedTurns": 0,
+        "degradedRate": 0,
+        "missingAudio": 1,
+        "audioFetchFailures": 0,
+        "speechCacheHits": 78,
+        "throughputTurnsPerMin": 9.941033022943627,
+        "createSessionLatency": {
+          "n": 4,
+          "meanMs": 4.838300000003073,
+          "sdMs": 1.6726232630084141,
+          "minMs": 2.943500000052154,
+          "p50Ms": 4.729649999993853,
+          "p90Ms": 6.403830000013113,
+          "p95Ms": 6.677114999992773,
+          "p99Ms": 6.8957429999765,
+          "maxMs": 6.950399999972433
+        },
+        "requestLatency": {
+          "n": 68,
+          "meanMs": 3590.944738235321,
+          "sdMs": 3807.6658333051237,
+          "minMs": 8.7074000001885,
+          "p50Ms": 3260.071799999918,
+          "p90Ms": 4748.751470000066,
+          "p95Ms": 7288.302479999953,
+          "p99Ms": 16130.50533499999,
+          "maxMs": 31107.262900000205
+        },
+        "serverTotal": {
+          "n": 68,
+          "meanMs": 3587.6176470588234,
+          "sdMs": 3807.789455601687,
+          "minMs": 6,
+          "p50Ms": 3255.5,
+          "p90Ms": 4745.300000000002,
+          "p95Ms": 7286.499999999998,
+          "p99Ms": 16125.809999999961,
+          "maxMs": 31105
+        },
+        "orchestrator": {
+          "n": 68,
+          "meanMs": 1176.9558823529412,
+          "sdMs": 524.4100433315241,
+          "minMs": 6,
+          "p50Ms": 1243,
+          "p90Ms": 1625.7,
+          "p95Ms": 1683.1499999999999,
+          "p99Ms": 2347.2099999999987,
+          "maxMs": 2841
+        },
+        "audioWait": {
+          "n": 68,
+          "meanMs": 2410.5,
+          "sdMs": 3860.550720515357,
+          "minMs": 0,
+          "p50Ms": 1949,
+          "p90Ms": 3412.1000000000017,
+          "p95Ms": 7279.799999999998,
+          "p99Ms": 15760.429999999964,
+          "maxMs": 30012
+        },
+        "audioDownload": {
+          "n": 67,
+          "meanMs": 4.100101492531014,
+          "sdMs": 2.5502958427673965,
+          "minMs": 1.5834999999497086,
+          "p50Ms": 3.7217000001110137,
+          "p90Ms": 5.327020000014454,
+          "p95Ms": 5.895630000019444,
+          "p99Ms": 12.302239999896901,
+          "maxMs": 22.787000000011176
+        },
+        "criteria": {
+          "checked": true,
+          "passed": true,
+          "failures": []
+        },
+        "slowTurnShare": 0.04411764705882353,
+        "host": {
+          "samples": 120,
+          "machineCpuMean": 16.291666666666668,
+          "machineCpuP95": 45,
+          "machineCpuMax": 82,
+          "backendCpuMean": 0.046503762753375935,
+          "backendMemMaxMb": 112,
+          "rhubarbProcessesMax": 3
+        }
+      },
+      {
+        "concurrency": 8,
+        "users": 8,
+        "completedUsers": 8,
+        "failedUsers": 0,
+        "stuckUsers": 0,
+        "stuckSlides": [],
+        "maxTurnUsers": 0,
+        "wallMs": 413867.32649999997,
+        "peakInFlight": 8,
+        "meanInFlightAtStart": 2.3284671532846715,
+        "turnsAttempted": 137,
+        "turnsOk": 137,
+        "turnsFailed": 0,
+        "errorRate": 0,
+        "timeouts": 0,
+        "httpStatus": {
+          "201": 145
+        },
+        "degradedTurns": 0,
+        "degradedRate": 0,
+        "missingAudio": 0,
+        "audioFetchFailures": 0,
+        "speechCacheHits": 162,
+        "throughputTurnsPerMin": 19.86143740680143,
+        "createSessionLatency": {
+          "n": 8,
+          "meanMs": 5.5086750000482425,
+          "sdMs": 1.000119386860631,
+          "minMs": 4.328900000080466,
+          "p50Ms": 5.2282999999588355,
+          "p90Ms": 6.645710000139661,
+          "p95Ms": 7.094655000173952,
+          "p99Ms": 7.4538110002013855,
+          "maxMs": 7.543600000208244
+        },
+        "requestLatency": {
+          "n": 137,
+          "meanMs": 3128.614278832126,
+          "sdMs": 1968.4539930483818,
+          "minMs": 7.561900000087917,
+          "p50Ms": 3227.500599999912,
+          "p90Ms": 5210.040159999952,
+          "p95Ms": 7251.800099999969,
+          "p99Ms": 9337.508335999948,
+          "maxMs": 10242.095300000161
+        },
+        "serverTotal": {
+          "n": 137,
+          "meanMs": 3125.6861313868612,
+          "sdMs": 1968.653035900976,
+          "minMs": 6,
+          "p50Ms": 3225,
+          "p90Ms": 5207.200000000001,
+          "p95Ms": 7249.799999999999,
+          "p99Ms": 9335.719999999972,
+          "maxMs": 10240
+        },
+        "orchestrator": {
+          "n": 137,
+          "meanMs": 1154.8759124087592,
+          "sdMs": 531.8666275383811,
+          "minMs": 5,
+          "p50Ms": 1220,
+          "p90Ms": 1588.4,
+          "p95Ms": 1708.9999999999995,
+          "p99Ms": 2114.479999999995,
+          "maxMs": 4071
+        },
+        "audioWait": {
+          "n": 137,
+          "meanMs": 1970.7372262773722,
+          "sdMs": 2050.578359125259,
+          "minMs": 0,
+          "p50Ms": 1903,
+          "p90Ms": 3880.000000000001,
+          "p95Ms": 7240.599999999999,
+          "p99Ms": 8727.119999999984,
+          "maxMs": 10085
+        },
+        "audioDownload": {
+          "n": 137,
+          "meanMs": 3.451344525550295,
+          "sdMs": 1.3694494646245585,
+          "minMs": 1.237300000153482,
+          "p50Ms": 3.2020000000484288,
+          "p90Ms": 5.389840000029653,
+          "p95Ms": 5.869859999837353,
+          "p99Ms": 7.28176399997435,
+          "maxMs": 8.650099999969825
+        },
+        "criteria": {
+          "checked": true,
+          "passed": true,
+          "failures": []
+        },
+        "slowTurnShare": 0.014598540145985401,
+        "host": {
+          "samples": 120,
+          "machineCpuMean": 18.308333333333334,
+          "machineCpuP95": 40,
+          "machineCpuMax": 100,
+          "backendCpuMean": 0.07420119398483284,
+          "backendMemMaxMb": 119,
+          "rhubarbProcessesMax": 5
+        }
+      },
+      {
+        "concurrency": 16,
+        "users": 16,
+        "completedUsers": 16,
+        "failedUsers": 0,
+        "stuckUsers": 0,
+        "stuckSlides": [],
+        "maxTurnUsers": 0,
+        "wallMs": 557993.8326000001,
+        "peakInFlight": 16,
+        "meanInFlightAtStart": 5.607407407407408,
+        "turnsAttempted": 270,
+        "turnsOk": 270,
+        "turnsFailed": 0,
+        "errorRate": 0,
+        "timeouts": 0,
+        "httpStatus": {
+          "201": 286
+        },
+        "degradedTurns": 0,
+        "degradedRate": 0,
+        "missingAudio": 7,
+        "audioFetchFailures": 0,
+        "speechCacheHits": 350,
+        "throughputTurnsPerMin": 29.03257895255812,
+        "createSessionLatency": {
+          "n": 16,
+          "meanMs": 4.523337499980698,
+          "sdMs": 1.2603656812474433,
+          "minMs": 2.70160000002943,
+          "p50Ms": 4.1424999999580905,
+          "p90Ms": 6.429049999918789,
+          "p95Ms": 6.787524999992456,
+          "p99Ms": 7.057825000013691,
+          "maxMs": 7.125400000018999
+        },
+        "requestLatency": {
+          "n": 270,
+          "meanMs": 9112.284799259269,
+          "sdMs": 9804.717080353521,
+          "minMs": 10.049600000027567,
+          "p50Ms": 3382.2257499999832,
+          "p90Ms": 22668.73171999976,
+          "p95Ms": 28834.034064999825,
+          "p99Ms": 33584.79167200005,
+          "maxMs": 51204.42029999988
+        },
+        "serverTotal": {
+          "n": 270,
+          "meanMs": 9109.637037037037,
+          "sdMs": 9804.803623645472,
+          "minMs": 7,
+          "p50Ms": 3379.5,
+          "p90Ms": 22666.5,
+          "p95Ms": 28832.049999999996,
+          "p99Ms": 33582.970000000016,
+          "maxMs": 51202
+        },
+        "orchestrator": {
+          "n": 270,
+          "meanMs": 1122.0148148148148,
+          "sdMs": 466.4589294516797,
+          "minMs": 5,
+          "p50Ms": 1204,
+          "p90Ms": 1555.1,
+          "p95Ms": 1677.3999999999996,
+          "p99Ms": 1949.6000000000004,
+          "maxMs": 2137
+        },
+        "audioWait": {
+          "n": 270,
+          "meanMs": 7987.566666666667,
+          "sdMs": 9803.315890033175,
+          "minMs": 0,
+          "p50Ms": 2048.5,
+          "p90Ms": 20769.499999999996,
+          "p95Ms": 27664.649999999998,
+          "p99Ms": 32508.160000000018,
+          "maxMs": 51194
+        },
+        "audioDownload": {
+          "n": 263,
+          "meanMs": 3.3414825095030207,
+          "sdMs": 1.148594138405174,
+          "minMs": 1.4512999998405576,
+          "p50Ms": 3.2398999999277294,
+          "p90Ms": 4.997260000091046,
+          "p95Ms": 5.4913500001188345,
+          "p99Ms": 6.4135900001600366,
+          "maxMs": 7.553899999707937
+        },
+        "criteria": {
+          "checked": true,
+          "passed": false,
+          "failures": [
+            "p95 28834 ms > 8000 ms"
+          ]
+        },
+        "slowTurnShare": 0.43703703703703706,
+        "host": {
+          "samples": 162,
+          "machineCpuMean": 19.22222222222222,
+          "machineCpuP95": 57,
+          "machineCpuMax": 100,
+          "backendCpuMean": 0.11400038128880245,
+          "backendMemMaxMb": 123,
+          "rhubarbProcessesMax": 7
+        }
+      }
+    ]
+  },
+  {
+    "label": "Free (Groq + Edge)",
+    "dir": "evaluation/results/2026-10-15T11-16-13-349Z-concurrency-27f4b122",
+    "runId": "27f4b122",
+    "pipelineMode": "free",
+    "stages": [
+      {
+        "concurrency": 1,
+        "users": 1,
+        "completedUsers": 1,
+        "failedUsers": 0,
+        "stuckUsers": 0,
+        "stuckSlides": [],
+        "maxTurnUsers": 0,
+        "wallMs": 372179.36350000004,
+        "peakInFlight": 1,
+        "meanInFlightAtStart": 1,
+        "turnsAttempted": 17,
+        "turnsOk": 17,
+        "turnsFailed": 0,
+        "errorRate": 0,
+        "timeouts": 0,
+        "httpStatus": {
+          "201": 18
+        },
+        "degradedTurns": 0,
+        "degradedRate": 0,
+        "missingAudio": 3,
+        "audioFetchFailures": 0,
+        "speechCacheHits": 16,
+        "throughputTurnsPerMin": 2.7406140695385433,
+        "createSessionLatency": {
+          "n": 1,
+          "meanMs": 5.05960000003688,
+          "sdMs": null,
+          "minMs": 5.05960000003688,
+          "p50Ms": 5.05960000003688,
+          "p90Ms": 5.05960000003688,
+          "p95Ms": 5.05960000003688,
+          "p99Ms": 5.05960000003688,
+          "maxMs": 5.05960000003688
+        },
+        "requestLatency": {
+          "n": 17,
+          "meanMs": 2594.352823529413,
+          "sdMs": 1426.7709209478435,
+          "minMs": 641.4734999999637,
+          "p50Ms": 2403.04310000001,
+          "p90Ms": 4475.052939999989,
+          "p95Ms": 4963.405640000023,
+          "p99Ms": 5760.952648000002,
+          "maxMs": 5960.339399999997
+        },
+        "serverTotal": {
+          "n": 17,
+          "meanMs": 2589.705882352941,
+          "sdMs": 1427.089028613224,
+          "minMs": 636,
+          "p50Ms": 2399,
+          "p90Ms": 4470.8,
+          "p95Ms": 4958.799999999999,
+          "p99Ms": 5758.16,
+          "maxMs": 5958
+        },
+        "orchestrator": {
+          "n": 17,
+          "meanMs": 856.5882352941177,
+          "sdMs": 586.5747031307617,
+          "minMs": 7,
+          "p50Ms": 743,
+          "p90Ms": 1761.6,
+          "p95Ms": 1839.9999999999998,
+          "p99Ms": 1968,
+          "maxMs": 2000
+        },
+        "audioWait": {
+          "n": 17,
+          "meanMs": 1732.9411764705883,
+          "sdMs": 1424.4906313568822,
+          "minMs": 0,
+          "p50Ms": 1670,
+          "p90Ms": 2934.6,
+          "p95Ms": 3568.399999999998,
+          "p99Ms": 5473.679999999999,
+          "maxMs": 5950
+        },
+        "audioDownload": {
+          "n": 14,
+          "meanMs": 4.2306285714314855,
+          "sdMs": 0.8659839556430101,
+          "minMs": 2.659799999964889,
+          "p50Ms": 4.099749999964843,
+          "p90Ms": 5.343490000022576,
+          "p95Ms": 5.452524999994784,
+          "p99Ms": 5.49074499996379,
+          "maxMs": 5.500299999956042
+        },
+        "criteria": {
+          "checked": true,
+          "passed": true,
+          "failures": []
+        },
+        "slowTurnShare": 0,
+        "host": {
+          "samples": 109,
+          "machineCpuMean": 7.36697247706422,
+          "machineCpuP95": 20,
+          "machineCpuMax": 51,
+          "backendCpuMean": 0.017184643070538394,
+          "backendMemMaxMb": 110,
+          "rhubarbProcessesMax": 2
+        }
+      },
+      {
+        "concurrency": 2,
+        "users": 2,
+        "completedUsers": 2,
+        "failedUsers": 0,
+        "stuckUsers": 0,
+        "stuckSlides": [],
+        "maxTurnUsers": 0,
+        "wallMs": 410627.9084000001,
+        "peakInFlight": 2,
+        "meanInFlightAtStart": 1.0857142857142856,
+        "turnsAttempted": 35,
+        "turnsOk": 35,
+        "turnsFailed": 0,
+        "errorRate": 0,
+        "timeouts": 0,
+        "httpStatus": {
+          "201": 37
+        },
+        "degradedTurns": 2,
+        "degradedRate": 0.05714285714285714,
+        "missingAudio": 1,
+        "audioFetchFailures": 0,
+        "speechCacheHits": 36,
+        "throughputTurnsPerMin": 5.11411902854482,
+        "createSessionLatency": {
+          "n": 2,
+          "meanMs": 5.288850000069942,
+          "sdMs": 1.6609231183168325,
+          "minMs": 4.114400000078604,
+          "p50Ms": 5.288850000069942,
+          "p90Ms": 6.228410000063013,
+          "p95Ms": 6.345855000062147,
+          "p99Ms": 6.439811000061454,
+          "maxMs": 6.463300000061281
+        },
+        "requestLatency": {
+          "n": 35,
+          "meanMs": 2387.430208571445,
+          "sdMs": 1500.4281455767737,
+          "minMs": 15.491300000110641,
+          "p50Ms": 2245.9244999999646,
+          "p90Ms": 4083.5825200000313,
+          "p95Ms": 4699.065190000047,
+          "p99Ms": 6192.884925999983,
+          "maxMs": 6264.089799999958
+        },
+        "serverTotal": {
+          "n": 35,
+          "meanMs": 2383.2,
+          "sdMs": 1500.5390364798911,
+          "minMs": 12,
+          "p50Ms": 2242,
+          "p90Ms": 4079.6,
+          "p95Ms": 4695.399999999994,
+          "p99Ms": 6189.94,
+          "maxMs": 6261
+        },
+        "orchestrator": {
+          "n": 35,
+          "meanMs": 656.3142857142857,
+          "sdMs": 568.8727124983322,
+          "minMs": 7,
+          "p50Ms": 558,
+          "p90Ms": 1437.2000000000012,
+          "p95Ms": 1836.7999999999995,
+          "p99Ms": 2269.659999999998,
+          "maxMs": 2440
+        },
+        "audioWait": {
+          "n": 35,
+          "meanMs": 1726.7714285714285,
+          "sdMs": 1526.8668628294752,
+          "minMs": 0,
+          "p50Ms": 1594,
+          "p90Ms": 3178,
+          "p95Ms": 4058.499999999992,
+          "p99Ms": 6182.259999999999,
+          "maxMs": 6254
+        },
+        "audioDownload": {
+          "n": 34,
+          "meanMs": 3.881058823526152,
+          "sdMs": 0.9012447033179029,
+          "minMs": 1.7860999999102205,
+          "p50Ms": 3.7884000000194646,
+          "p90Ms": 5.000110000034328,
+          "p95Ms": 5.241630000021541,
+          "p99Ms": 5.557673000009963,
+          "maxMs": 5.5847000000067055
+        },
+        "criteria": {
+          "checked": true,
+          "passed": false,
+          "failures": [
+            "degraded rate 0.05714285714285714 > 0.05"
+          ]
+        },
+        "slowTurnShare": 0,
+        "host": {
+          "samples": 119,
+          "machineCpuMean": 9.336134453781513,
+          "machineCpuP95": 25,
+          "machineCpuMax": 54,
+          "backendCpuMean": 0.021980821404236406,
+          "backendMemMaxMb": 110,
+          "rhubarbProcessesMax": 2
+        }
+      },
+      {
+        "concurrency": 4,
+        "users": 4,
+        "completedUsers": 4,
+        "failedUsers": 0,
+        "stuckUsers": 0,
+        "stuckSlides": [],
+        "maxTurnUsers": 0,
+        "wallMs": 479619.20350000006,
+        "peakInFlight": 4,
+        "meanInFlightAtStart": 1.197674418604651,
+        "turnsAttempted": 86,
+        "turnsOk": 86,
+        "turnsFailed": 0,
+        "errorRate": 0,
+        "timeouts": 0,
+        "httpStatus": {
+          "201": 90
+        },
+        "degradedTurns": 58,
+        "degradedRate": 0.6744186046511628,
+        "missingAudio": 0,
+        "audioFetchFailures": 0,
+        "speechCacheHits": 148,
+        "throughputTurnsPerMin": 10.758535026006312,
+        "createSessionLatency": {
+          "n": 4,
+          "meanMs": 5.159524999966379,
+          "sdMs": 2.1402554073806876,
+          "minMs": 2.0208000000566244,
+          "p50Ms": 5.933250000001863,
+          "p90Ms": 6.5906599998474125,
+          "p95Ms": 6.67072999982629,
+          "p99Ms": 6.734785999809391,
+          "maxMs": 6.750799999805167
+        },
+        "requestLatency": {
+          "n": 86,
+          "meanMs": 889.9853639534978,
+          "sdMs": 1720.8009471221064,
+          "minMs": 13.989000000059605,
+          "p50Ms": 102.7755500000203,
+          "p90Ms": 2890.494500000146,
+          "p95Ms": 5809.624050000159,
+          "p99Ms": 6794.6856950000165,
+          "maxMs": 6835.471499999985
+        },
+        "serverTotal": {
+          "n": 86,
+          "meanMs": 886.453488372093,
+          "sdMs": 1721.1314449374265,
+          "minMs": 11,
+          "p50Ms": 98,
+          "p90Ms": 2887.5,
+          "p95Ms": 5807.5,
+          "p99Ms": 6792.900000000001,
+          "maxMs": 6832
+        },
+        "orchestrator": {
+          "n": 86,
+          "meanMs": 292.95348837209303,
+          "sdMs": 612.2657037013134,
+          "minMs": 5,
+          "p50Ms": 94.5,
+          "p90Ms": 760.5,
+          "p95Ms": 1390.25,
+          "p99Ms": 2527.9000000000133,
+          "maxMs": 4488
+        },
+        "audioWait": {
+          "n": 86,
+          "meanMs": 593.4069767441861,
+          "sdMs": 1525.584465650167,
+          "minMs": 0,
+          "p50Ms": 0.5,
+          "p90Ms": 2041.5,
+          "p95Ms": 2940.25,
+          "p99Ms": 6695.55,
+          "maxMs": 6778
+        },
+        "audioDownload": {
+          "n": 86,
+          "meanMs": 3.5181046511658445,
+          "sdMs": 0.9831925334493022,
+          "minMs": 1.9618999999947846,
+          "p50Ms": 3.486650000093505,
+          "p90Ms": 4.805749999941327,
+          "p95Ms": 5.130725000053644,
+          "p99Ms": 5.397075000125916,
+          "maxMs": 5.598099999828264
+        },
+        "criteria": {
+          "checked": true,
+          "passed": false,
+          "failures": [
+            "degraded rate 0.6744186046511628 > 0.05"
+          ]
+        },
+        "slowTurnShare": 0,
+        "host": {
+          "samples": 140,
+          "machineCpuMean": 13.7,
+          "machineCpuP95": 34,
+          "machineCpuMax": 100,
+          "backendCpuMean": 0.03968996276494028,
+          "backendMemMaxMb": 111,
+          "rhubarbProcessesMax": 3
+        }
+      }
+    ]
+  }
+]
