@@ -1,0 +1,6 @@
+[
+  { "id": "gpt-oss-120b", "provider": "groq", "model": "openai/gpt-oss-120b", "family": "gpt-oss" },
+  { "id": "gpt-oss-20b", "provider": "groq", "model": "openai/gpt-oss-20b", "family": "gpt-oss" },
+  { "id": "claude-sonnet-5", "provider": "anthropic", "model": "claude-sonnet-5", "family": "claude", "judgeMaxTokens": 1600 },
+  { "id": "claude-haiku-5.5", "provider": "anthropic", "model": "claude-haiku-5-5", "family": "claude", "judgeMaxTokens": 1600 }
+]

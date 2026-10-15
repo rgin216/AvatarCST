@@ -61,12 +61,15 @@ export function pairedLatency(rows, models) {
   }));
 }
 
-export async function runLatencyEvaluation({ models, scenarios, repeats = 10, warmups = 1, delayMs = 0,
+export async function runLatencyEvaluation({ models, scenarios, repeats = 10, warmups = 1, delayMs = 0, stopOnQuota = false,
   generate = generateResponse, now = () => performance.now(), sleep = ms => new Promise(resolve => setTimeout(resolve, ms)),
   onRow = async () => {} }) {
   validateLatencyConfig({ models, scenarios, repeats, warmups, delayMs });
   const prepared = scenarios.map(s => ({ ...s, prompt: buildCstAdaptiveResponseInstructions(s.context) }));
   const rows = [];
+  const finish = () => ({ schemaVersion: 1, scope: LATENCY_SCOPE, models, repeats, warmups, delayMs,
+    complete: rows.length === models.length * (scenarios.length * repeats + warmups), stopOnQuota,
+    preparedScenarios: prepared, rows, summary: summarizeLatency(rows, models), comparisons: pairedLatency(rows, models) });
   let sequence = 0;
   async function measure(scenario, model, phase, repeat, order) {
     if (sequence && delayMs) await sleep(delayMs);
@@ -88,20 +91,26 @@ export async function runLatencyEvaluation({ models, scenarios, repeats = 10, wa
     } finally { row.latencyMs = now() - start; }
     rows.push(row);
     await onRow(row);
+    return row;
   }
   // Warm each model before measured blocks, retaining every warm-up failure.
   for (let repeat = 0; repeat < warmups; repeat++) {
-    for (const [order, model] of models.entries()) await measure(prepared[0], model, 'warmup', repeat, order);
+    for (const [order, model] of models.entries()) {
+      const row = await measure(prepared[0], model, 'warmup', repeat, order);
+      if (stopOnQuota && row.errorCategory === 'rate_limit') return finish();
+    }
   }
   for (let repeat = 0; repeat < repeats; repeat++) {
     for (const [index, scenario] of prepared.entries()) {
       const offset = (index + repeat) % models.length;
       const ordered = [...models.slice(offset), ...models.slice(0, offset)];
-      for (const [order, model] of ordered.entries()) await measure(scenario, model, 'measurement', repeat, order);
+      for (const [order, model] of ordered.entries()) {
+        const row = await measure(scenario, model, 'measurement', repeat, order);
+        if (stopOnQuota && row.errorCategory === 'rate_limit') return finish();
+      }
     }
   }
-  return { schemaVersion: 1, scope: LATENCY_SCOPE, models, repeats, warmups, delayMs,
-    preparedScenarios: prepared, rows, summary: summarizeLatency(rows, models), comparisons: pairedLatency(rows, models) };
+  return finish();
 }
 
 export function toCsv(records, columns) {
