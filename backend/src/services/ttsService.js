@@ -47,9 +47,14 @@ export function getVoiceDeliveryOptions(options = {}) {
 
 async function streamEdgeSpeech(text, writable, options = {}) {
   const tts = new MsEdgeTTS();
-  await tts.setMetadata(options.voice || EDGE_MALE_VOICE, OUTPUT_FORMAT.AUDIO_24KHZ_96KBITRATE_MONO_MP3);
-  const { audioStream } = tts.toStream(prepareSpeechText(text), getVoiceDeliveryOptions(options).edgeProsody);
-  await pipeline(audioStream, writable);
+  // Each call opens its own WebSocket; close it so connections don't accumulate across turns.
+  try {
+    await tts.setMetadata(options.voice || EDGE_MALE_VOICE, OUTPUT_FORMAT.AUDIO_24KHZ_96KBITRATE_MONO_MP3);
+    const { audioStream } = tts.toStream(prepareSpeechText(text), getVoiceDeliveryOptions(options).edgeProsody);
+    await pipeline(audioStream, writable);
+  } finally {
+    tts.close();
+  }
 }
 
 async function synthesizeEdgeSpeech(text, outputPath, options = {}) {
