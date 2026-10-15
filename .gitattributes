@@ -1,0 +1,2 @@
+# Preserve exported evidence bytes so checksums survive Windows Git checkouts.
+backend/evaluation/published/** -text

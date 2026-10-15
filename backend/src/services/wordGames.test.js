@@ -71,13 +71,19 @@ test('recap includes the word activities actually attempted', () => {
 });
 
 test('session handler blocks premature pronunciation progress and advances completed activities once', async t => {
+  const priorKey = process.env.OPENAI_API_KEY;
+  process.env.OPENAI_API_KEY = 'test-key';
+  t.after(() => { if (priorKey === undefined) delete process.env.OPENAI_API_KEY; else process.env.OPENAI_API_KEY = priorKey; });
   const session = { _id: 'word-game-test', userId: 'test', status: 'active', pipelineMode: 'free', scriptId: 'cst_word_games', scriptStepIndex: script.indexOf(find('pronunciation')), scriptStepTurnIndex: 1, scriptStepRetryCount: 0, activityRevision: 1, interactionState: { sessionAnswers: [] }, save: async () => session };
   t.mock.method(Session, 'findOneAndUpdate', async () => session);
   t.mock.method(User, 'findById', () => ({ lean: async () => ({ _id: 'test', name: 'Test' }) }));
   t.mock.method(Memory, 'findOne', () => ({ lean: async () => ({ entries: [] }) }));
   t.mock.method(Message, 'find', () => ({ sort() { return this; }, limit() { return this; }, lean: async () => [{ role: 'assistant', content: 'Try this activity.' }] }));
   t.mock.method(Message, 'create', async value => ({ _id: 'message', ...value }));
-  t.mock.method(globalThis, 'fetch', async () => ({ ok: true, json: async () => ({ choices: [{ message: { content: '{"answered":true,"response":"A lovely connection.","followUp":null}' } }] }) }));
+  t.mock.method(globalThis, 'fetch', async () => {
+    const content = '{"answered":true,"response":"A lovely connection.","followUp":null}';
+    return Response.json({ output_text: content, choices: [{ message: { content } }] });
+  });
   for (let i = 0; i < 4; i++) await assert.rejects(respondToSessionTurn({ sessionId: session._id, content: 'ready' }), { status: 409 });
   assert.equal(session.scriptStepIndex, script.indexOf(find('pronunciation')));
   const completion = `[[pronunciation-complete:${find('pronunciation').interaction.clips.map(c => c.id).join(',')}]]`;

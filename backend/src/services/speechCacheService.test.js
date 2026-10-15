@@ -47,9 +47,12 @@ test('incomplete results are returned but not reused', async () => {
   assert.equal(calls, 2);
 });
 
-test('a stalled synthesis times out and the next request retries', async () => {
+test('a stalled synthesis times out and the next request retries', async t => {
   const audioOutputPath = await makeAudioFile();
-  await assert.rejects(getOrCreateSpeech('key', () => new Promise(() => {}), { timeoutMs: 20 }), /timed out/);
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const rejected = assert.rejects(getOrCreateSpeech('key', () => new Promise(() => {}), { timeoutMs: 20 }), /timed out/);
+  t.mock.timers.tick(20);
+  await rejected;
   const audio = await getOrCreateSpeech('key', async () => ({ audioOutputPath, audioUrl: '/c.mp3' }));
   assert.equal(audio.audioUrl, '/c.mp3');
 });

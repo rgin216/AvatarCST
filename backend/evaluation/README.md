@@ -58,6 +58,17 @@ The adapter uses Anthropic's Messages API, separates system instructions, disabl
 
 Sources: [model lineup](https://platform.claude.com/docs/en/models/overview), [Messages API](https://platform.claude.com/docs/en/api/messages/create), [structured outputs](https://platform.claude.com/docs/en/build-with-claude/structured-outputs), [Sonnet 5 configuration changes](https://platform.claude.com/docs/en/models/sonnet-5/migration-guide).
 
+### Balanced GPT-OSS/Claude roster (13 October 2026)
+
+`models-balanced.json` compares GPT-OSS 120B and 20B (hosted on Groq) with Claude Sonnet 5 and Haiku 5.5 (hosted on Anthropic). It replaces Qwen only in this separate roster; previous rosters are preserved. Both Claude models use the existing `ANTHROPIC_API_KEY`, disabled thinking, and schema-constrained critiques with a 1600-token output budget.
+
+```powershell
+npm run eval:llm -- --models evaluation/models-balanced.json --limit 1
+npm run eval:llm -- --models evaluation/models-balanced.json --live --limit 1
+```
+
+One scenario makes four generation calls and twelve critiques. For all 30 scenarios, omit `--limit 1`. Equal model counts do not remove shared-family judge preferences or provider differences; retain scores by judge and calibrate against human review. Haiku 5.5's ID is `claude-haiku-5-5`, documented in the [Anthropic model overview](https://platform.claude.com/docs/en/models/overview). Account access must be verified with a live pilot before the main study.
+
 ## What is measured
 
 Seven criteria use integer scores from 1 (clear failure) through 5 (fully satisfies): script adherence, relevance, accessibility, respect, grounding, handling difficulty and continuity. Critics must supply evidence. Serious failures are counted separately. Local checks flag acknowledgement word limits and question marks.
@@ -69,6 +80,26 @@ Scores remain separated by facilitator and critic because each candidate has a d
 This design follows the bias concerns documented by [Zheng et al., Judging LLM-as-a-Judge with MT-Bench and Chatbot Arena](https://arxiv.org/abs/2306.05685). Independent model opinions are useful diagnostics, not ground truth.
 
 ## Outputs and human calibration
+
+New collections prepared for version control live under `published/YYYY-MM-DD/`, with a collection README, Markdown summaries, raw evidence and CSV tables. Runtime checkpoints remain ignored under `results/`. Failed calls and invalid critiques remain in the published reports. Publication here means writing local repository files, not committing or pushing Git changes.
+
+The [15 October 2026 collection](published/2026-10-15/README.md) contains the default three-model roster: 30 scenarios, 90 successful generations and 180 valid critiques. The separate deployed OpenAI speech pilot completed 18 measured turns and six warmups. Generation timing is retained from the quality run; no separate text-only latency benchmark was collected. The deployed pilot ran before the quality evaluation and measures API completion and audio delivery, excluding browser playback/rendering onset. No human calibration has been completed.
+
+### Export completed runs without API calls
+
+From `backend`, supply the completed run directories (relative to the current directory):
+
+```powershell
+node scripts/publish-evaluation.js --llm-run evaluation/results/current-2026-10-15/llm/2026-10-14T23-36-07-829Z-271b9fcf --deployed-run evaluation/results/current-2026-10-15/deployed --date 2026-10-15
+```
+
+The command validates the full scenario/model/repetition plan, checks the fixture hash and critique attempts, scans for configured credentials, removes local checkout paths, and writes checksums for the exported files. The destination must be new: the example collection already exists in this branch. An optional `--latency-run directory` includes a separate text-only benchmark and requires the same model roster. Failed attempts are preserved, not repaired or hidden. Older manifests record HEAD without working-tree status/source hashes; their saved prompts remain the authoritative prompt evidence. New LLM runs also record working-tree status and source hashes.
+
+`complete-evaluation-workflow.js --llm-run directory --api https://BACKEND/api --date YYYY-MM-DD` is a **live** workflow: it waits for a completed quality run under `results/current-DATE/`, runs separate text latency using the saved roster and scenarios, collects fresh deployed speech turns, then calls the offline exporter. `finish-evaluation-run.js REPORT_JSON OUTPUT_DIRECTORY` is an alternative live text-latency/report helper. Neither helper is needed to export already-collected results. Run provider benchmarks sequentially to avoid quota contention.
+
+To collect a fresh deployed speech pilot, write `{"api":"https://BACKEND/api"}` to a local target JSON and run `node scripts/collect-deployed-voice-latency.js TARGET_JSON NEW_OUTPUT_DIRECTORY`. This is live, creates six synthetic users/sessions, persists messages, and consumes speech/text provider usage; existing participant sessions are not used. Existing output directories are rejected to prevent mixing checkpoints from separate runs.
+
+For optional chart exports, install `reportlab` and `pypdfium2` in your Python environment and run `python scripts/plot-stage-latency.py --report COLLECTION/deployed-summary.json --out NEW_CHART_DIRECTORY`. The chart derives its date, sample counts, avatars and axis range from the report; exported CSV preserves each stage's sample count.
 
 Each run gets a unique directory under ignored `evaluation/results/`:
 - `manifest.json`: revision, roster, fixture snapshot/hash and start time.
@@ -104,6 +135,6 @@ Use the synthetic starter set for development, then separate development cases f
 
 ## Initial verification
 
-The backend regression suite and evaluation runner tests passed during implementation. A one-scenario live smoke test completed all three generations and six validated critiques after reducing Qwen's critic budget. This verifies connectivity and output handling, not comparative model quality. Full benchmark results have not yet been collected.
+The backend regression suite and evaluation runner tests passed during initial implementation. A one-scenario live smoke test completed all three generations and six validated critiques after reducing Qwen's critic budget. This verified connectivity and output handling, not comparative model quality. Completed benchmark evidence is now available in the dated collection linked above.
 
 Claude integration has mocked API coverage for headers, system instructions, schema preservation, refusals, truncation, credential checks, HTTP errors and aborted body reads. Live Claude verification requires an Anthropic API key; no key was configured during implementation, so the four-model live command stopped in preflight without API calls.

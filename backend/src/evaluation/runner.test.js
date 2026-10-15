@@ -78,6 +78,20 @@ test('validates scores, evidence and critical failure structure', () => {
   assert.throws(() => parseJudgment(JSON.stringify(data)), /critical/);
 });
 
+test('nested criticalFailures stays a visible failed critique with raw output preserved', async () => {
+  const malformed = JSON.parse(verdict);
+  malformed.scores.criticalFailures = malformed.criticalFailures;
+  delete malformed.criticalFailures;
+  const raw = JSON.stringify(malformed);
+  const report = await runEvaluation({ models, scenarios: scenarios.slice(0, 1), generate: async (_, options) =>
+    options.json ? (options.model === 'b' ? raw : verdict) : 'Thank you.' });
+  const judgment = report.rows[0].judgments.find(j => j.judge === 'b');
+  assert.equal(judgment.status, 'error');
+  assert.equal(judgment.error, 'Invalid critical failures');
+  assert.equal(judgment.raw, raw);
+  assert.equal(report.summary[0].byJudge.b.count, 0);
+});
+
 test('rejects aliases of the same underlying model and invalid runs', () => {
   assert.throws(() => validateInputs([models[0], { ...models[0], id: 'alias' }], scenarios, 1), /duplicate/);
   assert.throws(() => validateInputs(models, scenarios, 0), /Repeats/);

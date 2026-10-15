@@ -1,0 +1,42 @@
+{
+  "date": "2026-10-15",
+  "exportedAt": "2026-10-15T03:02:42.722Z",
+  "models": [
+    {
+      "id": "gpt-oss-120b",
+      "provider": "groq",
+      "model": "openai/gpt-oss-120b",
+      "family": "gpt-oss"
+    },
+    {
+      "id": "gpt-oss-20b",
+      "provider": "groq",
+      "model": "openai/gpt-oss-20b",
+      "family": "gpt-oss"
+    },
+    {
+      "id": "qwen-3.8-27b",
+      "provider": "groq",
+      "model": "qwen/qwen3.8-27b",
+      "family": "qwen",
+      "judgeMaxTokens": 900
+    }
+  ],
+  "scenarios": 30,
+  "repeats": 1,
+  "llm": {
+    "attempts": 90,
+    "generationFailures": 0,
+    "critiqueFailures": 0,
+    "revision": "c6367ab071290175d7d10550df2bc644e4b61fdd",
+    "workingTreeStatus": null,
+    "sourceHash": null,
+    "provenance": "HEAD alone does not establish exact working-tree contents. Saved prompts and raw responses are the experiment evidence."
+  },
+  "deployed": {
+    "complete": true,
+    "attempts": 24,
+    "stoppedReason": null
+  },
+  "separateTextLatency": null
+}

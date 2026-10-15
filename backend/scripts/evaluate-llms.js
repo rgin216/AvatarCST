@@ -49,8 +49,14 @@ try {
     await mkdir(out, { recursive: true });
     let revision = 'unknown';
     try { revision = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim(); } catch {}
+    let workingTreeStatus = 'unknown';
+    try { workingTreeStatus = execFileSync('git', ['status', '--short'], { cwd: root, encoding: 'utf8' }).trim(); } catch {}
+    const sourceHash = createHash('sha256');
+    for (const file of ['runner.js', 'pacing.js', '../services/llmService.js', '../services/promptService.js', '../services/anthropicService.js']) {
+      sourceHash.update(await readFile(resolve(root, 'src/evaluation', file)));
+    }
     await writeFile(resolve(out, 'manifest.json'), JSON.stringify({
-      startedAt: new Date().toISOString(), revision, models, scenarios, repeats, requestPolicy,
+      startedAt: new Date().toISOString(), revision, workingTreeStatus, sourceHash: sourceHash.digest('hex'), models, scenarios, repeats, requestPolicy,
       latencyDefinition: 'Pre-call pacing excluded; quota retry waits and service retries included.',
       fixtureHash: createHash('sha256').update(JSON.stringify(scenarios)).digest('hex'),
     }, null, 2));

@@ -6,6 +6,20 @@ import { distribution, runLatencyEvaluation, validateLatencyConfig, pairedLatenc
 const models = ['a', 'b', 'c'].map(id => ({ id, provider: 'groq', model: id }));
 const scenarios = JSON.parse(await readFile(new URL('../../evaluation/scenarios.json', import.meta.url), 'utf8')).slice(0, 2);
 
+test('optional quota stop saves partial measurement and warmup failures', async () => {
+  for (const warmups of [0, 1]) {
+    let calls = 0;
+    const saved = [];
+    const report = await runLatencyEvaluation({ models, scenarios, repeats: 1, warmups, stopOnQuota: true,
+      onRow: async row => saved.push(row), generate: async () => { calls++; throw new Error('Groq error 429: tokens per day'); } });
+    assert.equal(calls, 1);
+    assert.equal(saved.length, 1);
+    assert.equal(report.rows[0].errorCategory, 'rate_limit');
+    assert.equal(report.complete, false);
+    assert.equal(report.summary[0].attempts, warmups ? 0 : 1);
+  }
+});
+
 test('warmups are retained but excluded; order rotates and identical prompts are paired', async () => {
   let clock = 0;
   const calls = [], waits = [], saved = [];

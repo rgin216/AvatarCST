@@ -18,6 +18,7 @@ try {
     'delay-ms': { type: 'string', default: '1000' }, limit: { type: 'string' },
     out: { type: 'string', default: resolve(root, 'evaluation/results') },
     label: { type: 'string', default: '' },
+    'stop-on-quota': { type: 'boolean', default: false },
   } });
   dotenv.config({ path: resolve(root, '.env'), quiet: true });
   const { validateLatencyConfig, runLatencyEvaluation, LATENCY_SCOPE, toCsv, SAMPLE_COLUMNS,
@@ -29,7 +30,7 @@ try {
     if (!Number.isInteger(limit) || limit < 1) throw new Error('limit must be a positive integer');
     scenarios = scenarios.slice(0, limit);
   }
-  const config = { models, scenarios, repeats: Number(values.repeats), warmups: Number(values.warmups), delayMs: Number(values['delay-ms']) };
+  const config = { models, scenarios, repeats: Number(values.repeats), warmups: Number(values.warmups), delayMs: Number(values['delay-ms']), stopOnQuota: values['stop-on-quota'] };
   validateLatencyConfig(config);
   console.log(JSON.stringify({ mode: values.live ? 'live' : 'dry-run', scope: LATENCY_SCOPE,
     measuredCalls: models.length * scenarios.length * config.repeats,
