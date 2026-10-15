@@ -34,6 +34,7 @@ import { createEvaluationAssignment } from '../evaluation/liveConfig.js';
 import { EvaluationTurn, SessionEvaluation } from '../models/Evaluation.js';
 import { getSessionAccess, INTRO_SCRIPT_ID } from '../services/sessionAccessService.js';
 import { nowMs, timeAsync } from '../services/turnTiming.js';
+import { trackLlmFallbacks } from '../services/llmContext.js';
 import { getScriptDeckSlideStepIndex } from '../services/cstScriptService.js';
 
 const AVATAR_MODES = new Set(['male', 'female', 'visualizer']);
@@ -342,6 +343,7 @@ function prefetchNextTurnAudio(turn, pipelineMode, avatarMode, lipSyncMode) {
 
 export const respondToSession = async (req, res, next) => {
   const timings = {};
+  const llmFallbacks = { count: 0 };
   const turnId = uuidv4();
   const startedAtMs = nowMs();
   try {
@@ -349,11 +351,11 @@ export const respondToSession = async (req, res, next) => {
     const lipSyncMode = getLipSyncMode(req.body?.lipSyncMode);
     const turn = await timeAsync(
       'orchestratorMs',
-      () => respondToSessionTurn({
+      () => trackLlmFallbacks(llmFallbacks, () => respondToSessionTurn({
         sessionId: req.params.id,
         content: req.body?.content,
         prefetchSpeech: (text, pipelineMode) => prefetchSegmentAudio(text, pipelineMode, avatarMode, lipSyncMode),
-      }),
+      })),
       timings
     );
 
@@ -367,7 +369,7 @@ export const respondToSession = async (req, res, next) => {
 
     turn.turnId = turnId;
     turn.audioStatus ||= 'ok';
-    turn.timings = { ...timings, totalMs: nowMs() - startedAtMs };
+    turn.timings = { ...timings, llmFallbacks: llmFallbacks.count, totalMs: nowMs() - startedAtMs };
     res.status(201).json(turn);
   } catch (err) {
     next(err);
@@ -441,6 +443,7 @@ function startTranscriptStream(res, transcript) {
 export const respondAudioToSession = async (req, res, next) => {
   const uploadedFilePath = req.file?.path;
   const timings = {};
+  const llmFallbacks = { count: 0 };
   const turnId = uuidv4();
   const startedAtMs = nowMs();
   const streamTranscript = req.query?.stream === 'transcript';
@@ -469,11 +472,11 @@ export const respondAudioToSession = async (req, res, next) => {
 
     const turn = await timeAsync(
       'orchestratorMs',
-      () => respondToSessionTurn({
+      () => trackLlmFallbacks(llmFallbacks, () => respondToSessionTurn({
         sessionId: req.params.id,
         content: transcript,
         prefetchSpeech: (text) => prefetchSegmentAudio(text, session.pipelineMode, avatarMode, lipSyncMode),
-      }),
+      })),
       timings
     );
 
@@ -488,7 +491,7 @@ export const respondAudioToSession = async (req, res, next) => {
     turn.turnId = turnId;
     turn.audioStatus ||= 'ok';
     turn.transcript = transcript;
-    turn.timings = { ...timings, totalMs: nowMs() - startedAtMs };
+    turn.timings = { ...timings, llmFallbacks: llmFallbacks.count, totalMs: nowMs() - startedAtMs };
     if (!streamTranscript) return res.status(201).json(turn);
     writeStreamLine(res, { type: 'turn', turn });
     res.end();
