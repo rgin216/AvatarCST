@@ -68,6 +68,18 @@ test('short nonempty credentials are scanned without treating empty values as se
   assert.equal(portableArtifact('safe', 'unused-root', configuredSecrets({ EMPTY_SECRET: '' })), 'safe');
 });
 
+test('PASS and CREDENTIAL key forms reject configured values in exported artifacts', () => {
+  for (const key of ['PASS', 'DB_PASS', 'PASSPHRASE', 'PASSWORD', 'CREDENTIAL', 'API_CREDENTIAL', 'CREDENTIALS', 'service_credentials']) {
+    const value = 's"x';
+    const secrets = configuredSecrets({ [key]: value });
+    assert.deepEqual(secrets, [value], key);
+    for (const text of [value, JSON.stringify({ value })]) {
+      assert.throws(() => portableArtifact(text, 'unused-root', secrets), /Credential/, key);
+    }
+  }
+  assert.deepEqual(configuredSecrets({ PASS: '', DB_PASS: null, CREDENTIAL: 123, CREDENTIALS: undefined }), []);
+});
+
 test('publication rejects duplicate blocks, missing critics and changed fixtures/rosters', () => {
   const report = makeReport();
   assert.throws(() => validateCompletedRun(manifest, { ...report, rows: [report.rows[0], report.rows[0]] }), /Duplicate/);

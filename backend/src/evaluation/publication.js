@@ -37,7 +37,7 @@ export function validateCompletedRun(manifest, report) {
 }
 
 export const configuredSecrets = (...environments) => [...new Set(environments.flatMap(environment => Object.entries(environment)
-  .filter(([key, value]) => /KEY|TOKEN|PASSWORD|SECRET|AUTH_CONFIG/i.test(key) && typeof value === 'string' && value.length > 0)
+  .filter(([key, value]) => /KEY|TOKEN|PASS|SECRET|AUTH_CONFIG|CREDENTIAL/i.test(key) && typeof value === 'string' && value.length > 0)
   .map(([, value]) => value)))];
 
 export function portableArtifact(text, root, secrets = []) {
