@@ -46,6 +46,28 @@ test('configured auth configs are refused in plain and JSON-escaped artifacts', 
   }
 });
 
+test('secret collection preserves conflicting source values and deduplicates by value', () => {
+  const secrets = configuredSecrets(
+    { API_TOKEN: 'runtime-token', SHARED_SECRET: 'same-value' },
+    { API_TOKEN: 'dotenv-token', OTHER_PASSWORD: 'same-value' },
+  );
+  assert.deepEqual(secrets, ['runtime-token', 'same-value', 'dotenv-token']);
+  for (const value of secrets) {
+    assert.throws(() => portableArtifact(value, 'unused-root', secrets), /Credential/);
+  }
+});
+
+test('short nonempty credentials are scanned without treating empty values as secrets', () => {
+  const secrets = configuredSecrets({ PASSWORD: 'abc', API_KEY: 'x', AUTH_CONFIG: 'a"b', EMPTY_SECRET: '', NORMAL_SETTING: 'safe' });
+  assert.deepEqual(secrets, ['abc', 'x', 'a"b']);
+  for (const value of secrets) {
+    for (const text of [value, JSON.stringify({ value })]) {
+      assert.throws(() => portableArtifact(text, 'unused-root', secrets), /Credential/);
+    }
+  }
+  assert.equal(portableArtifact('safe', 'unused-root', configuredSecrets({ EMPTY_SECRET: '' })), 'safe');
+});
+
 test('publication rejects duplicate blocks, missing critics and changed fixtures/rosters', () => {
   const report = makeReport();
   assert.throws(() => validateCompletedRun(manifest, { ...report, rows: [report.rows[0], report.rows[0]] }), /Duplicate/);

@@ -36,9 +36,9 @@ export function validateCompletedRun(manifest, report) {
   if (expected.size) throw new Error(`Incomplete run: ${expected.size} response blocks missing`);
 }
 
-export const configuredSecrets = environment => Object.entries(environment)
-  .filter(([key, value]) => /KEY|TOKEN|PASSWORD|SECRET|AUTH_CONFIG/i.test(key) && value.length >= 8)
-  .map(([, value]) => value);
+export const configuredSecrets = (...environments) => [...new Set(environments.flatMap(environment => Object.entries(environment)
+  .filter(([key, value]) => /KEY|TOKEN|PASSWORD|SECRET|AUTH_CONFIG/i.test(key) && typeof value === 'string' && value.length > 0)
+  .map(([, value]) => value)))];
 
 export function portableArtifact(text, root, secrets = []) {
   // Check before rewriting paths so credentials can never enter exported files.

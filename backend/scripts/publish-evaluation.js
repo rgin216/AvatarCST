@@ -27,9 +27,9 @@ try {
   const report = JSON.parse(await readFile(resolve(llmDir, 'report.json'), 'utf8'));
   validateCompletedRun(manifest, report);
   const destination = resolve(values.out ?? resolve(root, 'evaluation/published', values.date));
-  const secrets = configuredSecrets({ ...process.env, ...dotenv.parse(await readFile(resolve(root, '.env'), 'utf8').catch(error => {
+  const secrets = configuredSecrets(process.env, dotenv.parse(await readFile(resolve(root, '.env'), 'utf8').catch(error => {
     if (error.code === 'ENOENT') return ''; throw error;
-  })) });
+  })));
   const files = new Map();
   async function collect(dir, names, prefix = '') {
     for (const name of names) {
