@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { validateCompletedRun, portableArtifact } from './publication.js';
+import { validateCompletedRun, portableArtifact, configuredSecrets } from './publication.js';
 
 const models = ['a', 'b'].map(id => ({ id, model: id, provider: 'groq' }));
 const scenarios = [{ id: 's', input: 'Hello', context: { slide: 'intro', scriptId: 'intro' } }];
@@ -9,6 +9,7 @@ const manifest = { models, scenarios, repeats: 1,
   fixtureHash: createHash('sha256').update(JSON.stringify(scenarios)).digest('hex') };
 const makeReport = () => ({ models, repeats: 1, rows: models.map(m => ({
   scenario: 's', facilitator: m.id, repeat: 0, status: 'ok',
+  input: scenarios[0].input, context: structuredClone(scenarios[0].context),
   judgments: models.filter(j => j.id !== m.id).map(j => ({ judge: j.id, status: 'ok' })),
 })) });
 
@@ -21,6 +22,28 @@ test('publication requires the full plan, retaining attempted provider failures'
   validateCompletedRun(manifest, report);
   report.rows.pop();
   assert.throws(() => validateCompletedRun(manifest, report), /Incomplete/);
+});
+
+test('publication rejects substituted input and context, including failed responses', () => {
+  for (const status of ['ok', 'error']) {
+    for (const field of ['input', 'context']) {
+      const report = makeReport();
+      report.rows[0].status = status;
+      report.rows[0][field] = field === 'input' ? 'Different input' : { ...scenarios[0].context, slide: 'different' };
+      assert.throws(() => validateCompletedRun(manifest, report), /input\/context differ/);
+    }
+  }
+});
+
+test('configured auth configs are refused in plain and JSON-escaped artifacts', () => {
+  for (const name of ['AUTH_CONFIG', 'DOCKER_AUTH_CONFIG']) {
+    const secret = '{"auths":{"registry":{"auth":"test-credential"}}}';
+    const secrets = configuredSecrets({ [name]: secret, NORMAL_SETTING: 'ordinary-value' });
+    assert.deepEqual(secrets, [secret]);
+    for (const text of [secret, JSON.stringify({ config: secret })]) {
+      assert.throws(() => portableArtifact(text, 'unused-root', secrets), /Credential/);
+    }
+  }
 });
 
 test('publication rejects duplicate blocks, missing critics and changed fixtures/rosters', () => {

@@ -145,7 +145,7 @@ Suggested report wording: “We evaluated 3 language models on a synthetic adapt
 
 ## Evidence files
 
-Rotation source: backend\evaluation\published\2026-10-15\llm\report.json
+Rotation source: llm/report.json
 
 Latency source: not collected
 

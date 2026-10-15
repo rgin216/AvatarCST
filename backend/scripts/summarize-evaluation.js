@@ -1,15 +1,17 @@
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
-import { resolve } from 'node:path';
+import { resolve, relative } from 'node:path';
 import { parseArgs } from 'node:util';
 import { distribution, toCsv } from '../src/evaluation/latency.js';
 import { findDisagreements } from '../src/evaluation/analysis.js';
 
 const { values } = parseArgs({ options: { report: { type: 'string' }, latency: { type: 'string' }, out: { type: 'string' } } });
 if (!values.report || !values.out) throw new Error('--report and --out are required');
-const source = resolve(values.report);
-const report = JSON.parse(await readFile(source, 'utf8'));
+const sourceFile = resolve(values.report);
+const report = JSON.parse(await readFile(sourceFile, 'utf8'));
 const latency = values.latency ? JSON.parse(await readFile(resolve(values.latency), 'utf8')) : null;
 const out = resolve(values.out);
+const source = relative(out, sourceFile).replaceAll('\\', '/');
+const latencySource = values.latency ? relative(out, resolve(values.latency)).replaceAll('\\', '/') : null;
 await mkdir(out, { recursive: true });
 let deployed = null;
 try { deployed = JSON.parse(await readFile(resolve(out, 'deployed-summary.json'), 'utf8')); }
@@ -105,7 +107,7 @@ const text = [
   'The LLM experiment is a synthetic component benchmark of generated text; its scores do not evaluate the orchestrator, speech recognition, synthesis, avatar playback or complete-session progression. The separate deployed pilot, if present, evaluates API latency only. One generated response per scenario is insufficient to estimate stochastic variation. Automated judges are diagnostic and require CST-informed human calibration. These results do not establish usability, therapeutic effectiveness or cognitive benefit.',
   `Suggested report wording: “We evaluated ${report.models.length} language models on a synthetic adaptive-acknowledgement benchmark. Each successful output was assessed independently by the remaining models, with malformed judgments excluded and failures reported separately. Completion latency was measured at the client. Results are exploratory component-level evidence; clinical effectiveness was outside this experiment.”`,
   '## Evidence files',
-  `Rotation source: ${source}\n\nLatency source: ${values.latency ? resolve(values.latency) : 'not collected'}\n\nHuman review: use the rotation run’s anonymous human-review.json. Raw results remain in the associated run directory.`,
+  `Rotation source: ${source}\n\nLatency source: ${latencySource ?? 'not collected'}\n\nHuman review: use the rotation run’s anonymous human-review.json. Raw results remain in the associated run directory.`,
 ].join('\n\n') + '\n';
 await writeFile(resolve(out, 'evaluation.md'), text);
 if (deployed) {
@@ -113,7 +115,7 @@ if (deployed) {
   await writeFile(resolve(out, 'deployed-voice-evaluation.md'), '# Deployed voice/avatar latency evaluation\n\n' + section +
     '\nEvidence: deployed-summary.json, deployed-voice-rows.jsonl and deployed-voice-samples.csv in this directory. This pilot measures latency and audio/lip-sync delivery, not therapeutic effectiveness.\n');
 }
-await writeFile(resolve(out, 'evaluation.json'), JSON.stringify({ source, complete: report.complete ?? true, plannedRows: report.plannedRows ?? report.rows.length, latencySource: values.latency ? resolve(values.latency) : null, groups, criticValidity, errors, disagreements, deployed: deployed ? { complete: deployed.complete, stoppedReason: deployed.stoppedReason, summary: deployed.summary } : null }, null, 2));
+await writeFile(resolve(out, 'evaluation.json'), JSON.stringify({ source, complete: report.complete ?? true, plannedRows: report.plannedRows ?? report.rows.length, latencySource, groups, criticValidity, errors, disagreements, deployed: deployed ? { complete: deployed.complete, stoppedReason: deployed.stoppedReason, summary: deployed.summary } : null }, null, 2));
 await writeFile(resolve(out, 'judge-scores.csv'), toCsv(judgments, ['facilitator', 'judge', 'criterion', 'n', 'meanScore']));
 await writeFile(resolve(out, 'failures.csv'), toCsv(errors, ['scenario', 'facilitator', 'role', 'model', 'error']));
 console.log('Saved evaluation to ' + out);

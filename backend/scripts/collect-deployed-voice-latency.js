@@ -38,10 +38,16 @@ outer: for (let repeat = 0; repeat < repeats; repeat++) {
   // Counterbalance configuration order across fresh, isolated users/sessions.
   const ordered = repeat % 2 ? [...configurations].reverse() : configurations;
   for (const config of ordered) {
-    const user = await json('/users', { name: 'Synthetic voice evaluation ' + randomUUID(), preferredName: 'Alex', role: 'patient',
-      settings: { avatarMode: config.avatarMode, language: 'en' } });
-    const session = await json('/sessions', { userId: user._id, title: 'Synthetic voice latency ' + new Date().toISOString(),
-      scriptId: 'cst_intro_reminiscence', pipelineMode: 'openai-fast-scripted', evaluationSelection: 'off' });
+    let user, session;
+    try {
+      user = await json('/users', { name: 'Synthetic voice evaluation ' + randomUUID(), preferredName: 'Alex', role: 'patient',
+        settings: { avatarMode: config.avatarMode, language: 'en' } });
+      session = await json('/sessions', { userId: user._id, title: 'Synthetic voice latency ' + new Date().toISOString(),
+        scriptId: 'cst_intro_reminiscence', pipelineMode: 'openai-fast-scripted', evaluationSelection: 'off' });
+    } catch (error) {
+      stoppedReason = error.message;
+      break outer;
+    }
     sessions.push({ userId: user._id, sessionId: session._id, repeat, ...config });
     for (let index = -1; index < fixtures.fixtures.length; index++) {
       const row = { repeat, sessionId: session._id, phase: index < 0 ? 'warmup' : 'measurement', inputIndex: index,

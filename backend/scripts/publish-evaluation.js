@@ -1,18 +1,23 @@
 // Offline repository export only: never makes provider or deployment requests.
-import { readFile, writeFile, mkdir, readdir } from 'node:fs/promises';
-import { resolve, dirname, relative } from 'node:path';
+import { readFile, writeFile, mkdir, readdir, mkdtemp, rename, rm, access } from 'node:fs/promises';
+import { resolve, dirname, relative, basename } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
 import { parseArgs } from 'node:util';
 import { createHash } from 'node:crypto';
 import dotenv from 'dotenv';
-import { portableArtifact, validateCompletedRun } from '../src/evaluation/publication.js';
+import { portableArtifact, validateCompletedRun, configuredSecrets } from '../src/evaluation/publication.js';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const { values } = parseArgs({ options: {
   'llm-run': { type: 'string' }, 'deployed-run': { type: 'string' },
   'latency-run': { type: 'string' }, date: { type: 'string' }, out: { type: 'string' },
 } });
+let stagingDirectory;
+async function requireNewDestination(path) {
+  try { await access(path); } catch (error) { if (error.code === 'ENOENT') return; throw error; }
+  throw new Error('Export destination already exists');
+}
 try {
   if (!values['llm-run'] || !/^\d{4}-\d{2}-\d{2}$/.test(values.date ?? '')) {
     throw new Error('Required: --llm-run directory --date YYYY-MM-DD; optional --deployed-run and --latency-run');
@@ -21,10 +26,10 @@ try {
   const manifest = JSON.parse(await readFile(resolve(llmDir, 'manifest.json'), 'utf8'));
   const report = JSON.parse(await readFile(resolve(llmDir, 'report.json'), 'utf8'));
   validateCompletedRun(manifest, report);
-  const out = resolve(values.out ?? resolve(root, 'evaluation/published', values.date));
-  const secrets = Object.entries(dotenv.parse(await readFile(resolve(root, '.env'), 'utf8').catch(error => {
+  const destination = resolve(values.out ?? resolve(root, 'evaluation/published', values.date));
+  const secrets = configuredSecrets({ ...process.env, ...dotenv.parse(await readFile(resolve(root, '.env'), 'utf8').catch(error => {
     if (error.code === 'ENOENT') return ''; throw error;
-  }))).filter(([key, value]) => /KEY|TOKEN|PASSWORD|SECRET/i.test(key) && value.length >= 8).map(([, value]) => value);
+  })) });
   const files = new Map();
   async function collect(dir, names, prefix = '') {
     for (const name of names) {
@@ -46,9 +51,10 @@ try {
     if (JSON.stringify(latency.models) !== JSON.stringify(report.models)) throw new Error('Latency roster differs from LLM roster');
     await collect(dir, ['manifest.json', 'report.json', 'rows.jsonl', 'samples.csv', 'summary.csv', 'paired-comparisons.csv'], 'text-latency/');
   }
-  // Validate and scan inputs before creating the destination; never overwrite a collection.
-  await mkdir(dirname(out), { recursive: true });
-  await mkdir(out, { recursive: false });
+  // Build in a sibling on the same filesystem; publish only a finished collection.
+  await mkdir(dirname(destination), { recursive: true });
+  await requireNewDestination(destination);
+  const out = stagingDirectory = await mkdtemp(resolve(dirname(destination), '.evaluation-export-'));
   for (const [name, text] of files) {
     await mkdir(dirname(resolve(out, name)), { recursive: true });
     await writeFile(resolve(out, name), text);
@@ -89,7 +95,15 @@ try {
   }
   await finalize(out);
   await writeFile(resolve(out, 'checksums.json'), JSON.stringify(checksums, null, 2));
-  console.log('Exported collection: ' + out);
+  await requireNewDestination(destination);
+  await rename(out, destination);
+  stagingDirectory = undefined;
+  console.log('Exported collection: ' + destination);
 } catch (error) {
   console.error(error.message); process.exitCode = 1;
+} finally {
+  if (stagingDirectory) {
+    if (!basename(stagingDirectory).startsWith('.evaluation-export-')) throw new Error('Unexpected export staging path');
+    await rm(stagingDirectory, { recursive: true, force: true });
+  }
 }

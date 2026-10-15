@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { isDeepStrictEqual } from 'node:util';
 import { validateInputs } from './runner.js';
 
 // A finished file alone does not establish that every planned block was saved.
@@ -12,9 +13,14 @@ export function validateCompletedRun(manifest, report) {
   }
   const expected = new Set(scenarios.flatMap(s => models.flatMap(m =>
     Array.from({ length: repeats }, (_, repeat) => JSON.stringify([s.id, m.id, repeat])))));
+  const scenarioById = new Map(scenarios.map(s => [s.id, s]));
   for (const row of report.rows) {
     if (!expected.delete(JSON.stringify([row.scenario, row.facilitator, row.repeat]))) {
       throw new Error('Duplicate or unexpected response block');
+    }
+    const scenario = scenarioById.get(row.scenario);
+    if (row.input !== scenario.input || !isDeepStrictEqual(row.context, scenario.context)) {
+      throw new Error('Response input/context differ from manifest scenario');
     }
     if (row.status !== 'ok' && row.status !== 'error') throw new Error('Invalid response status');
     if (row.status === 'ok') {
@@ -29,6 +35,10 @@ export function validateCompletedRun(manifest, report) {
   }
   if (expected.size) throw new Error(`Incomplete run: ${expected.size} response blocks missing`);
 }
+
+export const configuredSecrets = environment => Object.entries(environment)
+  .filter(([key, value]) => /KEY|TOKEN|PASSWORD|SECRET|AUTH_CONFIG/i.test(key) && value.length >= 8)
+  .map(([, value]) => value);
 
 export function portableArtifact(text, root, secrets = []) {
   // Check before rewriting paths so credentials can never enter exported files.
