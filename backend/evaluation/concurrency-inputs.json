@@ -1,0 +1,15 @@
+{
+  "welcome_opening": ["I'm feeling alright today, thank you."],
+  "facilitator_role": ["My usual name is fine, thank you."],
+  "theme_song_choice": ["Moon River by Audrey Hepburn.", "The Audrey Hepburn one, please.", "skip"],
+  "introduce_yourself": [
+    "I live in Auckland, not far from the harbour.",
+    "I use a tablet sometimes, mostly to look at photos of the grandchildren.",
+    "It was easy enough to get going today."
+  ],
+  "what_is_cst": ["That sounds nice. I like a good chat."],
+  "cst_interests": ["Talking about the old days sounds enjoyable."],
+  "cst_nutshell": ["I like the idea of trying something new."],
+  "session_themes": ["Food sounds the most interesting to me."],
+  "next_session": ["I'd like to remember the song we listened to."]
+}
