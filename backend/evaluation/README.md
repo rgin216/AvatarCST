@@ -1,6 +1,6 @@
 # LLM evaluation pilot
 
-The [17 October five-model checkpoint](published/2026-10-17-llm-checkpoint/README.md) preserves 132 of 150 planned entries, including 113 successful responses and 354 valid critiques. It is explicitly incomplete: quota failures, user-requested Qwen skips and 18 unfinished entries are recorded separately. It is not pooled with the earlier completed three-model collection.
+The [completed five-model evaluation](published/2026-10-17-llm-final-repair/README.md) contains 150 successful responses and 600 valid critiques across 30 scenarios. It combines original results with documented targeted retries; raw failures, skips and account/protocol changes are preserved in its attempt history. No scores were imputed.
 
 A dedicated automatic latency benchmark provides warmups, percentiles, failure analysis and research CSV exports. See [latency collection protocol](LATENCY.md); run `npm run eval:latency` for a dry run.
 
@@ -142,19 +142,3 @@ Use the synthetic starter set for development, then separate development cases f
 The backend regression suite and evaluation runner tests passed during initial implementation. A one-scenario live smoke test completed all three generations and six validated critiques after reducing Qwen's critic budget. This verified connectivity and output handling, not comparative model quality. Completed benchmark evidence is now available in the dated collection linked above.
 
 Claude integration has mocked API coverage for headers, system instructions, schema preservation, refusals, truncation, credential checks, HTTP errors and aborted body reads. Live Claude verification requires an Anthropic API key; no key was configured during implementation, so the four-model live command stopped in preflight without API calls.
-
-## Continued 17 October collection
-
-The [final processed five-model plan](published/2026-10-17-llm-final/README.md) continues the 132-entry checkpoint to all 150 planned entries. Qwen remains disabled; failures and deliberate skips are preserved and counted separately. No scores were imputed.
-
-## Linked Qwen retry
-
-The [Qwen retry collection](published/2026-10-17-llm-qwen-retry/README.md) preserves original attempts and successful later replacements, with account-change and quota-stop provenance.
-
-## Linked GPT-OSS 20B retry
-
-The [GPT-OSS 20B retry collection](published/2026-10-17-llm-gpt20b-retry/README.md) preserves original attempts and successful later replacements, with account-change and quota-stop provenance.
-
-## Final remaining-gap repair
-
-The [linked final repair collection](published/2026-10-17-llm-final-repair/README.md) documents actual response/critique completion after targeted retries, original attempt history and any remaining limitations.

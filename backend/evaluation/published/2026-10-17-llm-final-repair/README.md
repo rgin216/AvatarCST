@@ -16,4 +16,8 @@ This collection was exported offline with `scripts/publish-evaluation.js`; expor
 
 ## Linked final repair pass
 
-Actual completion: 150/150 successful responses and 600/600 valid critiques. All gaps filled: true. This is a derived view using successful linked retry attempts; it is not a single uninterrupted run. Previous successes are preserved, and original failures, prior credential changes and earlier partial collections remain available. The exact original prompts and options were reused; up to three non-quota failures per gap and provider-directed quota waits were allowed. Every new attempt is retained in repair-attempts.jsonl. No scores were imputed. Human calibration remains outstanding.
+Actual completion: 150/150 successful responses and 600/600 valid critiques. All gaps filled: true. This is a derived view using successful linked retry attempts; it is not a single uninterrupted run. Previous successes are preserved, and original failures, prior credential changes and earlier raw attempts remain available in attempt-history/. The exact original prompts and options were reused; up to three non-quota failures per gap and provider-directed quota waits were allowed. Every new attempt is retained in repair-attempts.jsonl. No scores were imputed. Human calibration remains outstanding.
+
+## Consolidated final collection
+
+Collection began on 17 October and finished at 12:37 am on 18 October 2026 (Pacific/Auckland). Superseded intermediate report folders were removed. Original failed/skipped attempts and credential/protocol changes are retained in [attempt-history/index.json](attempt-history/index.json), the linked base report, and repair logs. The 150 successful responses and 600 valid critiques reflect successful retries; they do not imply a failure-free first pass. Earlier completed latency runs remain separately available for comparison.
