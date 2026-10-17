@@ -146,3 +146,7 @@ Claude integration has mocked API coverage for headers, system instructions, sch
 ## Continued 17 October collection
 
 The [final processed five-model plan](published/2026-10-17-llm-final/README.md) continues the 132-entry checkpoint to all 150 planned entries. Qwen remains disabled; failures and deliberate skips are preserved and counted separately. No scores were imputed.
+
+## Linked Qwen retry
+
+The [Qwen retry collection](published/2026-10-17-llm-qwen-retry/README.md) preserves original attempts and successful later replacements, with account-change and quota-stop provenance.
