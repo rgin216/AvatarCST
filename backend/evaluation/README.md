@@ -142,3 +142,7 @@ Use the synthetic starter set for development, then separate development cases f
 The backend regression suite and evaluation runner tests passed during initial implementation. A one-scenario live smoke test completed all three generations and six validated critiques after reducing Qwen's critic budget. This verified connectivity and output handling, not comparative model quality. Completed benchmark evidence is now available in the dated collection linked above.
 
 Claude integration has mocked API coverage for headers, system instructions, schema preservation, refusals, truncation, credential checks, HTTP errors and aborted body reads. Live Claude verification requires an Anthropic API key; no key was configured during implementation, so the four-model live command stopped in preflight without API calls.
+
+## Continued 17 October collection
+
+The [final processed five-model plan](published/2026-10-17-llm-final/README.md) continues the 132-entry checkpoint to all 150 planned entries. Qwen remains disabled; failures and deliberate skips are preserved and counted separately. No scores were imputed.

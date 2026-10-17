@@ -1,0 +1,13 @@
+{
+  "collection.json": "5a948537e169fb1d90b9dedde1c4013bd74c848410d9f27168af7798781ba0e7",
+  "evaluation.json": "98e266daf926a527b6b56202d3ea318ffca9f60e90db38ccced80bd9a289ea02",
+  "evaluation.md": "b566c29be954db66a576f390863251c55a959bc0a6dc96ad01b8e6860139da3d",
+  "failures.csv": "cd8e6401d85de8b1572f4dc1b924339933981fad21e29fb6e18695b9affdb836",
+  "judge-scores.csv": "dd47b5006ddcec110681814b0abb1b2c345b36b88ce25d085db8488032f2df6a",
+  "llm/disagreements.json": "e1b7352cdb3cf0041e16c5d5cbeffc9dcf982da23cd561de62c02b9aeaafd68c",
+  "llm/human-review.json": "9bd1527317b1bd868acef537ce5d0ab3eaeb385d65746991d3c0f87371fc2416",
+  "llm/manifest.json": "acf4382050b1ee088e829e844a123932024f8cffea25fd1fbdbcc18629ba5f9e",
+  "llm/report.json": "105566749388c752c082d9ccec43b78377f6dcc970b91009282a6040457a06a4",
+  "llm/rows.jsonl": "825bd63dd92c9e1203a94a74bfbd2d7b25572f527d694e3c900101ccb16ad585",
+  "README.md": "65e43df9f59e4a30e3b694371d7c6273774e5a2770ab413838a177d193c480ba"
+}
