@@ -1,5 +1,7 @@
 # Deployed application latency collection
 
+The [17 October 2026 production speech pipeline collection](published/2026-10-17-production-latency/README.md) records fresh female/male avatar trials against the university-hosted backend, with uploaded synthetic speech, response processing, synthesized audio, Rhubarb cues and verified audio downloads. Its report separates API completion from completion of audio downloads and documents cache/prefetch and browser-onset limitations. LLM quality evaluations are separate.
+
 There are two collection paths. The CLI exercises the deployed backend now, using its existing response contract. Browser capture and corrected multi-segment server timing require deploying the changed frontend/backend first. Neither implementation publishes a deployment automatically.
 
 ## 1. Deployed API benchmark
