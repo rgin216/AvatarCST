@@ -5,5 +5,6 @@
   "manifest.json": "1b919ba59e70b2f74243729b64ff0d13bd95218579f76e221da23e7c8a78e91a",
   "latency-statistics.json": "fbca44fdea0bb6f972dac5b8f4b3442e0bb0dad4fbc70722faf6785995177189",
   "stage-statistics.csv": "b5f919a26ecb9ab180846c4cf1caf2330bfe98e0f34710f7e7b13583fc3d832e",
-  "README.md": "8069861fb5dc8b77bdce36e122947780cdcb88a04ee4fe6f538d84e787859205"
+  "README.md": "22aa07ed15639afe254df5ad875e8eba8b11c483145915233e7e40a716c78178",
+  "comparison-with-2026-10-15.md": "05012b5fb3cf908643fc16df5c6d575d73554e7fbd86caf7e747e132aaf95b36"
 }

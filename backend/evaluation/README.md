@@ -1,5 +1,7 @@
 # LLM evaluation pilot
 
+The [17 October five-model checkpoint](published/2026-10-17-llm-checkpoint/README.md) preserves 132 of 150 planned entries, including 113 successful responses and 354 valid critiques. It is explicitly incomplete: quota failures, user-requested Qwen skips and 18 unfinished entries are recorded separately. It is not pooled with the earlier completed three-model collection.
+
 A dedicated automatic latency benchmark provides warmups, percentiles, failure analysis and research CSV exports. See [latency collection protocol](LATENCY.md); run `npm run eval:latency` for a dry run.
 
 How latency, errors and degraded responses change with many simultaneous users is covered in [the concurrent-user load test](CONCURRENCY.md); run `npm run eval:concurrency -- --api http://localhost:5000/api` for a dry run.

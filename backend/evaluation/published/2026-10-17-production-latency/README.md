@@ -51,3 +51,7 @@ node --test src/evaluation/deployedLatency.test.js src/evaluation/latency.test.j
 Live collection creates synthetic records and incurs provider usage. Never use participant sessions. The offline export verified all 24 checkpoints against the completed report, fixture hashes, audio/lip-sync delivery, secret scanning and artifact SHA-256 checksums. Eleven relevant timing tests passed.
 
 No LLM quality-evaluation results are included in this collection.
+
+## Previous-run comparison
+
+See [comparison with 15 October](comparison-with-2026-10-15.md) for the lower previous mean/P95, repetition-level variation, cache differences and stage evidence.
