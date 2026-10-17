@@ -150,3 +150,7 @@ The [final processed five-model plan](published/2026-10-17-llm-final/README.md) 
 ## Linked Qwen retry
 
 The [Qwen retry collection](published/2026-10-17-llm-qwen-retry/README.md) preserves original attempts and successful later replacements, with account-change and quota-stop provenance.
+
+## Linked GPT-OSS 20B retry
+
+The [GPT-OSS 20B retry collection](published/2026-10-17-llm-gpt20b-retry/README.md) preserves original attempts and successful later replacements, with account-change and quota-stop provenance.
