@@ -1,0 +1,12 @@
+{
+  "startedAt": "2026-10-17T08:43:57.146Z",
+  "previousWorkflows": {
+    "base": "complete",
+    "qwenRetry": "complete"
+  },
+  "health": {
+    "status": "ok",
+    "timestamp": "2026-10-17T08:43:57.258Z"
+  },
+  "note": "Queued until both LLM workflows terminated. Same collector and protocol; no cache reset; previous latency results are retained."
+}

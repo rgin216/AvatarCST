@@ -1,0 +1,515 @@
+{
+  "schemaVersion": 1,
+  "startedAt": "2026-10-17T07:15:16.561Z",
+  "sourceRun": "2026-10-17T02-06-29-266Z-3fd006e5",
+  "sourceReportSha256": "105566749388c752c082d9ccec43b78377f6dcc970b91009282a6040457a06a4",
+  "sourceRevision": "80a579d8ef82243d7e3e5488cc9fea68531f05f6",
+  "credentialChange": "User supplied an updated Groq key from another account/organization. No credential or fingerprint is exported.",
+  "policy": "Retry only failed/skipped Qwen generations and Qwen critiques. Preserve existing successful results. New Qwen generations receive fresh independent critiques from all four other models. Keep original attempts and successful replacements linked. Stop on the first quota error.",
+  "requestPolicy": {
+    "intervalMs": 61000,
+    "maxRetries": 0
+  },
+  "plan": [
+    {
+      "type": "critique",
+      "scenario": "technology-difficulty",
+      "originalRowId": "6c3212bb-27bc-4e22-8a79-d4786b8c6185"
+    },
+    {
+      "type": "critique",
+      "scenario": "technology-difficulty",
+      "originalRowId": "b128aec8-f58e-4457-92a4-c1d21bcf319c"
+    },
+    {
+      "type": "critique",
+      "scenario": "technology-difficulty",
+      "originalRowId": "1565cf09-3ef4-4ee1-a429-ea39f71a3ee5"
+    },
+    {
+      "type": "generation",
+      "scenario": "technology-difficulty",
+      "originalRowId": "7532639e-9a11-47b5-969c-db9be6580e65"
+    },
+    {
+      "type": "critique",
+      "scenario": "technology-positive",
+      "originalRowId": "da872442-ef64-4731-939b-12cf75e91884"
+    },
+    {
+      "type": "critique",
+      "scenario": "technology-positive",
+      "originalRowId": "920c9e91-4d1a-4867-a8c9-d34ff960f8a1"
+    },
+    {
+      "type": "critique",
+      "scenario": "technology-positive",
+      "originalRowId": "0756f32c-1063-462d-95a1-3fe32534eca0"
+    },
+    {
+      "type": "critique",
+      "scenario": "technology-positive",
+      "originalRowId": "97033bdf-0c19-477f-9caf-4eb275af7f0d"
+    },
+    {
+      "type": "critique",
+      "scenario": "uncertain-answer",
+      "originalRowId": "094dddb2-35ee-4c12-99ed-938d73c83154"
+    },
+    {
+      "type": "critique",
+      "scenario": "uncertain-answer",
+      "originalRowId": "186c8525-482b-4afd-8000-4ab237c15e7a"
+    },
+    {
+      "type": "critique",
+      "scenario": "uncertain-answer",
+      "originalRowId": "13caef2f-e63f-469f-a98b-61132b16cd1e"
+    },
+    {
+      "type": "critique",
+      "scenario": "uncertain-answer",
+      "originalRowId": "a420395e-f4fc-46f2-955f-4575fdbe6c97"
+    },
+    {
+      "type": "critique",
+      "scenario": "repeat-question",
+      "originalRowId": "87464407-09bf-4606-ad60-95467ec1c7f9"
+    },
+    {
+      "type": "critique",
+      "scenario": "repeat-question",
+      "originalRowId": "83896acc-9fe4-4b8d-aa9b-d09846a29f6a"
+    },
+    {
+      "type": "critique",
+      "scenario": "repeat-question",
+      "originalRowId": "a90f32ea-0b12-4b15-a5f0-a020a4631dd5"
+    },
+    {
+      "type": "critique",
+      "scenario": "repeat-question",
+      "originalRowId": "ebdd3619-6006-4877-8835-1e48fbd63496"
+    },
+    {
+      "type": "critique",
+      "scenario": "off-topic",
+      "originalRowId": "dfa26b32-8814-436b-9673-b864cc5ec136"
+    },
+    {
+      "type": "critique",
+      "scenario": "off-topic",
+      "originalRowId": "e093bffb-7cc1-4277-bff0-0092c985a072"
+    },
+    {
+      "type": "critique",
+      "scenario": "off-topic",
+      "originalRowId": "d8e0a456-8002-4a83-9e4f-1a93e1e4c18b"
+    },
+    {
+      "type": "critique",
+      "scenario": "off-topic",
+      "originalRowId": "0e2cffa3-74c0-49fb-8503-bda6a5747e2b"
+    },
+    {
+      "type": "critique",
+      "scenario": "repeated-difficulty",
+      "originalRowId": "5bf8def8-8459-4b29-b692-8291a2228e89"
+    },
+    {
+      "type": "critique",
+      "scenario": "repeated-difficulty",
+      "originalRowId": "e1763131-ccc6-4bca-8513-6ce8854a0297"
+    },
+    {
+      "type": "critique",
+      "scenario": "repeated-difficulty",
+      "originalRowId": "83b0203e-2c24-471d-bc72-c61885795390"
+    },
+    {
+      "type": "critique",
+      "scenario": "repeated-difficulty",
+      "originalRowId": "10b2dca3-b396-435e-9124-ca6e7b496ccf"
+    },
+    {
+      "type": "generation",
+      "scenario": "repeated-difficulty",
+      "originalRowId": "97a3933e-3190-4e78-95a5-a3fe3da106b4"
+    },
+    {
+      "type": "critique",
+      "scenario": "decline-personal",
+      "originalRowId": "09a4844a-4eb2-44f1-a20d-f55786375d54"
+    },
+    {
+      "type": "critique",
+      "scenario": "decline-personal",
+      "originalRowId": "0df0410d-4391-440f-a804-0e47900c9b2d"
+    },
+    {
+      "type": "critique",
+      "scenario": "decline-personal",
+      "originalRowId": "35846a25-5685-45c9-b3e6-ad490ea433ae"
+    },
+    {
+      "type": "generation",
+      "scenario": "decline-personal",
+      "originalRowId": "9e6162ca-a8d7-41aa-9852-249d4e53ec6f"
+    },
+    {
+      "type": "critique",
+      "scenario": "decline-personal",
+      "originalRowId": "ba37151e-7cb4-424f-b258-1ed073ecfde0"
+    },
+    {
+      "type": "critique",
+      "scenario": "clinical-expectation",
+      "originalRowId": "b0a56685-f247-4e4b-967a-cc6a77ed50e6"
+    },
+    {
+      "type": "critique",
+      "scenario": "clinical-expectation",
+      "originalRowId": "789ad132-d4d2-4975-be20-ee4c195a6d3a"
+    },
+    {
+      "type": "generation",
+      "scenario": "clinical-expectation",
+      "originalRowId": "dfea4ac8-744f-47e9-8761-868972d09a8f"
+    },
+    {
+      "type": "critique",
+      "scenario": "clinical-expectation",
+      "originalRowId": "2c2accf7-ce7c-45d8-8738-d7dc25e6c124"
+    },
+    {
+      "type": "critique",
+      "scenario": "clinical-expectation",
+      "originalRowId": "a17cbe3a-4a79-4909-bbd4-78dffb73e221"
+    },
+    {
+      "type": "critique",
+      "scenario": "clinical-scepticism",
+      "originalRowId": "d5c08bd1-ec32-481d-8260-55c96cddd080"
+    },
+    {
+      "type": "generation",
+      "scenario": "clinical-scepticism",
+      "originalRowId": "407fc248-e4b1-452b-a114-f99043ef88dd"
+    },
+    {
+      "type": "critique",
+      "scenario": "clinical-scepticism",
+      "originalRowId": "57509ecf-c21c-46d8-9d28-7d12aa2e0c81"
+    },
+    {
+      "type": "critique",
+      "scenario": "clinical-scepticism",
+      "originalRowId": "168d0750-58eb-467d-8650-32f952e8bcb1"
+    },
+    {
+      "type": "critique",
+      "scenario": "clinical-scepticism",
+      "originalRowId": "093d2d03-7e6e-45e9-9e08-adfed50eb7ca"
+    },
+    {
+      "type": "generation",
+      "scenario": "enjoyment",
+      "originalRowId": "2e07b9b0-8644-4d2d-a884-f418e46f54d8"
+    },
+    {
+      "type": "critique",
+      "scenario": "enjoyment",
+      "originalRowId": "e6fcb09a-55d4-4fd8-9146-d80300f13f86"
+    },
+    {
+      "type": "critique",
+      "scenario": "enjoyment",
+      "originalRowId": "1b5711aa-3a1d-43c4-bff4-f601d9fa1a51"
+    },
+    {
+      "type": "critique",
+      "scenario": "enjoyment",
+      "originalRowId": "68dbe59f-f049-4cfa-bab4-c1b88d413608"
+    },
+    {
+      "type": "critique",
+      "scenario": "memory-goal",
+      "originalRowId": "eb517214-682c-425c-ab62-7ce531ba60d2"
+    },
+    {
+      "type": "critique",
+      "scenario": "memory-goal",
+      "originalRowId": "0e513550-0cc5-428d-aab1-11caffdadd52"
+    },
+    {
+      "type": "critique",
+      "scenario": "memory-goal",
+      "originalRowId": "af165d1a-f0f8-47c3-aedc-8204af1b82e5"
+    },
+    {
+      "type": "generation",
+      "scenario": "memory-goal",
+      "originalRowId": "a54acd7a-1833-4098-a16c-9f2539f01607"
+    },
+    {
+      "type": "critique",
+      "scenario": "uncertain-preference",
+      "originalRowId": "bf203598-abb9-4b00-98e5-ee8e1d91dae5"
+    },
+    {
+      "type": "critique",
+      "scenario": "uncertain-preference",
+      "originalRowId": "842bd83b-e53b-40bd-b9b1-953e3defad08"
+    },
+    {
+      "type": "critique",
+      "scenario": "uncertain-preference",
+      "originalRowId": "ca9ae903-fdc0-4623-8eef-516604c4112c"
+    },
+    {
+      "type": "generation",
+      "scenario": "uncertain-preference",
+      "originalRowId": "f959f67e-cda3-4302-9d71-a9ca1c778f8a"
+    },
+    {
+      "type": "critique",
+      "scenario": "uncertain-preference",
+      "originalRowId": "35fb574b-5d9f-4e24-ab62-85b04b07196a"
+    },
+    {
+      "type": "critique",
+      "scenario": "opinions",
+      "originalRowId": "721fe019-5e7a-4965-a666-db3690e8b7d4"
+    },
+    {
+      "type": "critique",
+      "scenario": "opinions",
+      "originalRowId": "f22727fb-d24e-463e-83e1-679c93963afd"
+    },
+    {
+      "type": "generation",
+      "scenario": "opinions",
+      "originalRowId": "a4c24dbc-bebf-4978-8bb3-828ac81f214e"
+    },
+    {
+      "type": "critique",
+      "scenario": "opinions",
+      "originalRowId": "4027c377-dccd-488f-8391-8a2331621f9c"
+    },
+    {
+      "type": "critique",
+      "scenario": "opinions",
+      "originalRowId": "32131308-ffd6-4df1-8dc0-0e60af651687"
+    },
+    {
+      "type": "generation",
+      "scenario": "ideas",
+      "originalRowId": "2186fb80-7837-4799-b747-11e33bbe3c8e"
+    },
+    {
+      "type": "critique",
+      "scenario": "ideas",
+      "originalRowId": "8011d826-6ce3-46d6-b6af-a9951d6d5623"
+    },
+    {
+      "type": "critique",
+      "scenario": "ideas",
+      "originalRowId": "3540913c-102f-4c1f-b59c-9e93f64f6071"
+    },
+    {
+      "type": "critique",
+      "scenario": "ideas",
+      "originalRowId": "b82c2cde-6cc1-4031-b72c-171f3cb47f23"
+    },
+    {
+      "type": "generation",
+      "scenario": "prompt-injection",
+      "originalRowId": "7dbccd23-3ea2-4a59-abca-fb38a202bc15"
+    },
+    {
+      "type": "critique",
+      "scenario": "prompt-injection",
+      "originalRowId": "a7fe9f4d-1cda-4afe-a32b-65eca0ec5118"
+    },
+    {
+      "type": "critique",
+      "scenario": "prompt-injection",
+      "originalRowId": "59063db4-2a51-4160-bb79-f704464fd3c1"
+    },
+    {
+      "type": "critique",
+      "scenario": "prompt-injection",
+      "originalRowId": "5f2ae278-1ae9-4179-a965-740b5c834d00"
+    },
+    {
+      "type": "critique",
+      "scenario": "prompt-injection",
+      "originalRowId": "81a612c2-d630-4a8c-9557-156266e7ef6e"
+    },
+    {
+      "type": "critique",
+      "scenario": "judge-injection",
+      "originalRowId": "1d46f832-1dce-40d2-8708-f3a229f17594"
+    },
+    {
+      "type": "critique",
+      "scenario": "judge-injection",
+      "originalRowId": "1207d002-54a6-4622-9ebc-2740bc8cbf74"
+    },
+    {
+      "type": "critique",
+      "scenario": "judge-injection",
+      "originalRowId": "6fec7418-3f6a-48ad-85b6-e1a27eae4df4"
+    },
+    {
+      "type": "critique",
+      "scenario": "judge-injection",
+      "originalRowId": "629c7aaf-b7ce-46cf-aff0-931ddffd4024"
+    },
+    {
+      "type": "generation",
+      "scenario": "judge-injection",
+      "originalRowId": "d30266df-9a0c-4963-915f-247e022045e7"
+    },
+    {
+      "type": "critique",
+      "scenario": "long-answer",
+      "originalRowId": "1fc9254b-8e14-4f03-8002-29d1c9b6678d"
+    },
+    {
+      "type": "critique",
+      "scenario": "long-answer",
+      "originalRowId": "0d59526a-5150-4f95-86d0-8627fc14771b"
+    },
+    {
+      "type": "critique",
+      "scenario": "long-answer",
+      "originalRowId": "41c3dd1e-2dfc-4dae-a947-2c6a704185b0"
+    },
+    {
+      "type": "generation",
+      "scenario": "long-answer",
+      "originalRowId": "34f7989a-8db7-450b-97fe-e442a3c7e7ce"
+    },
+    {
+      "type": "critique",
+      "scenario": "long-answer",
+      "originalRowId": "9ac236f1-c826-4c3f-aa7c-33c7c14d75cc"
+    },
+    {
+      "type": "critique",
+      "scenario": "correction",
+      "originalRowId": "55286485-5b1e-43b5-aa56-98d68ca25ef5"
+    },
+    {
+      "type": "critique",
+      "scenario": "correction",
+      "originalRowId": "b96fe80d-440b-46aa-b2ba-9a10ef6ae09d"
+    },
+    {
+      "type": "generation",
+      "scenario": "correction",
+      "originalRowId": "21b232e1-f296-4aab-93f2-8a63f237d28c"
+    },
+    {
+      "type": "critique",
+      "scenario": "correction",
+      "originalRowId": "8b419db3-e352-430b-8c94-4060b67f0593"
+    },
+    {
+      "type": "critique",
+      "scenario": "correction",
+      "originalRowId": "0a11df41-54b5-40be-a97f-06cea2488414"
+    },
+    {
+      "type": "generation",
+      "scenario": "hearing-difficulty",
+      "originalRowId": "bd646309-67ce-4517-a376-ef358fdf23f2"
+    },
+    {
+      "type": "critique",
+      "scenario": "hearing-difficulty",
+      "originalRowId": "1ae91d13-7e53-4cad-85aa-cdbade205e45"
+    },
+    {
+      "type": "critique",
+      "scenario": "hearing-difficulty",
+      "originalRowId": "194b0679-3ebf-47d6-94ca-e8a83db2442f"
+    },
+    {
+      "type": "critique",
+      "scenario": "hearing-difficulty",
+      "originalRowId": "b52bce17-3a90-4ef5-b0bb-5d538a177898"
+    },
+    {
+      "type": "generation",
+      "scenario": "frustration",
+      "originalRowId": "0aa00007-526b-445b-889b-a296ba7b439a"
+    },
+    {
+      "type": "critique",
+      "scenario": "frustration",
+      "originalRowId": "df427e26-6d0c-4679-8a4a-171d40206a5f"
+    },
+    {
+      "type": "critique",
+      "scenario": "frustration",
+      "originalRowId": "b08c26cb-bb0b-4a58-bcc1-2dafdebdc5c9"
+    },
+    {
+      "type": "critique",
+      "scenario": "frustration",
+      "originalRowId": "37388f95-6ba7-4e6b-947b-aed3a5bedd88"
+    },
+    {
+      "type": "critique",
+      "scenario": "no-invented-family",
+      "originalRowId": "f67b98bc-b7b8-4801-a8ff-b281a7c35246"
+    },
+    {
+      "type": "critique",
+      "scenario": "no-invented-family",
+      "originalRowId": "ee608e3d-8fe4-4557-9f6c-91e7fde0bc19"
+    },
+    {
+      "type": "critique",
+      "scenario": "no-invented-family",
+      "originalRowId": "a1f1cdf5-0d08-46df-9ac9-b996c4385d13"
+    },
+    {
+      "type": "critique",
+      "scenario": "no-invented-family",
+      "originalRowId": "bc5d4bb2-5c4b-4aa8-b4d5-3a87d77e0c3b"
+    },
+    {
+      "type": "generation",
+      "scenario": "no-invented-family",
+      "originalRowId": "645a3110-97e4-4950-93a8-d3a1be8d7b31"
+    },
+    {
+      "type": "critique",
+      "scenario": "repetitive-openers",
+      "originalRowId": "052c1b5b-6e2f-4c72-a847-0d2a13f258d2"
+    },
+    {
+      "type": "critique",
+      "scenario": "repetitive-openers",
+      "originalRowId": "2206d3be-29e2-40be-8aa6-e1f65fd1a8d3"
+    },
+    {
+      "type": "critique",
+      "scenario": "repetitive-openers",
+      "originalRowId": "caaf2855-f440-44c7-9e67-4b1ac7e697f6"
+    },
+    {
+      "type": "generation",
+      "scenario": "repetitive-openers",
+      "originalRowId": "9174f9b2-16d8-488a-8c9f-34c3b8245ac6"
+    },
+    {
+      "type": "critique",
+      "scenario": "repetitive-openers",
+      "originalRowId": "aaa177e7-5f64-4334-a771-c492da7eb87d"
+    }
+  ]
+}

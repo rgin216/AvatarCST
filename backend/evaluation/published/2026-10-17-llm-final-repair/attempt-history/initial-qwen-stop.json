@@ -1,0 +1,6 @@
+{
+  "at": "2026-10-17T03:56:17.473Z",
+  "reason": "User requested stopping Qwen calls after daily token quota failures.",
+  "savedRows": 63,
+  "policy": "Retain completed rows verbatim. Skip remaining Qwen generations and critiques with explicit error/missing markers. Continue other models; no imputed scores."
+}

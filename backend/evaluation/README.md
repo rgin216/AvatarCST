@@ -1,5 +1,7 @@
 # LLM evaluation pilot
 
+The [completed five-model evaluation](published/2026-10-17-llm-final-repair/README.md) contains 150 successful responses and 600 valid critiques across 30 scenarios. It combines original results with documented targeted retries; raw failures, skips and account/protocol changes are preserved in its attempt history. No scores were imputed.
+
 A dedicated automatic latency benchmark provides warmups, percentiles, failure analysis and research CSV exports. See [latency collection protocol](LATENCY.md); run `npm run eval:latency` for a dry run.
 
 How latency, errors and degraded responses change with many simultaneous users is covered in [the concurrent-user load test](CONCURRENCY.md); run `npm run eval:concurrency -- --api http://localhost:5000/api` for a dry run.
