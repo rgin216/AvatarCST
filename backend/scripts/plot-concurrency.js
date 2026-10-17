@@ -6,6 +6,7 @@ import { resolve, dirname, relative } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { parseArgs } from 'node:util';
 import { execFileSync } from 'node:child_process';
+import { distribution } from '../src/evaluation/latency.js';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const W = 800;
@@ -86,7 +87,9 @@ async function loadRun(label, dir) {
     // The median hides a slow tail when cached narration returns instantly and fresh speech queues, so report the tail share.
     const ok = rows.filter(r => r.kind === 'turn' && r.status === 'ok');
     const slowTurnShare = ok.length ? ok.filter(r => r.requestMs > 8000).length / ok.length : null;
-    return { ...stage, slowTurnShare, host: samples.length ? { samples: samples.length, machineCpuMean: mean(cpu), machineCpuP95: p95(cpu),
+    // Each session has one opening turn, whose long name-bearing narration can't come from the shared speech cache.
+    const nonOpeningLatency = distribution(ok.filter(r => r.contentKind !== 'opening').map(r => r.requestMs));
+    return { ...stage, slowTurnShare, nonOpeningLatency, host: samples.length ? { samples: samples.length, machineCpuMean: mean(cpu), machineCpuP95: p95(cpu),
       machineCpuMax: Math.max(...cpu), backendCpuMean: mean(samples.map(s => s.backendCpuPercent)),
       backendMemMaxMb: Math.max(...samples.map(s => s.backendMemMb)), rhubarbProcessesMax: Math.max(...samples.map(s => s.rhubarbProcesses)) } : null };
   });
@@ -107,27 +110,31 @@ const yGrid = (left, right, y, max, step, format) => {
   return out;
 };
 
-function latencyFigure(runs, levels) {
+function latencyFigure(runs, levels, scope = 'all') {
+  const pick = scope === 'non-opening' ? s => s.nonOpeningLatency : s => s.requestLatency;
   const height = 520, left = 72, right = W - 150, top = 124, base = height - 72;
-  const max = Math.max(...runs.flatMap(r => r.stages.map(s => (s.requestLatency.p95Ms || 0) / 1000)));
+  const max = Math.max(...runs.flatMap(r => r.stages.map(s => (pick(s).p95Ms || 0) / 1000)));
   const step = niceStep(max), yMax = Math.ceil(max / step) * step;
   const x = xScale(levels, left + 20, right - 20), y = v => base - (v / yMax) * (base - top);
-  let body = header('Turn latency as concurrent users increase', ['Client wait from sending a reply to receiving Aria\'s response, successful turns only.',
-    'Solid: 95th percentile. Dashed: median.']);
+  let body = scope === 'non-opening'
+    ? header('Turn latency excluding each session\'s opening turn', ['Same data as the all-turns chart, without the one opening turn per session (long narration with the user\'s name).',
+      'Successful turns only. Solid: 95th percentile. Dashed: median.'])
+    : header('Turn latency as concurrent users increase', ['Client wait from sending a reply to receiving Aria\'s response, successful turns only.',
+      'Solid: 95th percentile. Dashed: median.']);
   body += yGrid(left, right, y, yMax, step, v => `${v} s`) + xAxis(levels, x, base);
   const criterion = runs.map(r => r.manifest.criteria?.p95Ms).find(Number.isFinite);
   if (criterion && criterion / 1000 <= yMax) {
     body += line(left, y(criterion / 1000), right, y(criterion / 1000), C.muted, 1.5, '2 4')
-      + text(left + 6, y(criterion / 1000) - 6, `${criterion / 1000} s p95 criterion`, { size: 11, fill: C.muted });
+      + text(right - 4, y(criterion / 1000) - 6, `${criterion / 1000} s p95 criterion`, { size: 11, fill: C.muted, anchor: 'end' });
   }
   const ends = [];
   runs.forEach((run, i) => {
     for (const [key, dash, name] of [['p95Ms', '', 'p95'], ['p50Ms', '5 4', 'median']]) {
-      const pts = run.stages.filter(s => s.requestLatency[key] !== null).map(s => [x(s.concurrency), y(s.requestLatency[key] / 1000)]);
+      const pts = run.stages.filter(s => pick(s)[key] !== null).map(s => [x(s.concurrency), y(pick(s)[key] / 1000)]);
       body += `<polyline points="${pts.map(p => p.join(',')).join(' ')}" fill="none" stroke="${C.series[i]}" stroke-width="2" stroke-linejoin="round"${dash ? ` stroke-dasharray="${dash}"` : ''}/>`;
       body += pts.map(([px, py]) => `<circle cx="${px}" cy="${py}" r="4" fill="${C.series[i]}" stroke="${C.surface}" stroke-width="2"/>`).join('');
       const last = run.stages.at(-1);
-      ends.push({ y: pts.at(-1)[1], x: pts.at(-1)[0], label: `${run.label.split(' ')[0]} ${name} ${(last.requestLatency[key] / 1000).toFixed(1)} s` });
+      ends.push({ y: pts.at(-1)[1], x: pts.at(-1)[0], label: `${run.label.split(' ')[0]} ${name} ${(pick(last)[key] / 1000).toFixed(1)} s` });
     }
   });
   // Direct labels at line ends, nudged apart so they never overlap.
@@ -227,7 +234,8 @@ try {
   const runs = await Promise.all(values.run.map(spec => { const [label, dir] = spec.split('='); return loadRun(label, resolve(dir)); }));
   const levels = [...new Set(runs.flatMap(r => r.stages.map(s => s.concurrency)))].sort((a, b) => a - b);
   await mkdir(values.out, { recursive: true });
-  const figures = { latency: latencyFigure(runs, levels), quality: qualityFigure(runs, levels), cpu: cpuFigure(runs, levels) };
+  const figures = { latency: latencyFigure(runs, levels), 'latency-non-opening': latencyFigure(runs, levels, 'non-opening'),
+    quality: qualityFigure(runs, levels), cpu: cpuFigure(runs, levels) };
   for (const [name, fig] of Object.entries(figures)) {
     if (!fig) continue;
     const svgPath = resolve(values.out, `${values.prefix}-${name}.svg`);
