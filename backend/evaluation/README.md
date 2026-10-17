@@ -154,3 +154,7 @@ The [Qwen retry collection](published/2026-10-17-llm-qwen-retry/README.md) prese
 ## Linked GPT-OSS 20B retry
 
 The [GPT-OSS 20B retry collection](published/2026-10-17-llm-gpt20b-retry/README.md) preserves original attempts and successful later replacements, with account-change and quota-stop provenance.
+
+## Final remaining-gap repair
+
+The [linked final repair collection](published/2026-10-17-llm-final-repair/README.md) documents actual response/critique completion after targeted retries, original attempt history and any remaining limitations.

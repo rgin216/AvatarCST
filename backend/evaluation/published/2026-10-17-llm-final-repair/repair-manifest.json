@@ -1,0 +1,74 @@
+{
+  "startedAt": "2026-10-17T11:29:11.862Z",
+  "sourceCollection": "latest-repair-checkpoint-before-credential-change",
+  "sourceReportSha256": "3a988eaad2a7c772066c5226151b641bfaa6576c357d9f389ec3ad6ea9285c5d",
+  "sourceRevision": "aa7c2638d44f4e783946e4fd7df6004be479a9d5",
+  "policy": "Repair only remaining generation/critique gaps using unchanged prompts and model options. Preserve successful prior outputs. New generations receive four fresh independent critiques. Retain every failed retry. Defer quota-limited models for provider-indicated waits while processing other models. Up to three non-quota failures per gap; maximum 24-hour quota wait window. No scores imputed.",
+  "credentialProvenance": "User supplied another Groq account/organization key; one Qwen access test returned HTTP 200. Resumed latest checkpoint without repeating completed successes. No key or fingerprint exported.",
+  "intervalMs": 61000,
+  "initialTasks": [
+    {
+      "type": "critique",
+      "key": "[\"hearing-difficulty\",\"gpt-oss-20b\",0]",
+      "modelId": "qwen-3.8-27b",
+      "originalRowId": "68c987cc-1bbb-46de-914b-590dcb90b1c2",
+      "nonQuotaFailures": 0
+    },
+    {
+      "type": "critique",
+      "key": "[\"frustration\",\"claude-haiku-5.5\",0]",
+      "modelId": "qwen-3.8-27b",
+      "originalRowId": "b08c26cb-bb0b-4a58-bcc1-2dafdebdc5c9",
+      "nonQuotaFailures": 0
+    },
+    {
+      "type": "critique",
+      "key": "[\"no-invented-family\",\"claude-sonnet-5\",0]",
+      "modelId": "qwen-3.8-27b",
+      "originalRowId": "f67b98bc-b7b8-4801-a8ff-b281a7c35246",
+      "nonQuotaFailures": 0
+    },
+    {
+      "type": "critique",
+      "key": "[\"no-invented-family\",\"claude-haiku-5.5\",0]",
+      "modelId": "qwen-3.8-27b",
+      "originalRowId": "ee608e3d-8fe4-4557-9f6c-91e7fde0bc19",
+      "nonQuotaFailures": 0
+    },
+    {
+      "type": "critique",
+      "key": "[\"no-invented-family\",\"gpt-oss-120b\",0]",
+      "modelId": "qwen-3.8-27b",
+      "originalRowId": "a1f1cdf5-0d08-46df-9ac9-b996c4385d13",
+      "nonQuotaFailures": 0
+    },
+    {
+      "type": "generation",
+      "key": "[\"no-invented-family\",\"qwen-3.8-27b\",0]",
+      "modelId": "qwen-3.8-27b",
+      "originalRowId": "645a3110-97e4-4950-93a8-d3a1be8d7b31",
+      "nonQuotaFailures": 0
+    },
+    {
+      "type": "critique",
+      "key": "[\"repetitive-openers\",\"claude-haiku-5.5\",0]",
+      "modelId": "qwen-3.8-27b",
+      "originalRowId": "052c1b5b-6e2f-4c72-a847-0d2a13f258d2",
+      "nonQuotaFailures": 0
+    },
+    {
+      "type": "critique",
+      "key": "[\"repetitive-openers\",\"gpt-oss-20b\",0]",
+      "modelId": "qwen-3.8-27b",
+      "originalRowId": "caaf2855-f440-44c7-9e67-4b1ac7e697f6",
+      "nonQuotaFailures": 0
+    },
+    {
+      "type": "critique",
+      "key": "[\"repetitive-openers\",\"claude-sonnet-5\",0]",
+      "modelId": "qwen-3.8-27b",
+      "originalRowId": "aaa177e7-5f64-4334-a771-c492da7eb87d",
+      "nonQuotaFailures": 0
+    }
+  ]
+}
