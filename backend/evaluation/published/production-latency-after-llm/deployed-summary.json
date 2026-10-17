@@ -1,0 +1,1200 @@
+{
+  "scope": "deployed-uploaded-audio-to-API-response-and-audio-delivery",
+  "startedAt": "2026-10-17T08:43:58.018Z",
+  "completedAt": "2026-10-17T08:45:57.453Z",
+  "api": "https://deleted-primarily-finals-figured.trycloudflare.com/api",
+  "pipeline": {
+    "mode": "openai-fast-scripted",
+    "rhubarb": {
+      "available": true,
+      "source": "vendored"
+    },
+    "stt": "openai-transcribe",
+    "llm": "openai-responses",
+    "tts": "openai-tts",
+    "lipsync": "rhubarb-for-avatars/audio-energy-for-visualizer",
+    "availableModes": [
+      "openai-fast-scripted"
+    ],
+    "transcriptsAvailable": false
+  },
+  "fixtures": {
+    "voice": "Microsoft David Desktop",
+    "engine": "Windows System.Speech",
+    "rate": 0,
+    "volume": 100,
+    "fixtures": [
+      {
+        "file": "01-name.wav",
+        "text": "My name is Alex.",
+        "bytes": 87330,
+        "encoding": 1,
+        "channels": 1,
+        "sampleRate": 22050,
+        "byteRate": 44100,
+        "bitsPerSample": 16,
+        "durationSeconds": 1.9792290249433107,
+        "sha256": "0a40401696fed4728f810723976037602c161cf345a9f56c92ff428bc6375145"
+      },
+      {
+        "file": "02-gardening.wav",
+        "text": "I enjoy gardening.",
+        "bytes": 82922,
+        "encoding": 1,
+        "channels": 1,
+        "sampleRate": 22050,
+        "byteRate": 44100,
+        "bitsPerSample": 16,
+        "durationSeconds": 1.8792743764172335,
+        "sha256": "3dabd2bc50da2fd763aecd0361c5046eb7e21f5d4a2204100fa076662eb5ce2a"
+      },
+      {
+        "file": "03-unsure.wav",
+        "text": "I am not sure.",
+        "bytes": 76970,
+        "encoding": 1,
+        "channels": 1,
+        "sampleRate": 22050,
+        "byteRate": 44100,
+        "bitsPerSample": 16,
+        "durationSeconds": 1.7443083900226757,
+        "sha256": "2e07e9a327817e1e699796cba5cc781de7fa3b73eefb8ea4c9b9b516d8ed8a01"
+      }
+    ]
+  },
+  "sessions": [
+    {
+      "userId": "6ad3354ef0469de489cd7518",
+      "sessionId": "6ad3354ef0469de489cd751a",
+      "repeat": 0,
+      "avatarMode": "female",
+      "lipSyncMode": "rhubarb"
+    },
+    {
+      "userId": "6ad33566f0469de489cd7523",
+      "sessionId": "6ad33566f0469de489cd7525",
+      "repeat": 0,
+      "avatarMode": "male",
+      "lipSyncMode": "rhubarb"
+    },
+    {
+      "userId": "6ad3357af0469de489cd752e",
+      "sessionId": "6ad3357af0469de489cd7530",
+      "repeat": 1,
+      "avatarMode": "male",
+      "lipSyncMode": "rhubarb"
+    },
+    {
+      "userId": "6ad3358cf0469de489cd7539",
+      "sessionId": "6ad3358cf0469de489cd753b",
+      "repeat": 1,
+      "avatarMode": "female",
+      "lipSyncMode": "rhubarb"
+    },
+    {
+      "userId": "6ad335a0f0469de489cd7544",
+      "sessionId": "6ad335a0f0469de489cd7546",
+      "repeat": 2,
+      "avatarMode": "female",
+      "lipSyncMode": "rhubarb"
+    },
+    {
+      "userId": "6ad335b3f0469de489cd754f",
+      "sessionId": "6ad335b3f0469de489cd7551",
+      "repeat": 2,
+      "avatarMode": "male",
+      "lipSyncMode": "rhubarb"
+    }
+  ],
+  "plannedMeasurements": 18,
+  "plannedWarmups": 6,
+  "complete": true,
+  "stoppedReason": null,
+  "summary": [
+    {
+      "avatarMode": "female",
+      "lipSyncMode": "rhubarb",
+      "attempts": 9,
+      "successes": 9,
+      "failures": 0,
+      "requestLatency": {
+        "n": 9,
+        "meanMs": 3598.890055555555,
+        "sdMs": 2632.001441632617,
+        "minMs": 369.0014999999985,
+        "p50Ms": 4600.540399999998,
+        "p90Ms": 5926.710340000001,
+        "p95Ms": 6805.25742,
+        "p99Ms": 7508.0950840000005,
+        "maxMs": 7683.8045
+      },
+      "stages": {
+        "sttMs": {
+          "n": 9,
+          "meanMs": 765.4444444444445,
+          "sdMs": 1700.8389188214674,
+          "minMs": 191,
+          "p50Ms": 199,
+          "p90Ms": 1224.200000000001,
+          "p95Ms": 3262.599999999998,
+          "p99Ms": 4893.32,
+          "maxMs": 5301
+        },
+        "orchestratorMs": {
+          "n": 9,
+          "meanMs": 976.3333333333334,
+          "sdMs": 792.6406815196908,
+          "minMs": 12,
+          "p50Ms": 1086,
+          "p90Ms": 1672,
+          "p95Ms": 1937.9999999999998,
+          "p99Ms": 2150.8,
+          "maxMs": 2204
+        },
+        "audioMs": {
+          "n": 9,
+          "meanMs": 1689.3333333333333,
+          "sdMs": 1657.4233768111274,
+          "minMs": 0,
+          "p50Ms": 2158,
+          "p90Ms": 3418.4,
+          "p95Ms": 3517.2,
+          "p99Ms": 3596.24,
+          "maxMs": 3616
+        },
+        "ttsMs": {
+          "n": 5,
+          "meanMs": 1554.6,
+          "sdMs": 447.68046640433175,
+          "minMs": 992,
+          "p50Ms": 1641,
+          "p90Ms": 1975.6,
+          "p95Ms": 2080.7999999999997,
+          "p99Ms": 2164.96,
+          "maxMs": 2186
+        },
+        "rhubarbMs": {
+          "n": 5,
+          "meanMs": 1486,
+          "sdMs": 230.36384264897129,
+          "minMs": 1166,
+          "p50Ms": 1430,
+          "p90Ms": 1711.4,
+          "p95Ms": 1712.2,
+          "p99Ms": 1712.84,
+          "maxMs": 1713
+        },
+        "totalMs": {
+          "n": 9,
+          "meanMs": 3434.3333333333335,
+          "sdMs": 2628.6198850347305,
+          "minMs": 207,
+          "p50Ms": 4447,
+          "p90Ms": 5743.200000000001,
+          "p95Ms": 6625.599999999999,
+          "p99Ms": 7331.5199999999995,
+          "maxMs": 7508
+        }
+      }
+    },
+    {
+      "avatarMode": "male",
+      "lipSyncMode": "rhubarb",
+      "attempts": 9,
+      "successes": 9,
+      "failures": 0,
+      "requestLatency": {
+        "n": 9,
+        "meanMs": 3037.7009666666654,
+        "sdMs": 2464.666828101094,
+        "minMs": 366.043399999995,
+        "p50Ms": 3910.585899999998,
+        "p90Ms": 5715.043399999999,
+        "p95Ms": 6320.855199999999,
+        "p99Ms": 6805.504640000001,
+        "maxMs": 6926.667000000001
+      },
+      "stages": {
+        "sttMs": {
+          "n": 9,
+          "meanMs": 196.55555555555554,
+          "sdMs": 9.395625459636934,
+          "minMs": 181,
+          "p50Ms": 197,
+          "p90Ms": 206.2,
+          "p95Ms": 210.6,
+          "p99Ms": 214.12,
+          "maxMs": 215
+        },
+        "orchestratorMs": {
+          "n": 9,
+          "meanMs": 1042.2222222222222,
+          "sdMs": 1027.453378233993,
+          "minMs": 15,
+          "p50Ms": 1074,
+          "p90Ms": 1793.0000000000005,
+          "p95Ms": 2538.999999999999,
+          "p99Ms": 3135.8,
+          "maxMs": 3285
+        },
+        "audioMs": {
+          "n": 9,
+          "meanMs": 1633.5555555555557,
+          "sdMs": 1615.4695223921058,
+          "minMs": 0,
+          "p50Ms": 2189,
+          "p90Ms": 3375.8,
+          "p95Ms": 3527.3999999999996,
+          "p99Ms": 3648.68,
+          "maxMs": 3679
+        },
+        "ttsMs": {
+          "n": 5,
+          "meanMs": 1403.6,
+          "sdMs": 383.03563802863044,
+          "minMs": 993,
+          "p50Ms": 1438,
+          "p90Ms": 1776.4,
+          "p95Ms": 1884.1999999999998,
+          "p99Ms": 1970.44,
+          "maxMs": 1992
+        },
+        "rhubarbMs": {
+          "n": 5,
+          "meanMs": 1536.2,
+          "sdMs": 317.037379499642,
+          "minMs": 1194,
+          "p50Ms": 1687,
+          "p90Ms": 1811.4,
+          "p95Ms": 1829.2,
+          "p99Ms": 1843.44,
+          "maxMs": 1847
+        },
+        "totalMs": {
+          "n": 9,
+          "meanMs": 2876,
+          "sdMs": 2460.849345246474,
+          "minMs": 211,
+          "p50Ms": 3749,
+          "p90Ms": 5539.400000000001,
+          "p95Ms": 6154.2,
+          "p99Ms": 6646.04,
+          "maxMs": 6769
+        }
+      }
+    }
+  ],
+  "rows": [
+    {
+      "repeat": 0,
+      "sessionId": "6ad3354ef0469de489cd751a",
+      "phase": "warmup",
+      "inputIndex": -1,
+      "startedAt": "2026-10-17T08:43:58.018Z",
+      "avatarMode": "female",
+      "lipSyncMode": "rhubarb",
+      "status": "ok",
+      "requestMs": 123.12210000000005,
+      "transcript": null,
+      "assistantText": "Hello Alex, and welcome. I am Aria, and I will be guiding you through this AI-supported Cognitive Stimulation Therapy session. Today is our first session, so we will take it gently and get comfortable together. How are you feeling today? Is there anything you’d like to share about your day so far?",
+      "pipelineMode": "openai-fast-scripted",
+      "turnId": "3ea37d7b-f8f6-458a-9e2d-d9e8c1955539",
+      "audioStatus": "ok",
+      "serverTimings": {
+        "orchestratorMs": 14,
+        "speechCacheHits": 1,
+        "audioMs": 0,
+        "llmFallbacks": 0,
+        "totalMs": 15
+      },
+      "audioSegments": 1,
+      "lipSyncSegments": 1,
+      "audioDelivery": [
+        {
+          "bytes": 273792,
+          "downloadMs": 344.81039999999996
+        }
+      ]
+    },
+    {
+      "repeat": 0,
+      "sessionId": "6ad3354ef0469de489cd751a",
+      "phase": "measurement",
+      "inputIndex": 0,
+      "startedAt": "2026-10-17T08:44:00.501Z",
+      "avatarMode": "female",
+      "lipSyncMode": "rhubarb",
+      "status": "ok",
+      "fixture": "01-name.wav",
+      "inputDurationSeconds": 1.9792290249433107,
+      "expectedTranscript": "My name is Alex.",
+      "httpStatus": 201,
+      "requestMs": 7683.8045,
+      "transcript": "My name is Alex.",
+      "assistantText": "Thanks for letting me know. My role is to keep you company, try some interesting questions with you, and enjoy some fun conversation together. There are no tests here and no right or wrong answers. I know your name is Alex, but do you have a nickname or another name you would prefer me to call you?",
+      "pipelineMode": "openai-fast-scripted",
+      "turnId": "cd47c853-6a41-4967-a026-88a866601ada",
+      "audioStatus": "ok",
+      "serverTimings": {
+        "sttMs": 5301,
+        "orchestratorMs": 2204,
+        "speechCacheHits": 2,
+        "audioMs": 0,
+        "llmFallbacks": 0,
+        "totalMs": 7508
+      },
+      "audioSegments": 2,
+      "lipSyncSegments": 2,
+      "audioDelivery": [
+        {
+          "bytes": 29568,
+          "downloadMs": 350.5810999999994
+        },
+        {
+          "bytes": 254592,
+          "downloadMs": 339.6208000000006
+        }
+      ]
+    },
+    {
+      "repeat": 0,
+      "sessionId": "6ad3354ef0469de489cd751a",
+      "phase": "measurement",
+      "inputIndex": 1,
+      "startedAt": "2026-10-17T08:44:10.887Z",
+      "avatarMode": "female",
+      "lipSyncMode": "rhubarb",
+      "status": "ok",
+      "fixture": "02-gardening.wav",
+      "inputDurationSeconds": 1.8792743764172335,
+      "expectedTranscript": "I enjoy gardening.",
+      "httpStatus": 201,
+      "requestMs": 5487.436800000001,
+      "transcript": "I enjoy gardening.",
+      "assistantText": "Gardening is a lovely way to spend time. Before we get to know each other, what is your favourite song? If you know the artist, please tell me their name too. I can keep the song ready to play near the end of our session. You can also say skip.",
+      "pipelineMode": "openai-fast-scripted",
+      "turnId": "73e31f55-3f08-4560-b669-3b747d25e083",
+      "audioStatus": "ok",
+      "serverTimings": {
+        "sttMs": 203,
+        "orchestratorMs": 1480,
+        "speechCacheHits": 1,
+        "ttsMs": 2186,
+        "rhubarbMs": 1430,
+        "audioMs": 3616,
+        "llmFallbacks": 0,
+        "totalMs": 5302
+      },
+      "audioSegments": 2,
+      "lipSyncSegments": 2,
+      "audioDelivery": [
+        {
+          "bytes": 54528,
+          "downloadMs": 340.8130999999994
+        },
+        {
+          "bytes": 208128,
+          "downloadMs": 310.6726000000017
+        }
+      ]
+    },
+    {
+      "repeat": 0,
+      "sessionId": "6ad3354ef0469de489cd751a",
+      "phase": "measurement",
+      "inputIndex": 2,
+      "startedAt": "2026-10-17T08:44:19.044Z",
+      "avatarMode": "female",
+      "lipSyncMode": "rhubarb",
+      "status": "ok",
+      "fixture": "03-unsure.wav",
+      "inputDurationSeconds": 1.7443083900226757,
+      "expectedTranscript": "I am not sure.",
+      "httpStatus": 201,
+      "requestMs": 385.53210000000036,
+      "transcript": "I am not sure.",
+      "assistantText": "No problem. We can continue without a theme song today. Thank you. I would love to learn a little more about you. Where do you live?",
+      "pipelineMode": "openai-fast-scripted",
+      "turnId": "3b868aff-eb3c-45d7-8da1-ede102a29646",
+      "audioStatus": "ok",
+      "serverTimings": {
+        "sttMs": 199,
+        "orchestratorMs": 16,
+        "speechCacheHits": 1,
+        "audioMs": 0,
+        "llmFallbacks": 0,
+        "totalMs": 217
+      },
+      "audioSegments": 1,
+      "lipSyncSegments": 1,
+      "audioDelivery": [
+        {
+          "bytes": 137856,
+          "downloadMs": 330.2350000000006
+        }
+      ]
+    },
+    {
+      "repeat": 0,
+      "sessionId": "6ad33566f0469de489cd7525",
+      "phase": "warmup",
+      "inputIndex": -1,
+      "startedAt": "2026-10-17T08:44:21.966Z",
+      "avatarMode": "male",
+      "lipSyncMode": "rhubarb",
+      "status": "ok",
+      "requestMs": 102.21379999999772,
+      "transcript": null,
+      "assistantText": "Hello Alex, and welcome. I am Aria, and I will be guiding you through this AI-supported Cognitive Stimulation Therapy session. Today is our first session, so we will take it gently and get comfortable together. How are you feeling today? Is there anything you’d like to share about your day so far?",
+      "pipelineMode": "openai-fast-scripted",
+      "turnId": "9e33d125-1b6b-4429-88c0-f04e44c61d7a",
+      "audioStatus": "ok",
+      "serverTimings": {
+        "orchestratorMs": 13,
+        "speechCacheHits": 1,
+        "audioMs": 0,
+        "llmFallbacks": 0,
+        "totalMs": 13
+      },
+      "audioSegments": 1,
+      "lipSyncSegments": 1,
+      "audioDelivery": [
+        {
+          "bytes": 290688,
+          "downloadMs": 314.3386999999966
+        }
+      ]
+    },
+    {
+      "repeat": 0,
+      "sessionId": "6ad33566f0469de489cd7525",
+      "phase": "measurement",
+      "inputIndex": 0,
+      "startedAt": "2026-10-17T08:44:24.395Z",
+      "avatarMode": "male",
+      "lipSyncMode": "rhubarb",
+      "status": "ok",
+      "fixture": "01-name.wav",
+      "inputDurationSeconds": 1.9792290249433107,
+      "expectedTranscript": "My name is Alex.",
+      "httpStatus": 201,
+      "requestMs": 3910.585899999998,
+      "transcript": "My name is Alex.",
+      "assistantText": "Alex is a nice name. My role is to keep you company, try some interesting questions with you, and enjoy some fun conversation together. There are no tests here and no right or wrong answers. I know your name is Alex, but do you have a nickname or another name you would prefer me to call you?",
+      "pipelineMode": "openai-fast-scripted",
+      "turnId": "cdc6b9f6-3247-4c4f-855b-f4b2824876f3",
+      "audioStatus": "ok",
+      "serverTimings": {
+        "sttMs": 197,
+        "orchestratorMs": 1213,
+        "speechCacheHits": 1,
+        "ttsMs": 1142,
+        "rhubarbMs": 1194,
+        "audioMs": 2336,
+        "llmFallbacks": 0,
+        "totalMs": 3749
+      },
+      "audioSegments": 2,
+      "lipSyncSegments": 2,
+      "audioDelivery": [
+        {
+          "bytes": 29568,
+          "downloadMs": 345.4989999999998
+        },
+        {
+          "bytes": 252288,
+          "downloadMs": 302.09850000000006
+        }
+      ]
+    },
+    {
+      "repeat": 0,
+      "sessionId": "6ad33566f0469de489cd7525",
+      "phase": "measurement",
+      "inputIndex": 1,
+      "startedAt": "2026-10-17T08:44:30.970Z",
+      "avatarMode": "male",
+      "lipSyncMode": "rhubarb",
+      "status": "ok",
+      "fixture": "02-gardening.wav",
+      "inputDurationSeconds": 1.8792743764172335,
+      "expectedTranscript": "I enjoy gardening.",
+      "httpStatus": 201,
+      "requestMs": 5412.137499999997,
+      "transcript": "I enjoy gardening.",
+      "assistantText": "Gardening is a lovely way to spend time, especially outdoors. Before we get to know each other, what is your favourite song? If you know the artist, please tell me their name too. I can keep the song ready to play near the end of our session. You can also say skip.",
+      "pipelineMode": "openai-fast-scripted",
+      "turnId": "a387f575-f8d2-42b2-abbc-277d5a6a7491",
+      "audioStatus": "ok",
+      "serverTimings": {
+        "sttMs": 204,
+        "orchestratorMs": 1346,
+        "speechCacheHits": 1,
+        "ttsMs": 1992,
+        "rhubarbMs": 1687,
+        "audioMs": 3679,
+        "llmFallbacks": 0,
+        "totalMs": 5232
+      },
+      "audioSegments": 2,
+      "lipSyncSegments": 2,
+      "audioDelivery": [
+        {
+          "bytes": 74496,
+          "downloadMs": 348.2949000000008
+        },
+        {
+          "bytes": 153600,
+          "downloadMs": 300.33980000000156
+        }
+      ]
+    },
+    {
+      "repeat": 0,
+      "sessionId": "6ad33566f0469de489cd7525",
+      "phase": "measurement",
+      "inputIndex": 2,
+      "startedAt": "2026-10-17T08:44:39.041Z",
+      "avatarMode": "male",
+      "lipSyncMode": "rhubarb",
+      "status": "ok",
+      "fixture": "03-unsure.wav",
+      "inputDurationSeconds": 1.7443083900226757,
+      "expectedTranscript": "I am not sure.",
+      "httpStatus": 201,
+      "requestMs": 373.82139999999345,
+      "transcript": "I am not sure.",
+      "assistantText": "No problem. We can continue without a theme song today. Thank you. I would love to learn a little more about you. Where do you live?",
+      "pipelineMode": "openai-fast-scripted",
+      "turnId": "b5c12326-e7b2-4763-90b5-1760f252569b",
+      "audioStatus": "ok",
+      "serverTimings": {
+        "sttMs": 192,
+        "orchestratorMs": 15,
+        "speechCacheHits": 1,
+        "audioMs": 0,
+        "llmFallbacks": 0,
+        "totalMs": 211
+      },
+      "audioSegments": 1,
+      "lipSyncSegments": 1,
+      "audioDelivery": [
+        {
+          "bytes": 141696,
+          "downloadMs": 334.3565000000017
+        }
+      ]
+    },
+    {
+      "repeat": 1,
+      "sessionId": "6ad3357af0469de489cd7530",
+      "phase": "warmup",
+      "inputIndex": -1,
+      "startedAt": "2026-10-17T08:44:41.938Z",
+      "avatarMode": "male",
+      "lipSyncMode": "rhubarb",
+      "status": "ok",
+      "requestMs": 99.68509999999515,
+      "transcript": null,
+      "assistantText": "Hello Alex, and welcome. I am Aria, and I will be guiding you through this AI-supported Cognitive Stimulation Therapy session. Today is our first session, so we will take it gently and get comfortable together. How are you feeling today? Is there anything you’d like to share about your day so far?",
+      "pipelineMode": "openai-fast-scripted",
+      "turnId": "692df521-c7f7-4c6c-976f-eac13c69b42e",
+      "audioStatus": "ok",
+      "serverTimings": {
+        "orchestratorMs": 13,
+        "speechCacheHits": 1,
+        "audioMs": 0,
+        "llmFallbacks": 0,
+        "totalMs": 13
+      },
+      "audioSegments": 1,
+      "lipSyncSegments": 1,
+      "audioDelivery": [
+        {
+          "bytes": 290688,
+          "downloadMs": 160.63290000000416
+        }
+      ]
+    },
+    {
+      "repeat": 1,
+      "sessionId": "6ad3357af0469de489cd7530",
+      "phase": "measurement",
+      "inputIndex": 0,
+      "startedAt": "2026-10-17T08:44:44.217Z",
+      "avatarMode": "male",
+      "lipSyncMode": "rhubarb",
+      "status": "ok",
+      "fixture": "01-name.wav",
+      "inputDurationSeconds": 1.9792290249433107,
+      "expectedTranscript": "My name is Alex.",
+      "httpStatus": 201,
+      "requestMs": 3993.8551000000007,
+      "transcript": "My name is Alex.",
+      "assistantText": "Thanks for letting me know. My role is to keep you company, try some interesting questions with you, and enjoy some fun conversation together. There are no tests here and no right or wrong answers. I know your name is Alex, but do you have a nickname or another name you would prefer me to call you?",
+      "pipelineMode": "openai-fast-scripted",
+      "turnId": "17e51da8-f865-4ce2-b61f-5d381bb22841",
+      "audioStatus": "ok",
+      "serverTimings": {
+        "sttMs": 215,
+        "orchestratorMs": 1420,
+        "speechCacheHits": 1,
+        "ttsMs": 993,
+        "rhubarbMs": 1195,
+        "audioMs": 2189,
+        "llmFallbacks": 0,
+        "totalMs": 3828
+      },
+      "audioSegments": 2,
+      "lipSyncSegments": 2,
+      "audioDelivery": [
+        {
+          "bytes": 35328,
+          "downloadMs": 341.3206999999966
+        },
+        {
+          "bytes": 252288,
+          "downloadMs": 144.15090000000055
+        }
+      ]
+    },
+    {
+      "repeat": 1,
+      "sessionId": "6ad3357af0469de489cd7530",
+      "phase": "measurement",
+      "inputIndex": 1,
+      "startedAt": "2026-10-17T08:44:50.706Z",
+      "avatarMode": "male",
+      "lipSyncMode": "rhubarb",
+      "status": "ok",
+      "fixture": "02-gardening.wav",
+      "inputDurationSeconds": 1.8792743764172335,
+      "expectedTranscript": "I enjoy gardening.",
+      "httpStatus": 201,
+      "requestMs": 4545.254800000002,
+      "transcript": "I enjoy gardening.",
+      "assistantText": "Gardening is a lovely way to spend time, especially on a Saturday like today. Before we get to know each other, what is your favourite song? If you know the artist, please tell me their name too. I can keep the song ready to play near the end of our session. You can also say skip.",
+      "pipelineMode": "openai-fast-scripted",
+      "turnId": "e1bef79e-7f7d-4db5-a9ae-29ff49994fca",
+      "audioStatus": "ok",
+      "serverTimings": {
+        "sttMs": 195,
+        "orchestratorMs": 988,
+        "speechCacheHits": 1,
+        "ttsMs": 1438,
+        "rhubarbMs": 1758,
+        "audioMs": 3197,
+        "llmFallbacks": 0,
+        "totalMs": 4384
+      },
+      "audioSegments": 2,
+      "lipSyncSegments": 2,
+      "audioDelivery": [
+        {
+          "bytes": 101760,
+          "downloadMs": 341.60080000000016
+        },
+        {
+          "bytes": 153600,
+          "downloadMs": 134.05040000000008
+        }
+      ]
+    },
+    {
+      "repeat": 1,
+      "sessionId": "6ad3357af0469de489cd7530",
+      "phase": "measurement",
+      "inputIndex": 2,
+      "startedAt": "2026-10-17T08:44:57.747Z",
+      "avatarMode": "male",
+      "lipSyncMode": "rhubarb",
+      "status": "ok",
+      "fixture": "03-unsure.wav",
+      "inputDurationSeconds": 1.7443083900226757,
+      "expectedTranscript": "I am not sure.",
+      "httpStatus": 201,
+      "requestMs": 376.8099999999977,
+      "transcript": "I am not sure.",
+      "assistantText": "No problem. We can continue without a theme song today. Thank you. I would love to learn a little more about you. Where do you live?",
+      "pipelineMode": "openai-fast-scripted",
+      "turnId": "0ee92f6f-3ee1-469b-a081-cbeacf666a90",
+      "audioStatus": "ok",
+      "serverTimings": {
+        "sttMs": 198,
+        "orchestratorMs": 22,
+        "speechCacheHits": 1,
+        "audioMs": 0,
+        "llmFallbacks": 0,
+        "totalMs": 224
+      },
+      "audioSegments": 1,
+      "lipSyncSegments": 1,
+      "audioDelivery": [
+        {
+          "bytes": 141696,
+          "downloadMs": 123.14609999999811
+        }
+      ]
+    },
+    {
+      "repeat": 1,
+      "sessionId": "6ad3358cf0469de489cd753b",
+      "phase": "warmup",
+      "inputIndex": -1,
+      "startedAt": "2026-10-17T08:45:00.466Z",
+      "avatarMode": "female",
+      "lipSyncMode": "rhubarb",
+      "status": "ok",
+      "requestMs": 115.42690000000584,
+      "transcript": null,
+      "assistantText": "Hello Alex, and welcome. I am Aria, and I will be guiding you through this AI-supported Cognitive Stimulation Therapy session. Today is our first session, so we will take it gently and get comfortable together. How are you feeling today? Is there anything you’d like to share about your day so far?",
+      "pipelineMode": "openai-fast-scripted",
+      "turnId": "dadffdc6-1731-4aa2-a69a-dee652a988e2",
+      "audioStatus": "ok",
+      "serverTimings": {
+        "orchestratorMs": 17,
+        "speechCacheHits": 1,
+        "audioMs": 0,
+        "llmFallbacks": 0,
+        "totalMs": 17
+      },
+      "audioSegments": 1,
+      "lipSyncSegments": 1,
+      "audioDelivery": [
+        {
+          "bytes": 273792,
+          "downloadMs": 330.5760999999984
+        }
+      ]
+    },
+    {
+      "repeat": 1,
+      "sessionId": "6ad3358cf0469de489cd753b",
+      "phase": "measurement",
+      "inputIndex": 0,
+      "startedAt": "2026-10-17T08:45:02.926Z",
+      "avatarMode": "female",
+      "lipSyncMode": "rhubarb",
+      "status": "ok",
+      "fixture": "01-name.wav",
+      "inputDurationSeconds": 1.9792290249433107,
+      "expectedTranscript": "My name is Alex.",
+      "httpStatus": 201,
+      "requestMs": 4600.540399999998,
+      "transcript": "My name is Alex.",
+      "assistantText": "Alex — thank you for letting me know. My role is to keep you company, try some interesting questions with you, and enjoy some fun conversation together. There are no tests here and no right or wrong answers. I know your name is Alex, but do you have a nickname or another name you would prefer me to call you?",
+      "pipelineMode": "openai-fast-scripted",
+      "turnId": "d8a8c1ba-90e9-4809-a03e-f40b63dcfe05",
+      "audioStatus": "ok",
+      "serverTimings": {
+        "sttMs": 199,
+        "orchestratorMs": 1539,
+        "speechCacheHits": 1,
+        "ttsMs": 1294,
+        "rhubarbMs": 1412,
+        "audioMs": 2706,
+        "llmFallbacks": 0,
+        "totalMs": 4447
+      },
+      "audioSegments": 2,
+      "lipSyncSegments": 2,
+      "audioDelivery": [
+        {
+          "bytes": 53760,
+          "downloadMs": 347.9063000000024
+        },
+        {
+          "bytes": 254592,
+          "downloadMs": 157.16889999998966
+        }
+      ]
+    },
+    {
+      "repeat": 1,
+      "sessionId": "6ad3358cf0469de489cd753b",
+      "phase": "measurement",
+      "inputIndex": 1,
+      "startedAt": "2026-10-17T08:45:10.046Z",
+      "avatarMode": "female",
+      "lipSyncMode": "rhubarb",
+      "status": "ok",
+      "fixture": "02-gardening.wav",
+      "inputDurationSeconds": 1.8792743764172335,
+      "expectedTranscript": "I enjoy gardening.",
+      "httpStatus": 201,
+      "requestMs": 4806.866899999994,
+      "transcript": "I enjoy gardening.",
+      "assistantText": "Gardening is a lovely way to spend time, especially on a fresh Saturday like today. Before we get to know each other, what is your favourite song? If you know the artist, please tell me their name too. I can keep the song ready to play near the end of our session. You can also say skip.",
+      "pipelineMode": "openai-fast-scripted",
+      "turnId": "6eecb5c8-4fa2-43a8-8a5b-97ca774b3a76",
+      "audioStatus": "ok",
+      "serverTimings": {
+        "sttMs": 200,
+        "orchestratorMs": 1069,
+        "speechCacheHits": 1,
+        "ttsMs": 1660,
+        "rhubarbMs": 1709,
+        "audioMs": 3369,
+        "llmFallbacks": 0,
+        "totalMs": 4642
+      },
+      "audioSegments": 2,
+      "lipSyncSegments": 2,
+      "audioDelivery": [
+        {
+          "bytes": 84096,
+          "downloadMs": 358.2697999999946
+        },
+        {
+          "bytes": 208128,
+          "downloadMs": 149.16410000000906
+        }
+      ]
+    },
+    {
+      "repeat": 1,
+      "sessionId": "6ad3358cf0469de489cd753b",
+      "phase": "measurement",
+      "inputIndex": 2,
+      "startedAt": "2026-10-17T08:45:17.370Z",
+      "avatarMode": "female",
+      "lipSyncMode": "rhubarb",
+      "status": "ok",
+      "fixture": "03-unsure.wav",
+      "inputDurationSeconds": 1.7443083900226757,
+      "expectedTranscript": "I am not sure.",
+      "httpStatus": 201,
+      "requestMs": 369.0014999999985,
+      "transcript": "I am not sure.",
+      "assistantText": "No problem. We can continue without a theme song today. Thank you. I would love to learn a little more about you. Where do you live?",
+      "pipelineMode": "openai-fast-scripted",
+      "turnId": "b0e11de5-461d-4520-aeff-2916b52b6f4d",
+      "audioStatus": "ok",
+      "serverTimings": {
+        "sttMs": 193,
+        "orchestratorMs": 15,
+        "speechCacheHits": 1,
+        "audioMs": 0,
+        "llmFallbacks": 0,
+        "totalMs": 212
+      },
+      "audioSegments": 1,
+      "lipSyncSegments": 1,
+      "audioDelivery": [
+        {
+          "bytes": 137856,
+          "downloadMs": 149.46169999999984
+        }
+      ]
+    },
+    {
+      "repeat": 2,
+      "sessionId": "6ad335a0f0469de489cd7546",
+      "phase": "warmup",
+      "inputIndex": -1,
+      "startedAt": "2026-10-17T08:45:20.110Z",
+      "avatarMode": "female",
+      "lipSyncMode": "rhubarb",
+      "status": "ok",
+      "requestMs": 104.08139999999548,
+      "transcript": null,
+      "assistantText": "Hello Alex, and welcome. I am Aria, and I will be guiding you through this AI-supported Cognitive Stimulation Therapy session. Today is our first session, so we will take it gently and get comfortable together. How are you feeling today? Is there anything you’d like to share about your day so far?",
+      "pipelineMode": "openai-fast-scripted",
+      "turnId": "1105c0d1-378a-4ef3-8180-12d6a47f2aa8",
+      "audioStatus": "ok",
+      "serverTimings": {
+        "orchestratorMs": 13,
+        "speechCacheHits": 1,
+        "audioMs": 0,
+        "llmFallbacks": 0,
+        "totalMs": 13
+      },
+      "audioSegments": 1,
+      "lipSyncSegments": 1,
+      "audioDelivery": [
+        {
+          "bytes": 273792,
+          "downloadMs": 199.59839999998803
+        }
+      ]
+    },
+    {
+      "repeat": 2,
+      "sessionId": "6ad335a0f0469de489cd7546",
+      "phase": "measurement",
+      "inputIndex": 0,
+      "startedAt": "2026-10-17T08:45:22.435Z",
+      "avatarMode": "female",
+      "lipSyncMode": "rhubarb",
+      "status": "ok",
+      "fixture": "01-name.wav",
+      "inputDurationSeconds": 1.9792290249433107,
+      "expectedTranscript": "My name is Alex.",
+      "httpStatus": 201,
+      "requestMs": 3885.6494999999995,
+      "transcript": "My name is Alex.",
+      "assistantText": "Thanks for telling me. My role is to keep you company, try some interesting questions with you, and enjoy some fun conversation together. There are no tests here and no right or wrong answers. I know your name is Alex, but do you have a nickname or another name you would prefer me to call you?",
+      "pipelineMode": "openai-fast-scripted",
+      "turnId": "25df0250-ba64-49b4-9e94-6b5a9a607f91",
+      "audioStatus": "ok",
+      "serverTimings": {
+        "sttMs": 198,
+        "orchestratorMs": 1366,
+        "speechCacheHits": 1,
+        "ttsMs": 992,
+        "rhubarbMs": 1166,
+        "audioMs": 2158,
+        "llmFallbacks": 0,
+        "totalMs": 3725
+      },
+      "audioSegments": 2,
+      "lipSyncSegments": 2,
+      "audioDelivery": [
+        {
+          "bytes": 31488,
+          "downloadMs": 360.91829999999027
+        },
+        {
+          "bytes": 254592,
+          "downloadMs": 172.3307000000059
+        }
+      ]
+    },
+    {
+      "repeat": 2,
+      "sessionId": "6ad335a0f0469de489cd7546",
+      "phase": "measurement",
+      "inputIndex": 1,
+      "startedAt": "2026-10-17T08:45:28.873Z",
+      "avatarMode": "female",
+      "lipSyncMode": "rhubarb",
+      "status": "ok",
+      "fixture": "02-gardening.wav",
+      "inputDurationSeconds": 1.8792743764172335,
+      "expectedTranscript": "I enjoy gardening.",
+      "httpStatus": 201,
+      "requestMs": 4800.332000000009,
+      "transcript": "I enjoy gardening.",
+      "assistantText": "Gardening is a lovely way to spend time outdoors, with something new growing and changing each day. Before we get to know each other, what is your favourite song? If you know the artist, please tell me their name too. I can keep the song ready to play near the end of our session. You can also say skip.",
+      "pipelineMode": "openai-fast-scripted",
+      "turnId": "d639586a-afd6-4eb3-a069-ea94ffcf6145",
+      "audioStatus": "ok",
+      "serverTimings": {
+        "sttMs": 205,
+        "orchestratorMs": 1086,
+        "speechCacheHits": 1,
+        "ttsMs": 1641,
+        "rhubarbMs": 1713,
+        "audioMs": 3355,
+        "llmFallbacks": 0,
+        "totalMs": 4649
+      },
+      "audioSegments": 2,
+      "lipSyncSegments": 2,
+      "audioDelivery": [
+        {
+          "bytes": 94464,
+          "downloadMs": 329.4832000000024
+        },
+        {
+          "bytes": 208128,
+          "downloadMs": 153.66790000000037
+        }
+      ]
+    },
+    {
+      "repeat": 2,
+      "sessionId": "6ad335a0f0469de489cd7546",
+      "phase": "measurement",
+      "inputIndex": 2,
+      "startedAt": "2026-10-17T08:45:36.166Z",
+      "avatarMode": "female",
+      "lipSyncMode": "rhubarb",
+      "status": "ok",
+      "fixture": "03-unsure.wav",
+      "inputDurationSeconds": 1.7443083900226757,
+      "expectedTranscript": "I am not sure.",
+      "httpStatus": 201,
+      "requestMs": 370.84679999999935,
+      "transcript": "I am not sure.",
+      "assistantText": "No problem. We can continue without a theme song today. Thank you. I would love to learn a little more about you. Where do you live?",
+      "pipelineMode": "openai-fast-scripted",
+      "turnId": "cc8664fa-657e-470e-9330-d57177b32e61",
+      "audioStatus": "ok",
+      "serverTimings": {
+        "sttMs": 191,
+        "orchestratorMs": 12,
+        "speechCacheHits": 1,
+        "audioMs": 0,
+        "llmFallbacks": 0,
+        "totalMs": 207
+      },
+      "audioSegments": 1,
+      "lipSyncSegments": 1,
+      "audioDelivery": [
+        {
+          "bytes": 137856,
+          "downloadMs": 144.1143000000011
+        }
+      ]
+    },
+    {
+      "repeat": 2,
+      "sessionId": "6ad335b3f0469de489cd7551",
+      "phase": "warmup",
+      "inputIndex": -1,
+      "startedAt": "2026-10-17T08:45:38.883Z",
+      "avatarMode": "male",
+      "lipSyncMode": "rhubarb",
+      "status": "ok",
+      "requestMs": 103.69610000000102,
+      "transcript": null,
+      "assistantText": "Hello Alex, and welcome. I am Aria, and I will be guiding you through this AI-supported Cognitive Stimulation Therapy session. Today is our first session, so we will take it gently and get comfortable together. How are you feeling today? Is there anything you’d like to share about your day so far?",
+      "pipelineMode": "openai-fast-scripted",
+      "turnId": "57e0453c-6d87-4d12-87d5-fa559782534e",
+      "audioStatus": "ok",
+      "serverTimings": {
+        "orchestratorMs": 11,
+        "speechCacheHits": 1,
+        "audioMs": 0,
+        "llmFallbacks": 0,
+        "totalMs": 11
+      },
+      "audioSegments": 1,
+      "lipSyncSegments": 1,
+      "audioDelivery": [
+        {
+          "bytes": 290688,
+          "downloadMs": 316.934699999998
+        }
+      ]
+    },
+    {
+      "repeat": 2,
+      "sessionId": "6ad335b3f0469de489cd7551",
+      "phase": "measurement",
+      "inputIndex": 0,
+      "startedAt": "2026-10-17T08:45:41.314Z",
+      "avatarMode": "male",
+      "lipSyncMode": "rhubarb",
+      "status": "ok",
+      "fixture": "01-name.wav",
+      "inputDurationSeconds": 1.9792290249433107,
+      "expectedTranscript": "My name is Alex.",
+      "httpStatus": 201,
+      "requestMs": 1434.133600000001,
+      "transcript": "My name is Alex.",
+      "assistantText": "Thanks for letting me know. My role is to keep you company, try some interesting questions with you, and enjoy some fun conversation together. There are no tests here and no right or wrong answers. I know your name is Alex, but do you have a nickname or another name you would prefer me to call you?",
+      "pipelineMode": "openai-fast-scripted",
+      "turnId": "313f20a0-f0b9-4232-912a-24e06806c23b",
+      "audioStatus": "ok",
+      "serverTimings": {
+        "sttMs": 197,
+        "orchestratorMs": 1074,
+        "speechCacheHits": 2,
+        "audioMs": 1,
+        "llmFallbacks": 0,
+        "totalMs": 1276
+      },
+      "audioSegments": 2,
+      "lipSyncSegments": 2,
+      "audioDelivery": [
+        {
+          "bytes": 35328,
+          "downloadMs": 101.77610000000277
+        },
+        {
+          "bytes": 252288,
+          "downloadMs": 316.1597000000038
+        }
+      ]
+    },
+    {
+      "repeat": 2,
+      "sessionId": "6ad335b3f0469de489cd7551",
+      "phase": "measurement",
+      "inputIndex": 1,
+      "startedAt": "2026-10-17T08:45:45.173Z",
+      "avatarMode": "male",
+      "lipSyncMode": "rhubarb",
+      "status": "ok",
+      "fixture": "02-gardening.wav",
+      "inputDurationSeconds": 1.8792743764172335,
+      "expectedTranscript": "I enjoy gardening.",
+      "httpStatus": 201,
+      "requestMs": 6926.667000000001,
+      "transcript": "I enjoy gardening.",
+      "assistantText": "Gardening is a lovely way to spend time outdoors, especially on a spring day like today. Before we get to know each other, what is your favourite song? If you know the artist, please tell me their name too. I can keep the song ready to play near the end of our session. You can also say skip.",
+      "pipelineMode": "openai-fast-scripted",
+      "turnId": "8e3b960e-f787-4404-b2f2-45436176177d",
+      "audioStatus": "ok",
+      "serverTimings": {
+        "sttMs": 181,
+        "orchestratorMs": 3285,
+        "speechCacheHits": 1,
+        "ttsMs": 1453,
+        "rhubarbMs": 1847,
+        "audioMs": 3300,
+        "llmFallbacks": 0,
+        "totalMs": 6769
+      },
+      "audioSegments": 2,
+      "lipSyncSegments": 2,
+      "audioDelivery": [
+        {
+          "bytes": 97920,
+          "downloadMs": 364.37519999999495
+        },
+        {
+          "bytes": 153600,
+          "downloadMs": 302.6996999999974
+        }
+      ]
+    },
+    {
+      "repeat": 2,
+      "sessionId": "6ad335b3f0469de489cd7551",
+      "phase": "measurement",
+      "inputIndex": 2,
+      "startedAt": "2026-10-17T08:45:54.785Z",
+      "avatarMode": "male",
+      "lipSyncMode": "rhubarb",
+      "status": "ok",
+      "fixture": "03-unsure.wav",
+      "inputDurationSeconds": 1.7443083900226757,
+      "expectedTranscript": "I am not sure.",
+      "httpStatus": 201,
+      "requestMs": 366.043399999995,
+      "transcript": "I am not sure.",
+      "assistantText": "No problem. We can continue without a theme song today. Thank you. I would love to learn a little more about you. Where do you live?",
+      "pipelineMode": "openai-fast-scripted",
+      "turnId": "70829436-bc6a-4284-96af-246c3cee65b3",
+      "audioStatus": "ok",
+      "serverTimings": {
+        "sttMs": 190,
+        "orchestratorMs": 17,
+        "speechCacheHits": 1,
+        "audioMs": 0,
+        "llmFallbacks": 0,
+        "totalMs": 211
+      },
+      "audioSegments": 1,
+      "lipSyncSegments": 1,
+      "audioDelivery": [
+        {
+          "bytes": 141696,
+          "downloadMs": 293.15380000000005
+        }
+      ]
+    }
+  ],
+  "caveats": [
+    "No browser playing-event or acoustic/lip-frame onset measurement.",
+    "Uploaded synthetic speech excludes microphone recording and finalisation.",
+    "Fresh synthetic users and sessions; each fixed fixture advances conversation state.",
+    "Service cache/prefetch effects are retained, not disabled.",
+    "Accumulated TTS/Rhubarb service durations may overlap and must not be summed as wall time.",
+    "Only three repetitions per configuration; descriptive pilot, not a comprehensive latency study.",
+    "Deployed build revision not verified; pipeline response and turn compatibility fields retained."
+  ]
+}

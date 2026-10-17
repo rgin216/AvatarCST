@@ -84,3 +84,7 @@ Example methods statement:
 > We exercised the deployed AvatarCST application at [frontend/backend URLs and revisions] using [N] synthetic sessions with [fixture sequence], [pipeline], [avatar mode] and [browser/network conditions]. Client request completion and first media-playing onset were measured using browser monotonic time. Server stage durations were joined using turn IDs. Warmups and autoplay interventions were excluded from successful onset distributions and reported separately, along with request and speech failures.
 
 Automated tests verify timing arithmetic, failure handling, rotation and export logic with controlled clocks and mocked requests. They do not constitute a live deployment dataset. A live pilot must be collected against the selected deployment before reporting measured values.
+
+## Repeat after LLM work
+
+The [post-LLM repeat](published/production-latency-after-llm/README.md) uses the same protocol and preserves every latency run in an explicit comparison.
