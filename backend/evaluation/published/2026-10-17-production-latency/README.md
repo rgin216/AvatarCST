@@ -57,3 +57,7 @@ No LLM quality-evaluation results are included in this collection.
 See [comparison with 15 October](comparison-with-2026-10-15.md) for the lower previous mean/P95, repetition-level variation, cache differences and stage evidence.
 
 Large raw JSON/JSONL and redundant statistics were archived under the ignored local evaluation/results directory. This PR retains the summary, manifest, per-turn timing samples and stage-statistics CSV. All recorded slow trials remain included.
+
+## STT reporting correction
+
+The historical pipeline endpoint label was derived from the base pipeline and ignored STT_PROVIDER. It does not independently establish whether this run used OpenAI transcription, a Groq Whisper override, or a fallback. See the [18 October rerun](../2026-10-18-production-latency/README.md) for the configuration-reporting fix and verification limits.
