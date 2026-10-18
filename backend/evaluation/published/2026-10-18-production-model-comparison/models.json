@@ -1,0 +1,36 @@
+[
+  {
+    "id": "gpt-oss-120b",
+    "provider": "groq",
+    "model": "openai/gpt-oss-120b",
+    "family": "gpt-oss"
+  },
+  {
+    "id": "gpt-5.4-mini",
+    "provider": "openai",
+    "model": "gpt-5.4-mini",
+    "family": "gpt-5.4",
+    "judgeMaxTokens": 4096
+  },
+  {
+    "id": "qwen-3.8-27b",
+    "provider": "groq",
+    "model": "qwen/qwen3.8-27b",
+    "family": "qwen",
+    "judgeMaxTokens": 900
+  },
+  {
+    "id": "claude-sonnet-5",
+    "provider": "anthropic",
+    "model": "claude-sonnet-5",
+    "family": "claude",
+    "judgeMaxTokens": 1600
+  },
+  {
+    "id": "claude-haiku-5.5",
+    "provider": "anthropic",
+    "model": "claude-haiku-5-5",
+    "family": "claude",
+    "judgeMaxTokens": 1600
+  }
+]
