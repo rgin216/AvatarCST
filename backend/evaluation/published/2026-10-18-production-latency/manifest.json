@@ -26,9 +26,22 @@
     "transcriptsAvailable": false
   },
   "providerVerification": {
-    "expectedStt": "Groq Whisper, reported by project owner",
-    "configuredRemoteSttIndependentlyVerified": false,
-    "caveat": "The deployed /sessions/pipeline endpoint hardcodes its STT label from the base pipeline and does not expose STT_PROVIDER. It cannot establish the primary provider or per-turn fallback. The PR fixes configuration reporting; this collection predates deploying that fix."
+    "configurationEvidence": {
+      "source": "User-provided SSH grep output from the deployment configuration file, received after collection",
+      "file": "~/avatarcst-deploy/shared/backend.env",
+      "settings": {
+        "STT_PROVIDER": "groq",
+        "GROQ_WHISPER_MODEL": "whisper-large-v3-turbo",
+        "OPENAI_TEXT_MODEL": "gpt-5.4-mini",
+        "OPENAI_FAST_TEXT_MODEL": ""
+      }
+    },
+    "configuredPrimarySttProvider": "groq",
+    "configuredPrimarySttModel": "whisper-large-v3-turbo",
+    "configuredTextModel": "gpt-5.4-mini",
+    "runtimeEnvironmentIndependentlyInspected": false,
+    "perTurnProviderVerified": false,
+    "caveat": "The pipeline endpoint STT label ignores STT_PROVIDER. Supplied file settings were obtained after collection and do not establish active per-request configuration or whether fallback occurred."
   },
   "deployedRevision": null,
   "modelIdsIndependentlyVerified": false,

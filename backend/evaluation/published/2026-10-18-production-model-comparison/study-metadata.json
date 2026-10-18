@@ -66,5 +66,5 @@
   "humanCalibrationCompleted": false,
   "localRawArchive": "evaluation/results/production-model-comparison",
   "rawReportSha256": "e48c4aba18395f546eb80dd92782a8cdf02f01b84d89dbb5dcc57aed69a22590",
-  "deployedModelNote": "gpt-5.4-mini is the configured application OpenAI text model and is now evaluated. Exact remote deployment override was not independently verified."
+  "deployedModelNote": "gpt-5.4-mini matches the application configuration and the deployment backend.env settings shown in user-provided SSH output after collection: OPENAI_TEXT_MODEL=gpt-5.4-mini, OPENAI_FAST_TEXT_MODEL empty. The running process environment and deployment revision were not independently inspected."
 }

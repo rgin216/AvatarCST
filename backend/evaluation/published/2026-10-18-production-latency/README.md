@@ -4,7 +4,9 @@
 
 ## Actual STT configuration
 
-The project owner reports Groq Whisper STT with OpenAI text/TTS. The deployed pipeline endpoint still advertises openai-transcribe, but inspection found that label hardcoded to the base pipeline; audio handling separately honours STT_PROVIDER. Therefore this run must not be labelled independently verified OpenAI STT or independently verified Groq STT. SSH without password authentication could not inspect the server environment. Exact model IDs and per-turn fallbacks were not verified.
+After collection, the project owner supplied SSH output from `~/avatarcst-deploy/shared/backend.env` showing `STT_PROVIDER=groq`, `GROQ_WHISPER_MODEL=whisper-large-v3-turbo`, `OPENAI_TEXT_MODEL=gpt-5.4-mini` and an empty `OPENAI_FAST_TEXT_MODEL`. The declared deployment configuration therefore selects **Groq Whisper Large V3 Turbo for STT and GPT-5.4-mini for text**, retaining the advertised OpenAI TTS and Rhubarb path. The empty fast-text override falls back to `OPENAI_TEXT_MODEL`.
+
+The deployed endpoint's `openai-transcribe` label is hardcoded to the base pipeline; audio handling separately honours `STT_PROVIDER`. It must not be treated as evidence that OpenAI STT was selected. The supplied configuration-file output was obtained after collection, not captured from the running process at each measured request. Per-turn fallback and the exact active deployment revision remain unverified; timings are not a controlled Groq-versus-OpenAI comparison.
 
 This PR fixes the endpoint to report configured sttProvider, sttModel and sttFallbackProvider using the same routing helper as audio requests. That reports configuration, not the provider actually used after a per-turn fallback, and requires deployment before it can verify production configuration.
 
