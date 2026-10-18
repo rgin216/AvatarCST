@@ -1,0 +1,73 @@
+{
+  "scope": "Adaptive acknowledgements for synthetic Session 1 scenarios; not complete therapy sessions",
+  "scenarios": 30,
+  "models": [
+    {
+      "id": "gpt-oss-120b",
+      "provider": "groq",
+      "model": "openai/gpt-oss-120b",
+      "family": "gpt-oss"
+    },
+    {
+      "id": "gpt-oss-20b",
+      "provider": "groq",
+      "model": "openai/gpt-oss-20b",
+      "family": "gpt-oss"
+    },
+    {
+      "id": "qwen-3.8-27b",
+      "provider": "groq",
+      "model": "qwen/qwen3.8-27b",
+      "family": "qwen",
+      "judgeMaxTokens": 900
+    },
+    {
+      "id": "claude-sonnet-5",
+      "provider": "anthropic",
+      "model": "claude-sonnet-5",
+      "family": "claude",
+      "judgeMaxTokens": 1600
+    },
+    {
+      "id": "claude-haiku-5.5",
+      "provider": "anthropic",
+      "model": "claude-haiku-5-5",
+      "family": "claude",
+      "judgeMaxTokens": 1600
+    }
+  ],
+  "responses": 150,
+  "validCritiques": 600,
+  "criteria": {
+    "script_adherence": "Acknowledgement respects the supplied step, answer state and next line; asks no question.",
+    "relevance": "Acknowledges the actual answer without generic filler.",
+    "accessibility": "Acknowledgement is one clear sentence, at most 25 words.",
+    "respect": "Warm adult-to-adult tone; no patronising praise or pressure.",
+    "grounding": "No invented personal facts or unsupported image observations.",
+    "difficulty": "Handles uncertainty, refusal or confusion without pressure.",
+    "continuity": "Fits recent conversation without repetitive wording or duplicating the next line."
+  },
+  "sourceRevision": "ffec729273fc97b9fdab754d778f5855fa51150c",
+  "sourceHash": "9e865aba0d03f649d72b1df2cf7af44a4a44efbdb50c742d847783e28515f7a2",
+  "fixtureHash": "3c26521a8b1fa98f95822601cd92acde150b354d09cc21f3c566de3ccd9208a7",
+  "generation": {
+    "temperatureRequested": 0.4,
+    "maxTokensRequested": 256,
+    "gptOssMinimumTokens": 512
+  },
+  "critic": {
+    "temperatureRequested": 0,
+    "maxTokensByModel": {
+      "gpt-oss-120b": 4096,
+      "gpt-oss-20b": 4096,
+      "qwen-3.8-27b": 900,
+      "claude-sonnet-5": 1600,
+      "claude-haiku-5.5": 1600
+    }
+  },
+  "provenance": "Final results combine original successful outputs with linked actual retries over multiple collection windows and Groq organizations. Failed/skipped calls were preserved in local raw archives, not assigned scores. No results imputed.",
+  "deployment": "Configured application OpenAI text model is gpt-5.4-mini; that model was not included in this five-model quality evaluation. Exact remote model override was not independently verified.",
+  "humanCalibrationCompleted": false,
+  "localRawArchive": "evaluation/results/review-archive-2026-10-18T01-39-44-951Z/2026-10-17-llm-final-repair",
+  "rawReportSha256": "9d9144d52aff01f548e563df7d8f5267fb69f9b997a8195a6b4455f50d7786a4"
+}

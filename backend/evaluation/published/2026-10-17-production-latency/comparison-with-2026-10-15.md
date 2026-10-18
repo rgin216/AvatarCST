@@ -41,4 +41,4 @@ The public pipeline responses differ: 15 October advertised both free and OpenAI
 
 The tests ran at different times without controlled host load, provider conditions or a reset speech cache. With only 18 measured turns each, report this as observed run-to-run variability rather than proof that production became slower. Browser playback/acoustic onset was not measured in either run.
 
-Sources: [15 October raw evidence](../2026-10-15/deployed-summary.json) and [17 October raw evidence](deployed-summary.json). No LLM quality scores are pooled into this latency comparison.
+Sources: [15 October raw evidence](../2026-10-15/deployed-summary.json) and [17 October timing samples](deployed-voice-samples.csv). No LLM quality scores are pooled into this latency comparison.

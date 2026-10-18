@@ -1,6 +1,6 @@
 # LLM evaluation pilot
 
-The [completed five-model evaluation](published/2026-10-17-llm-final-repair/README.md) contains 150 successful responses and 600 valid critiques across 30 scenarios. It combines original results with documented targeted retries; raw failures, skips and account/protocol changes are preserved in its attempt history. No scores were imputed.
+The [completed five-model evaluation](published/2026-10-17-llm-final-repair/README.md) contains 150 successful responses and 600 valid critiques across 30 scenarios. It combines original results with documented targeted retries. The PR contains summaries, score CSVs and metadata; raw failures, skips and account/protocol history are preserved in an ignored local archive. No scores were imputed. The app-configured gpt-5.4-mini model was not part of this five-model comparison.
 
 A dedicated automatic latency benchmark provides warmups, percentiles, failure analysis and research CSV exports. See [latency collection protocol](LATENCY.md); run `npm run eval:latency` for a dry run.
 

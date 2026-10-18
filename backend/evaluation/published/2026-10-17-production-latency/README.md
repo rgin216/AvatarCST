@@ -33,7 +33,7 @@ Measured turns only, pooled across avatars. n counts observed durations; omitted
 
 - Six independent synthetic users/sessions: three female and three male. Each receives one text warmup then the same three WAV fixtures, advancing normal Session 1 state. Avatar order alternates between repetitions; turns run sequentially with a two-second delay.
 
-- Fixtures, hashes, returned transcripts, stage timings, compatibility fields, raw rows and delivered-byte counts are preserved in the accompanying evidence. Cached and prefetched production paths remain enabled.
+- Fixture provenance and timing samples are retained in the manifest and CSV tables. Full raw responses, transcripts and delivery evidence were validated and archived locally before removal from the PR. Cached and prefetched production paths remain enabled.
 
 - The local collector revision, source hashes and client runtime are in `manifest.json`. The deployed commit was not independently verified; the healthy endpoint and reported pipeline are operational evidence, not build provenance.
 
@@ -55,3 +55,5 @@ No LLM quality-evaluation results are included in this collection.
 ## Previous-run comparison
 
 See [comparison with 15 October](comparison-with-2026-10-15.md) for the lower previous mean/P95, repetition-level variation, cache differences and stage evidence.
+
+Large raw JSON/JSONL and redundant statistics were archived under the ignored local evaluation/results directory. This PR retains the summary, manifest, per-turn timing samples and stage-statistics CSV. All recorded slow trials remain included.
