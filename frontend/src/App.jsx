@@ -6,6 +6,8 @@ import LandingPage from "./pages/LandingPage";
 import SessionPage from "./pages/SessionPage";
 import SessionInputTutorial from "./components/SessionInputTutorial.jsx";
 import { shouldShowInputTutorial, tutorialStorageKey } from "./utils/inputTutorial.js";
+import SessionPreparationNotice from "./components/SessionPreparationNotice.jsx";
+import { preparationStorageKey, shouldShowPreparation } from "./utils/sessionPreparation.js";
 import EndPage from "./pages/EndPage";
 import CaregiverPage from "./pages/CaregiverPage";
 import CaregiverGate from "./components/CaregiverGate.jsx";
@@ -113,6 +115,7 @@ const TEST_SESSIONS = [
   },
   ...Array.from({ length: 7 }, (_, i) => {
     const n = i + 9;
+    if (n === 9) return { id: "cst_being_creative", label: "Session 9", title: "Being Creative", theme: "Being Creative", icon: "🎨" };
     if (n === 10) return { id: "cst_categorizing_objects", label: "Session 10", title: "Categorizing Objects", theme: "Categorizing Objects", icon: "🧩" };
     if (n === 11) return { id: "cst_orientation", label: "Session 11", title: "Orientation", theme: "Orientation", icon: "🧭" };
     if (n === 12) return { id: "cst_using_money", label: "Session 12", title: "Using Money", theme: "Using Money", icon: "💰" };
@@ -140,6 +143,10 @@ function SessionRoute({ userName, fallbackPipelineMode, defaultAvatarMode, defau
     try { return sessionStorage.getItem(tutorialStorageKey(sessionId)) === "done" ? sessionId : null; }
     catch { return null; }
   });
+  const [preparedFor, setPreparedFor] = useState(() => {
+    try { return sessionStorage.getItem(preparationStorageKey(sessionId)) === "done" ? sessionId : null; }
+    catch { return null; }
+  });
 
   useEffect(() => {
     // Reset route-owned state before loading a different session. This effect
@@ -150,8 +157,10 @@ function SessionRoute({ userName, fallbackPipelineMode, defaultAvatarMode, defau
     setInvalid(false);
     try {
       setPracticeCompletedFor(sessionStorage.getItem(tutorialStorageKey(sessionId)) === "done" ? sessionId : null);
+      setPreparedFor(sessionStorage.getItem(preparationStorageKey(sessionId)) === "done" ? sessionId : null);
     } catch {
       setPracticeCompletedFor(null);
+      setPreparedFor(null);
     }
     if (sessionId === "dev-session") return undefined;
     let cancelled = false;
@@ -176,21 +185,32 @@ function SessionRoute({ userName, fallbackPipelineMode, defaultAvatarMode, defau
       setPracticeCompletedFor(sessionId);
     }} />;
   }
+  // Shown over the session's first slide. The session holds its first turn
+  // until then, so Aria does not start speaking while they fetch a pen.
+  const preparing = shouldShowPreparation(sessionInfo.data, preparedFor === sessionId);
 
   return (
-    <SessionPage
-      key={sessionId}
-      sessionId={sessionId}
-      introductionRequired={Boolean(sessionInfo.data.unlocksSessions)}
-      onEnd={() => onSessionEnd(sessionId)}
-      userName={userName}
-      pipelineMode={pipelineMode}
-      sessionTitle={sessionInfo.data.title}
-      defaultAvatarMode={defaultAvatarMode}
-      defaultSpeechRate={defaultSpeechRate}
-      onSpeechRateChange={onSpeechRateChange}
-      evaluationFacilitator={sessionInfo.data.evaluation?.facilitator?.id}
-    />
+    <>
+      <SessionPage
+        key={sessionId}
+        sessionId={sessionId}
+        holdStart={preparing}
+        previewImageUrl={preparing ? sessionInfo.data.preparation.slideImageUrl : ""}
+        introductionRequired={Boolean(sessionInfo.data.unlocksSessions)}
+        onEnd={() => onSessionEnd(sessionId)}
+        userName={userName}
+        pipelineMode={pipelineMode}
+        sessionTitle={sessionInfo.data.title}
+        defaultAvatarMode={defaultAvatarMode}
+        defaultSpeechRate={defaultSpeechRate}
+        onSpeechRateChange={onSpeechRateChange}
+        evaluationFacilitator={sessionInfo.data.evaluation?.facilitator?.id}
+      />
+      {preparing && <SessionPreparationNotice preparation={sessionInfo.data.preparation} sessionTitle={sessionInfo.data.title} onReady={() => {
+        try { sessionStorage.setItem(preparationStorageKey(sessionId), "done"); } catch { /* The session still starts without storage. */ }
+        setPreparedFor(sessionId);
+      }} />}
+    </>
   );
 }
 

@@ -35,7 +35,7 @@ import { EvaluationTurn, SessionEvaluation } from '../models/Evaluation.js';
 import { getSessionAccess, INTRO_SCRIPT_ID } from '../services/sessionAccessService.js';
 import { nowMs, timeAsync } from '../services/turnTiming.js';
 import { trackLlmFallbacks } from '../services/llmContext.js';
-import { getScriptDeckSlideStepIndex } from '../services/cstScriptService.js';
+import { getScriptDeckSlideStepIndex, getScriptPreparation } from '../services/cstScriptService.js';
 
 const AVATAR_MODES = new Set(['male', 'female', 'visualizer']);
 const LIP_SYNC_MODES = new Set(['rhubarb', 'energy']);
@@ -45,6 +45,8 @@ const publicSession = (session) => {
   if (result?.interactionState?.currentAffairs?.article) {
     delete result.interactionState.currentAffairs.article.fullContent;
   }
+  const preparation = getScriptPreparation(result?.scriptId);
+  if (preparation) result.preparation = preparation;
   return result;
 };
 

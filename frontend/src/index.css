@@ -829,6 +829,63 @@ body {
   opacity: 0.55;
 }
 
+/* Sits in the empty lower-right corner of a text slide, such as Draw and
+   Describe, so the slide's own instructions stay readable. */
+.slide-offscreen-task {
+  position: absolute;
+  z-index: 3;
+  right: 6%;
+  bottom: 9%;
+}
+
+.slide-offscreen-done {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 56px;
+  padding: 12px 28px 12px 22px;
+  border: 2px solid #126D37;
+  border-radius: 999px;
+  background: #126D37;
+  color: #FFFFFF;
+  font: 800 clamp(16px, 1.6cqw, 22px) / 1.2 Nunito, sans-serif;
+  white-space: nowrap;
+  cursor: pointer;
+  box-shadow: 0 8px 22px rgba(18, 109, 55, 0.28);
+  transition: background 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.slide-offscreen-done svg {
+  flex: none;
+  width: 1.15em;
+  height: 1.15em;
+  padding: 5px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.slide-offscreen-done:hover:not(:disabled) {
+  background: #0F5C2E;
+  transform: translateY(-1px);
+  box-shadow: 0 10px 26px rgba(18, 109, 55, 0.34);
+}
+
+.slide-offscreen-done:focus-visible {
+  outline: 4px solid rgba(244, 124, 32, 0.45);
+  outline-offset: 3px;
+}
+
+.slide-offscreen-done:disabled {
+  cursor: default;
+  opacity: 0.6;
+  box-shadow: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .slide-offscreen-done { transition: none; }
+  .slide-offscreen-done:hover:not(:disabled) { transform: none; }
+}
+
 .slide-audioclips-overlay {
   position: absolute;
   z-index: 3;

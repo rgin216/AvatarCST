@@ -88,6 +88,13 @@ const SESSION_SCRIPTS = {
     .split(/\r?\n---\r?\n/)
     .map((s) => s.trim())
     .filter(Boolean),
+  cst_being_creative: readFileSync(
+    join(CONTEXT_ROOT, 'vCST_Session9_AI_Script.md'),
+    'utf8'
+  )
+    .split(/\r?\n---\r?\n/)
+    .map((s) => s.trim())
+    .filter(Boolean),
 };
 
 const RECENT_PROMPT_MESSAGE_LIMIT = 8;
@@ -204,9 +211,13 @@ export const buildCstAdaptiveResponseInstructions = ({
   scriptedNextLine = '',
   isFinalStep = false,
   answerState = 'answered',
+  revealFact = '',
 }) => {
   const displayName = getDisplayNameFromContext({ user, recentMessages });
   const currentStepScript = getCurrentStepScript(scriptId, slide);
+  // A fact shared after any answer, such as a painting's title and artist,
+  // so the question itself never asks the person to recall it.
+  const sharesFact = Boolean(revealFact) && answerState !== 'repeat_question';
 
   return `${BASE_INSTRUCTIONS}${getPersonalityBlock(user)}
 
@@ -249,10 +260,15 @@ ${answerState === 'repeat_question'
   : answerState === 'move_on_after_retries'
   ? 'The latest message still did not answer after repeated tries. Briefly reassure them and let the app move on to the next scripted line.'
   : 'The latest message is a reasonable answer attempt. Briefly reflect it before the app continues.'}
-
+${sharesFact ? `
+# Fact To Share
+After acknowledging the answer, share this fact in your own words, keeping every name, date, and detail accurate. Share it whatever they said, as an interesting extra rather than a correction: ${quoteData(revealFact)}
+` : ''}
 # Output
 Return ONLY Aria's adaptive response to the latest user message.
-- Maximum 1 sentence.
+${sharesFact
+  ? '- Maximum 3 sentences: one short sentence acknowledging the latest answer, then the fact above in one or two sentences.'
+  : '- Maximum 1 sentence.'}
 - Always acknowledge the latest answer in one short, complete sentence of at most 25 words. Respond naturally without flattery or judging the quality of every observation. Acknowledging an opinion does not mean agreeing it is true.
 ${formatAcknowledgementVarietyGuidance(recentMessages)}
 - Do not address the person by name in this response. Scripted greetings handle their name separately.
