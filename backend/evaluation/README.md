@@ -1,5 +1,7 @@
 # LLM evaluation pilot
 
+The [completed application-model comparison](published/2026-10-18-production-model-comparison/README.md) evaluates gpt-5.4-mini, GPT-OSS 120B, Qwen, Claude Sonnet and Claude Haiku across 30 scenarios: 150 responses and 600 valid critiques. It reuses retained-model evidence and documents targeted new collection. GPT-OSS 20B is excluded. Raw evidence remains local; the PR contains concise reports, score CSVs, settings and provenance.
+
 A dedicated automatic latency benchmark provides warmups, percentiles, failure analysis and research CSV exports. See [latency collection protocol](LATENCY.md); run `npm run eval:latency` for a dry run.
 
 How latency, errors and degraded responses change with many simultaneous users is covered in [the concurrent-user load test](CONCURRENCY.md); run `npm run eval:concurrency -- --api http://localhost:5000/api` for a dry run.

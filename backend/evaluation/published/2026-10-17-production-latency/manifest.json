@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "scope": "deployed-uploaded-audio-to-API-response-and-audio-delivery",
+  "sourceRevision": "ffec729273fc97b9fdab754d778f5855fa51150c",
+  "sourceHashes": {
+    "scripts/collect-deployed-voice-latency.js": "238669a8cfb90ed1381bce66e0a07f2c99b6c89ca2c6451296967f853e142c07",
+    "src/evaluation/latency.js": "07e2009d365742aaef1bf3a83fab4eef5edaff945ac9913f5d9ac8c70df1f850"
+  },
+  "client": {
+    "node": "v20.20.2",
+    "platform": "win32",
+    "arch": "x64",
+    "timezone": "Pacific/Auckland",
+    "location": "User Windows computer; no university VPN path assertion"
+  },
+  "deployedRevision": null,
+  "deployedRevisionNote": "The public health endpoint does not expose the deployed commit; local source revision is not proof of production revision.",
+  "api": "https://deleted-primarily-finals-figured.trycloudflare.com/api",
+  "pipeline": {
+    "mode": "openai-fast-scripted",
+    "rhubarb": {
+      "available": true,
+      "source": "vendored"
+    },
+    "stt": "openai-transcribe",
+    "llm": "openai-responses",
+    "tts": "openai-tts",
+    "lipsync": "rhubarb-for-avatars/audio-energy-for-visualizer",
+    "availableModes": [
+      "openai-fast-scripted"
+    ],
+    "transcriptsAvailable": false
+  },
+  "startedAt": "2026-10-17T06:08:49.886Z",
+  "completedAt": "2026-10-17T06:12:07.353Z",
+  "plannedMeasurements": 18,
+  "plannedWarmups": 6,
+  "configuration": "Three fresh sessions per avatar, alternating female/male order, three fixed synthetic WAV turns after one warmup, 2-second inter-turn delay, OpenAI fast scripted pipeline, Rhubarb lip-sync.",
+  "fixtureManifest": "backend/evaluation/audio/manifest.json"
+}

@@ -402,21 +402,26 @@ export const remindSession = async (req, res, next) => {
 };
 
 export const getPipelineInfo = (_req, res) => {
+  const { provider: sttProvider, fallbackProvider: sttFallbackProvider } = getTranscriptionProviders(DEFAULT_PIPELINE_MODE);
   const info = {
     mode: DEFAULT_PIPELINE_MODE,
     rhubarb: getRhubarbStatus(),
     ...(DEFAULT_PIPELINE_MODE === 'free' && {
-      stt: 'groq-whisper',
       llm: 'groq',
       tts: 'edge-tts',
       lipsync: 'rhubarb-for-avatars/audio-energy-for-visualizer',
     }),
     ...(DEFAULT_PIPELINE_MODE === 'openai-fast-scripted' && {
-      stt: 'openai-transcribe',
       llm: 'openai-responses',
       tts: 'openai-tts',
       lipsync: 'rhubarb-for-avatars/audio-energy-for-visualizer',
     }),
+    stt: sttProvider === 'groq' ? 'groq-whisper' : 'openai-transcribe',
+    sttProvider,
+    sttModel: sttProvider === 'groq'
+      ? process.env.GROQ_WHISPER_MODEL || 'whisper-large-v3-turbo'
+      : process.env.OPENAI_TRANSCRIBE_MODEL || 'gpt-4o-mini-transcribe',
+    sttFallbackProvider,
     availableModes: SESSION_PIPELINE_MODES,
     transcriptsAvailable: transcriptsAvailable(),
   };

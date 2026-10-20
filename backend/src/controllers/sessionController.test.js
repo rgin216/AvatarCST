@@ -24,6 +24,36 @@ const mockClosedSession = (t) => {
   return session;
 };
 
+test('pipeline info reports the configured Groq STT override without changing OpenAI text and voice', (t) => {
+  const keys = ['STT_PROVIDER', 'GROQ_WHISPER_MODEL'];
+  const previous = Object.fromEntries(keys.map(key => [key, process.env[key]]));
+  t.after(() => { for (const key of keys) { if (previous[key] === undefined) delete process.env[key]; else process.env[key] = previous[key]; } });
+  process.env.STT_PROVIDER = ' Groq ';
+  process.env.GROQ_WHISPER_MODEL = 'whisper-large-v3';
+  const res = makeRes();
+  getPipelineInfo({}, res);
+  assert.equal(res.body.stt, 'groq-whisper');
+  assert.equal(res.body.sttProvider, 'groq');
+  assert.equal(res.body.sttModel, 'whisper-large-v3');
+  assert.equal(res.body.sttFallbackProvider, 'openai');
+  assert.equal(res.body.llm, 'openai-responses');
+  assert.equal(res.body.tts, 'openai-tts');
+});
+
+test('pipeline info reports OpenAI transcription when no STT override is configured', (t) => {
+  const keys = ['STT_PROVIDER', 'OPENAI_TRANSCRIBE_MODEL'];
+  const previous = Object.fromEntries(keys.map(key => [key, process.env[key]]));
+  t.after(() => { for (const key of keys) { if (previous[key] === undefined) delete process.env[key]; else process.env[key] = previous[key]; } });
+  delete process.env.STT_PROVIDER;
+  process.env.OPENAI_TRANSCRIBE_MODEL = 'gpt-4o-transcribe';
+  const res = makeRes();
+  getPipelineInfo({}, res);
+  assert.equal(res.body.stt, 'openai-transcribe');
+  assert.equal(res.body.sttProvider, 'openai');
+  assert.equal(res.body.sttModel, 'gpt-4o-transcribe');
+  assert.equal(res.body.sttFallbackProvider, null);
+});
+
 test('streamed audio turns send the transcript first and report later failures in-band', async (t) => {
   const session = mockClosedSession(t);
   const res = makeRes();

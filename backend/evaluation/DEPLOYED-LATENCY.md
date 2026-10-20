@@ -1,5 +1,9 @@
 # Deployed application latency collection
 
+The [18 October rerun](published/2026-10-18-production-latency/README.md) retains a fresh 18-turn measured sample and documents an STT reporting correction: older `/sessions/pipeline` responses derive their STT label from the base pipeline and ignore `STT_PROVIDER`. They cannot establish the actual primary provider. The endpoint fix in this branch reports configured `sttProvider`, `sttModel` and `sttFallbackProvider`; per-turn fallback still requires separate evidence. No configuration-reporting fix is deployed by collecting or exporting results.
+
+The [17 October 2026 production speech pipeline collection](published/2026-10-17-production-latency/README.md) records fresh female/male avatar trials against the university-hosted backend, with uploaded synthetic speech, response processing, synthesized audio, Rhubarb cues and verified audio downloads. Its report separates API completion from completion of audio downloads and documents cache/prefetch and browser-onset limitations. LLM quality evaluations are separate.
+
 There are two collection paths. The CLI exercises the deployed backend now, using its existing response contract. Browser capture and corrected multi-segment server timing require deploying the changed frontend/backend first. Neither implementation publishes a deployment automatically.
 
 ## 1. Deployed API benchmark
@@ -82,3 +86,7 @@ Example methods statement:
 > We exercised the deployed AvatarCST application at [frontend/backend URLs and revisions] using [N] synthetic sessions with [fixture sequence], [pipeline], [avatar mode] and [browser/network conditions]. Client request completion and first media-playing onset were measured using browser monotonic time. Server stage durations were joined using turn IDs. Warmups and autoplay interventions were excluded from successful onset distributions and reported separately, along with request and speech failures.
 
 Automated tests verify timing arithmetic, failure handling, rotation and export logic with controlled clocks and mocked requests. They do not constitute a live deployment dataset. A live pilot must be collected against the selected deployment before reporting measured values.
+
+## Repeat after LLM work
+
+The [post-LLM repeat](published/production-latency-after-llm/README.md) uses the same protocol and preserves every latency run in an explicit comparison.

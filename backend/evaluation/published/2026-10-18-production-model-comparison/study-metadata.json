@@ -1,0 +1,70 @@
+{
+  "scope": "adaptive-acknowledgement",
+  "startedAt": "2026-10-18T01:52:42.906Z",
+  "completedAt": "2026-10-18T04:24:14.752Z",
+  "models": [
+    {
+      "id": "gpt-oss-120b",
+      "provider": "groq",
+      "model": "openai/gpt-oss-120b",
+      "family": "gpt-oss"
+    },
+    {
+      "id": "gpt-5.4-mini",
+      "provider": "openai",
+      "model": "gpt-5.4-mini",
+      "family": "gpt-5.4",
+      "judgeMaxTokens": 4096
+    },
+    {
+      "id": "qwen-3.8-27b",
+      "provider": "groq",
+      "model": "qwen/qwen3.8-27b",
+      "family": "qwen",
+      "judgeMaxTokens": 900
+    },
+    {
+      "id": "claude-sonnet-5",
+      "provider": "anthropic",
+      "model": "claude-sonnet-5",
+      "family": "claude",
+      "judgeMaxTokens": 1600
+    },
+    {
+      "id": "claude-haiku-5.5",
+      "provider": "anthropic",
+      "model": "claude-haiku-5-5",
+      "family": "claude",
+      "judgeMaxTokens": 1600
+    }
+  ],
+  "scenarios": 30,
+  "responses": 150,
+  "validCritiques": 600,
+  "reusedResponses": 120,
+  "reusedCritiques": 360,
+  "newCallsPlanned": {
+    "generations": 30,
+    "critiques": 240,
+    "total": 270
+  },
+  "newAttempts": 271,
+  "settings": {
+    "generationTemperatureRequested": 0.4,
+    "generationMaxTokensRequested": 256,
+    "criticTemperatureRequested": 0,
+    "miniCriticMaxTokens": 4096,
+    "miniCriticFormat": "Strict JSON schema using JUDGE_SCHEMA; a rejected initial JSON-object compatibility attempt is archived locally.",
+    "note": "OpenAI/Anthropic adapters omit unsupported sampling controls; GPT-OSS retains low reasoning and a minimum 512 completion tokens. Responses API uses the application adapter. Pacing is excluded from generation latency."
+  },
+  "sourceRevision": "44d58088e8f39980595ecf798f0e039913c0aaf2",
+  "fixtureHash": "3c26521a8b1fa98f95822601cd92acde150b354d09cc21f3c566de3ccd9208a7",
+  "runnerSha256": "6e0df81f3e4ec01b9963671bd49c096e339ee78b54738e675f44b049949775c2",
+  "sourceReportSha256": "9d9144d52aff01f548e563df7d8f5267fb69f9b997a8195a6b4455f50d7786a4",
+  "protocol": "Replace only GPT-OSS 20B with gpt-5.4-mini. Reuse 120 saved retained-model responses and their 360 mutual critiques verbatim. Generate 30 mini responses, obtain 120 critiques of them, and have mini critique the 120 retained responses. No previous 20B outputs or judgments enter the new comparison.",
+  "credentialProvenance": "User supplied a new Groq account/organization key for this collection. Prior retained evidence spans earlier collection windows and account changes; this is a reused-data comparison, not a synchronized full rerun. No keys or fingerprints exported.",
+  "humanCalibrationCompleted": false,
+  "localRawArchive": "evaluation/results/production-model-comparison",
+  "rawReportSha256": "e48c4aba18395f546eb80dd92782a8cdf02f01b84d89dbb5dcc57aed69a22590",
+  "deployedModelNote": "gpt-5.4-mini matches the application configuration and the deployment backend.env settings shown in user-provided SSH output after collection: OPENAI_TEXT_MODEL=gpt-5.4-mini, OPENAI_FAST_TEXT_MODEL empty. The running process environment and deployment revision were not independently inspected."
+}
