@@ -151,6 +151,17 @@ export const extractPreferredNameAnswer = (content = '', currentName = '') => {
 
 const joinSpeechParts = (...parts) => parts.map((part) => part?.trim()).filter(Boolean).join(' ');
 
+const PACING_REASSURANCE = /\b(?:take (?:your|all the) time|no rush|no hurry|in your own time)\b/i;
+
+// Drops whole sentences that tell the person to take their time, for steps
+// where that reads as hovering (such as drawing on paper).
+export const removePacingReassurance = (text = '') =>
+  String(text)
+    .split(/(?<=[.!?])\s+/)
+    .filter((sentence) => !PACING_REASSURANCE.test(sentence))
+    .join(' ')
+    .trim();
+
 const SPEECH_OVERLAP_STOP_WORDS = new Set([
   'about', 'after', 'again', 'also', 'and', 'are', 'before', 'but', 'can', 'doing',
   'for', 'from', 'have', 'how', 'into', 'let', 'like', 'now', 'our', 'that', 'the',
@@ -1966,6 +1977,10 @@ export const buildTopicSessionSummary = (answers = [], { themeSong = null } = {}
     [/^number_games_everyday$/, 'thinking of everyday things that come in twos and dozens'],
     [/^number_games_lucky_number$/, 'talking about lucky numbers'],
     [/^number_games_guess_/, 'guessing how many lollies were in a jar'],
+    [/^being_creative_(monet_senses|scream|dali|picasso)$/, 'looking at famous paintings'],
+    [/^being_creative_(drain|love|box)$/, 'sharing what some thought-provoking art meant to you'],
+    [/^being_creative_(draw_house|house_favourite_part)$/, 'imagining a dream house of your own'],
+    [/^being_creative_(water_memory|home_memory)$/, 'remembering favourite places and homes'],
   ]) {
     if (meaningful.some((item) => pattern.test(item.stepId))) addTopic(topic);
   }
@@ -2007,7 +2022,7 @@ export const buildTopicSessionSummary = (answers = [], { themeSong = null } = {}
   }
 
   for (const item of meaningful) {
-    if (/^(faces_scenes|categorizing_objects|number_games)_/.test(item.stepId || '')) continue;
+    if (/^(faces_scenes|categorizing_objects|number_games|being_creative)_/.test(item.stepId || '')) continue;
     if ([
       'introduce_yourself',
       'what_is_cst',
@@ -2170,7 +2185,7 @@ export const buildTopicSessionSummary = (answers = [], { themeSong = null } = {}
   if (meaningful.some((item) => item.stepId === 'money_spin_question')) {
     addTopic('reflecting on a money-related question from the wheel');
   }
-  const wheelAnswer = meaningful.find((item) => ['current_affairs_spin_question', 'faces_scenes_spin_question', 'categorizing_objects_spin_question', 'orientation_spin_question', 'number_games_spin_question'].includes(item.stepId));
+  const wheelAnswer = meaningful.find((item) => ['current_affairs_spin_question', 'faces_scenes_spin_question', 'categorizing_objects_spin_question', 'orientation_spin_question', 'number_games_spin_question', 'being_creative_spin_question'].includes(item.stepId));
   let wheelTopic = '';
   if (wheelAnswer) {
     const wheelText = `${wheelAnswer.answer || ''} ${wheelAnswer.adaptiveFollowUp?.answer || ''}`;
@@ -2829,10 +2844,10 @@ const extractLastQuestion = (value = '') => {
   return text.slice(questionStart, questionEnd + 1).trim();
 };
 
-export const buildInactivityReminderText = (question = '') => {
+export const buildInactivityReminderText = (question = '', lead = 'Take your time; there is no rush.') => {
   const repeatedQuestion = String(question).replace(/\s+/g, ' ').trim();
   return joinSpeechParts(
-    'Take your time; there is no rush.',
+    lead,
     repeatedQuestion,
     'If you cannot think of an answer, feel free to say or type, "I don\'t know."'
   );
@@ -2878,6 +2893,12 @@ const getSessionInactivityReminderWrite = async (sessionId, expectedActivityRevi
     context = await getSessionTurnContext(sessionId, claimedSession);
     const { session, user, recentMessages, step } = context;
     assertCanUseSession(session, 'respond');
+    // Pen-and-paper tasks happen away from the screen; a nudge would interrupt them.
+    if (step.interaction?.type === 'offscreenTask') {
+      const err = new Error('This step does not use inactivity reminders');
+      err.status = 409;
+      throw err;
+    }
 
     const currentTurnIndex = session.scriptStepTurnIndex || 0;
     const effectiveTurnIndex = currentTurnIndex || (hasPriorAssistantTurn(recentMessages) ? 1 : 0);
@@ -2911,7 +2932,7 @@ const getSessionInactivityReminderWrite = async (sessionId, expectedActivityRevi
       step.prompt;
     assistantText = activeSafetySupport
       ? buildSafetyInactivityReminderText(activeSafetySupport)
-      : buildInactivityReminderText(question);
+      : buildInactivityReminderText(question, step.inactivityReminderLead);
     assistantMessage = await Message.create({
       sessionId,
       role: 'assistant',
@@ -3976,6 +3997,7 @@ const respondToSessionTurnWrite = async ({ sessionId, content, activitySession, 
       scriptedNextLine,
       isFinalStep,
       answerState,
+      revealFact: step.revealFact,
     });
     const llmMessages = [
       { role: 'system', content: systemPrompt },
@@ -3989,11 +4011,15 @@ const respondToSessionTurnWrite = async ({ sessionId, content, activitySession, 
     }).catch((error) => {
       console.warn('[session] Using acknowledgement fallback:', error.message);
       recordLlmFallback('Acknowledgement generation failed');
-      return 'Thank you for sharing your thoughts.';
+      return joinSpeechParts(
+        'Thank you for sharing your thoughts.',
+        step.revealFact && answerState !== 'repeat_question' ? step.revealFact : ''
+      );
     });
   }
 
   if (userContent && !hasAutoAdvanceProtocol) {
+    if (step.avoidPacingReassurance) adaptiveText = removePacingReassurance(adaptiveText);
     adaptiveText = collapseRepeatedAdjacentSpeech(adaptiveText);
     if (
       (nextSlideProvidesResponse && !isScriptedTriviaQuestion(step) && !namingSlotStep && !isTriviaChoiceStep(step)) ||

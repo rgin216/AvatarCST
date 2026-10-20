@@ -1,3 +1,4 @@
+import { BEING_CREATIVE_PREPARATION, createBeingCreativeScript } from './beingCreativeScript.js';
 import { createCategorizingObjectsScript } from './categorizingObjectsScript.js';
 import { createFacesScenesScript } from './facesScenesScript.js';
 import { createNumberGamesScript } from './numberGamesScript.js';
@@ -21,6 +22,7 @@ const scriptSlideFolders = {
   cst_faces_scenes: 'session7',
   cst_categorizing_objects: 'session10',
   cst_word_associations: 'session8',
+  cst_being_creative: 'session9',
   cst_orientation: 'session11',
   cst_using_money: 'session12',
   cst_number_games: 'session13',
@@ -2683,6 +2685,23 @@ scripts.cst_orientation = createOrientationScript(scripts.cst_faces_scenes);
 scripts.cst_word_games = createWordGamesScript(scripts.cst_faces_scenes);
 scripts.cst_categorizing_objects = createCategorizingObjectsScript(scripts.cst_current_affairs);
 scripts.cst_number_games = createNumberGamesScript(scripts.cst_current_affairs);
+scripts.cst_being_creative = createBeingCreativeScript(scripts.cst_current_affairs);
+
+// Things to have ready before a session starts, shown before the first slide.
+const scriptPreparation = {
+  cst_being_creative: BEING_CREATIVE_PREPARATION,
+};
+
+// The notice sits over the session's first slide, which is shown behind it.
+export const getScriptPreparation = (scriptId) => {
+  const preparation = scriptPreparation[scriptId];
+  if (!preparation) return null;
+  const { slideFolder, deckSlide } = getScriptStep(scriptId, 0).step;
+  return {
+    ...preparation,
+    slideImageUrl: deckSlide ? `/slides/${slideFolder}/slide-${String(deckSlide).padStart(2, '0')}.jpg` : '',
+  };
+};
 
 export const getScript = (scriptId = 'cst_intro_reminiscence') =>
   scripts[scriptId] || scripts.cst_intro_reminiscence;

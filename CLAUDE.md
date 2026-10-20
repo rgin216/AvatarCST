@@ -21,7 +21,7 @@ The project has moved beyond the old "basic backend foundation" phase. The main 
 - The caregiver area asks for the account password again each time it is opened (`CaregiverGate.jsx`, `POST /api/users/:id/verify-password`).
 - New accounts start with an empty memory bank.
 - The API does not yet authenticate requests: passwords gate the UI only, and routes still trust the `userId` they are given.
-- Landing flow with thirteen test sessions (Sessions 9 and 15 are placeholder "coming soon" entries):
+- Landing flow with fourteen test sessions (Session 15 is a placeholder "coming soon" entry):
   - `cst_intro_reminiscence` - Session 1: Introduction and Welcome.
   - `cst_childhood` - Session 2: Getting to Know You: Childhood.
   - `cst_physical_games` - Session 3: Physical Games.
@@ -30,6 +30,7 @@ The project has moved beyond the old "basic backend foundation" phase. The main 
   - `cst_current_affairs` - Session 6: Current Affairs.
   - `cst_faces_scenes` - Session 7: Faces and Scenes.
   - `cst_word_associations` - Session 8: Word Associations.
+  - `cst_being_creative` - Session 9: Being Creative.
   - `cst_categorizing_objects` - Session 10: Categorizing Objects.
   - `cst_orientation` - Session 11: Orientation.
   - `cst_using_money` - Session 12: Using Money.
@@ -37,10 +38,14 @@ The project has moved beyond the old "basic backend foundation" phase. The main 
   - `cst_word_games` - Session 14: Word Games.
 - Scripted session orchestration through `POST /api/sessions/:id/respond`.
 - Microphone input path through `POST /api/sessions/:id/respond-audio`.
-- Slide-backed session UI using exported slide images under `frontend/public/slides/session1/` through `session8/`, and `session10/` through `session14/`.
+- Slide-backed session UI using exported slide images under `frontend/public/slides/session1/` through `session14/`.
 - Session 4 adds an `audioClips` slide interaction: local `.mp3` clips in `frontend/public/audio/session4/` for the instrument-sounds slide and the Name That Tune slides, with a per-slot naming tracker and lenient right/wrong acknowledgement.
 - Session 5 adds a `mealBuilder` slide interaction (drag-or-tap food cards onto a plate, mobile/desktop via Pointer Events) and a `phraseCards` slide interaction (blanked food sayings, judged the same way as Session 4's instrument naming but by content rather than turn order, so an out-of-order answer still lands on the right saying).
 - Session 4 and Session 12 use a `triviaChoice` slide interaction for guessing games: tap-to-choose answer buttons, or a typed/spoken guess, resolve one round at a time. Each tap emits one `[[trivia-choice:...]]` event, which the backend validates and persists before the next selection.
+- Session 9 (`beingCreativeScript.js`) adds:
+  - a pre-session preparation notice (pen and paper), defined per script with `getScriptPreparation` in `cstScriptService.js`, returned as `preparation` on the session, and shown by `SessionPreparationNotice.jsx` after input practice as an overlay on the session's first slide, while `SessionPage` holds its first turn (`holdStart`);
+  - an `offscreenTask` slide interaction for the pen-and-paper drawing: a finish button over the slide, and no inactivity reminder on that step;
+  - step fields `revealFact` (Aria shares the fact, such as a painting's title and artist, after acknowledging any answer), `avoidPacingReassurance` (strips "take your time"-style sentences from Aria's reply), and `inactivityReminderLead` (replaces the reminder's "Take your time; there is no rush." opener).
 - Local avatar rendering with:
   - male avatar path based on `frontend/public/models/harry.glb`,
   - experimental female/avatar mode path,
@@ -55,7 +60,7 @@ The project has moved beyond the old "basic backend foundation" phase. The main 
 - Memory is stored, reviewed, and injected, but retrieval is currently broad and simple: the orchestrator loads approved memory entries and passes a small slice back as `memoryUsed`. There is no semantic search or scoring yet.
 - `suggestedMemoryUpdates` is heuristic only, based on simple regexes in `sessionOrchestratorService.js`, and is saved as pending caregiver-review memory.
 - The current voice paths still wait for a recorded browser audio blob before transcription starts; they are lower-latency response paths, not live full-duplex voice.
-- The eleven sessions are useful test scripts, not polished clinical content.
+- The fourteen sessions are useful test scripts, not polished clinical content.
 - Docs other than this file may still be stale; prefer source files over README text when they disagree.
 
 ## Current Audio / LLM Pipeline
@@ -144,12 +149,12 @@ The session state fields that matter most are:
 Script data is currently split across two layers:
 
 - `backend/src/services/cstScriptService.js` contains executable session steps used by the app.
-- `backend/context/vCST_Session1_AI_Script.md` through `vCST_Session8_AI_Script.md`, and `vCST_Session10_AI_Script.md` through `vCST_Session14_AI_Script.md`, hold fuller source script text and adaptation guidance. Each markdown file has one `---`-separated section per executable step, in order, after a preamble section. Session 14 is the exception: its prompt context is generated per step in `promptService.js`.
+- `backend/context/vCST_Session1_AI_Script.md` through `vCST_Session14_AI_Script.md` hold fuller source script text and adaptation guidance. Each markdown file has one `---`-separated section per executable step, in order, after a preamble section. Session 14 is the exception: its prompt context is generated per step in `promptService.js`.
 - `backend/context/vCST_Initial_Prompt.md` defines Aria's tone and CST facilitation principles.
 
 Slide images live in:
 
-- `frontend/public/slides/session1/` through `session8/`, and `session10/` through `session14/`
+- `frontend/public/slides/session1/` through `session14/`
 
 When adding a session:
 

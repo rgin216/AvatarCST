@@ -219,6 +219,10 @@ export default function SessionPage({
   defaultAvatarMode = "male",
   defaultSpeechRate = 1,
   onSpeechRateChange,
+  // While a notice (such as "have a pen and paper ready") sits over the page,
+  // show the first slide but hold the first turn so Aria does not speak yet.
+  holdStart = false,
+  previewImageUrl = "",
 }) {
   const [sessionReady, setSessionReady] = useState(false);
   const [messages, setMessages] = useState([]);
@@ -227,7 +231,7 @@ export default function SessionPage({
   const [typing, setTyping] = useState(false);
   const [elapsed, setElapsed] = useState(0);
   const [sessionMetaLabel, setSessionMetaLabel] = useState("");
-  const [slide, setSlide] = useState(defaultSlide);
+  const [slide, setSlide] = useState(() => previewImageUrl ? { ...defaultSlide, imageUrl: previewImageUrl } : defaultSlide);
   const [avatarMode, setAvatarMode] = useState(() => getInitialAvatarMode(defaultAvatarMode));
   const [lipSyncMode, setLipSyncMode] = useState("rhubarb");
   const [speechRate, setSpeechRate] = useState(() => clampSpeechRate(defaultSpeechRate));
@@ -359,6 +363,9 @@ export default function SessionPage({
   // by stepId so a fresh phraseCards slide never shows the old one's reveals.
   const namingSlotsForSlide = namingSlots?.stepId === slide.id ? namingSlots : null;
   const realOrAiInteraction = slide.interaction?.type === "realOrAi";
+  // A task done away from the screen, such as drawing on paper. The slide stays
+  // visible, and there is no inactivity reminder while they work.
+  const offscreenTaskInteraction = slide.interaction?.type === "offscreenTask" ? slide.interaction : null;
   const hasSlideInteraction =
     Boolean(pronunciationInteraction) || wordGuessInteraction || Boolean(orientationInteraction) || hasWheelInteraction ||
     Boolean(exerciseVideo) ||
@@ -879,6 +886,7 @@ export default function SessionPage({
       !exerciseAwaitingCompletion &&
       !musicAwaitingCompletion &&
       !autoAdvanceInteraction &&
+      !offscreenTaskInteraction &&
       !playingAudioClipId &&
       !inactivityRemindedRef.current;
     const expectedActivityRevision = activityRevisionRef.current;
@@ -973,6 +981,7 @@ export default function SessionPage({
     exerciseAwaitingCompletion,
     musicAwaitingCompletion,
     autoAdvanceInteraction,
+    offscreenTaskInteraction,
     playingAudioClipId,
     inactivityTimeoutMs,
     inactivityResetToken,
@@ -980,7 +989,7 @@ export default function SessionPage({
   ]);
 
   useEffect(() => {
-    if (!sessionId || booted.current) return;
+    if (!sessionId || booted.current || holdStart) return;
     booted.current = true;
 
     const startTurn = async () => {
@@ -1003,7 +1012,7 @@ export default function SessionPage({
     };
 
     startTurn();
-  }, [sessionId, userName]);
+  }, [sessionId, userName, holdStart]);
 
   useEffect(() => {
     const embedElement = spotifyEmbedRef.current;
@@ -1740,12 +1749,27 @@ export default function SessionPage({
             backgroundImage: slide.imageUrl && !hasSlideInteraction ? `url(${slide.imageUrl})` : undefined,
           }}
         >
-          {!sessionReady && (
+          {!sessionReady && !holdStart && (
             <div className="slide-loading-overlay" aria-label="Preparing your session">
               <div className="session-loading-spinner" />
             </div>
           )}
           {orientationInteraction && <OrientationActivity key={slide.id || slide.index} interaction={orientationInteraction} title={slide.title} disabled={sessionInputDisabled || isRecording} onActivity={registerUserActivity} onComplete={sendMessage} />}
+          {offscreenTaskInteraction && (
+            <div className="slide-offscreen-task">
+              <button
+                type="button"
+                className="slide-offscreen-done"
+                onClick={() => sendMessage(offscreenTaskInteraction.doneMessage || "I have finished.")}
+                disabled={sessionInputDisabled || isRecording}
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <polyline points="20 6 9 17 4 12" />
+                </svg>
+                {offscreenTaskInteraction.doneLabel || "I have finished"}
+              </button>
+            </div>
+          )}
           {pronunciationInteraction && <PronunciationActivity key={slide.id} interaction={pronunciationInteraction} sessionId={sessionId} disabled={activityControlsDisabled} onActivity={registerUserActivity} onComplete={sendMessage} />}
           {wordGuessInteraction && <WordGuessActivity key={slide.id} sessionId={sessionId} disabled={wordGuessControlsDisabled} onActivity={registerUserActivity} onComplete={sendMessage} />}
           {hasActivityRevealInteraction && (
