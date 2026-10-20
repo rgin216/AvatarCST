@@ -1979,7 +1979,7 @@ export const buildTopicSessionSummary = (answers = [], { themeSong = null } = {}
     [/^number_games_guess_/, 'guessing how many lollies were in a jar'],
     [/^being_creative_(monet_senses|scream|dali|picasso)$/, 'looking at famous paintings'],
     [/^being_creative_(drain|love|box)$/, 'sharing what some thought-provoking art meant to you'],
-    [/^being_creative_(draw_house|house_favourite_part)$/, 'drawing a dream house'],
+    [/^being_creative_(draw_house|house_favourite_part)$/, 'imagining a dream house of your own'],
     [/^being_creative_(water_memory|home_memory)$/, 'remembering favourite places and homes'],
   ]) {
     if (meaningful.some((item) => pattern.test(item.stepId))) addTopic(topic);
