@@ -1173,7 +1173,7 @@ const scripts = {
       },
       recordAnswer: false,
       reply: () =>
-        'Let us play 3-2-1 Action. Choose any three black activity cards, one at a time. When you reveal one, I will describe a gentle seated upper-body action for you to re-enact. Only move in ways that feel safe and comfortable. Select your first card when you are ready.',
+        'Let us play 3-2-1 Action. Choose any three black activity cards, one at a time. When you reveal one, I will describe a gentle seated upper-body action for you to re-enact. Only move in ways that feel safe and comfortable. Tap your first card when you are ready. After trying each action, press “I have finished this action” to choose another card.',
     },
     {
       id: 'physical_games_scattergories',
@@ -1493,7 +1493,7 @@ const scripts = {
         ],
       },
       reply: () =>
-        'On the slide are three short sounds. Have a listen to each one and tell me what you think is making it. It is completely fine to guess.',
+        'On the slide are three short sounds. Press Play for each sound, then say or type what you think is making it. You can replay the sounds. It is completely fine to guess.',
     },
     {
       id: 'sounds_naming_instruments_answer',
@@ -1547,7 +1547,7 @@ const scripts = {
         ],
       },
       reply: () =>
-        'It is time for some sound trivia. These are just for fun, so pick whichever option you like. First: how is sound created? And second: how fast does sound travel?',
+        'It is time for some sound trivia. These are just for fun. For each question, tap an answer, or say or type your choice. First: how is sound created? And second: how fast does sound travel?',
     },
     {
       id: 'sounds_trivia_2',
@@ -1585,7 +1585,7 @@ const scripts = {
         ],
       },
       reply: () =>
-        'Next: what is it called when sound bounces off an object? And in which of these places could you not hear sound at all?',
+        'For each question, tap an answer, or say or type your choice. Next: what is it called when sound bounces off an object? And in which of these places could you not hear sound at all?',
     },
     {
       id: 'sounds_name_that_tune_intro',
@@ -1619,7 +1619,7 @@ const scripts = {
         clips: [{ id: 'tune-1950s', label: 'Play the clip', src: '/audio/session4/tune-1950s.mp3' }],
       },
       reply: () =>
-        'Here is the first clip, from the 1950s. Have a listen — can you name the song, or the artist who sang it?',
+        'Here is the first clip, from the 1950s. Press Play to listen, then say or type your answer — can you name the song, or the artist who sang it?',
     },
     {
       id: 'sounds_name_that_tune_1960s',
@@ -1638,7 +1638,7 @@ const scripts = {
         clips: [{ id: 'tune-1960s', label: 'Play the clip', src: '/audio/session4/tune-1960s.mp3' }],
       },
       reply: () =>
-        'Now a clip from the 1960s. Have a listen — do you know the song or the artist?',
+        'Now a clip from the 1960s. Press Play to listen, then say or type your answer — do you know the song or the artist?',
     },
     {
       id: 'sounds_name_that_tune_motown',
@@ -1657,7 +1657,7 @@ const scripts = {
         clips: [{ id: 'tune-motown', label: 'Play the clip', src: '/audio/session4/tune-motown.mp3' }],
       },
       reply: () =>
-        'Next up, a clip from Motown — the sound of the 1960s and 1970s. Have a listen — can you name the song or the artist?',
+        'Next up, a clip from Motown — the sound of the 1960s and 1970s. Press Play to listen, then say or type your answer — can you name the song or the artist?',
     },
     {
       id: 'sounds_name_that_tune_classical',
@@ -1676,7 +1676,7 @@ const scripts = {
         clips: [{ id: 'tune-classical', label: 'Play the clip', src: '/audio/session4/tune-classical.mp3' }],
       },
       reply: () =>
-        'Last of all, a piece of classical music. Have a listen — can you name the piece, or the composer?',
+        'Last of all, a piece of classical music. Press Play to listen, then say or type your answer — can you name the piece, or the composer?',
     },
     {
       id: 'sounds_modern_music_opinion',
@@ -1697,7 +1697,7 @@ const scripts = {
         'Explore their opinion gently: what they like or dislike about it, or how it compares to music from their day.'
       ),
       reply: () =>
-        'Here is a more recent song. I am not asking you to name it, just to tell me what you think of it. Have a listen — what is your opinion of this artist or song?',
+        'Here is a more recent song. I am not asking you to name it, just to tell me what you think of it. Press Play to listen, then say or type your answer — what is your opinion of this artist or song?',
     },
     {
       id: 'sounds_onomatopoeia',
@@ -1883,7 +1883,7 @@ const scripts = {
         ],
       },
       reply: () =>
-        'On the slide are three well-known food sayings, each missing a word or two. Have a look at each one and see if you can finish it. It is completely fine to guess.',
+        'On the slide are three well-known food sayings, each missing a word or two. Say or type the missing words for each card, in any order. It is completely fine to guess.',
     },
     {
       id: 'food_sensory_game',
@@ -1939,7 +1939,7 @@ const scripts = {
         'Ask whether that combination is something they used to cook themselves, or something someone used to make for them.'
       ),
       reply: () =>
-        "Let's plan a meal together. Choose a few foods from the cards to build a dinner plate — drag one onto the plate, or just tap it.",
+        "Let's plan a meal together. Choose a few foods from the cards to build a dinner plate — drag one onto the plate, or just tap it. Tap a food on the plate to remove it. When you are ready, press “That's my plate”.",
       followUps: [
         ({ mealChoice }) =>
           mealChoice
@@ -2088,7 +2088,7 @@ const scripts = {
         ],
       },
       reply: () =>
-        'On the slide are three everyday phrases, each missing a word. There is no right answer here — whatever word comes to mind fills the blank. Have a go at each one, in any order.',
+        'On the slide are three everyday phrases, each missing a word. There is no right answer here — whatever word comes to mind fills the blank. Say or type a word for each card, in any order.',
     },
     {
       id: 'word_associations_pairs',
@@ -2119,7 +2119,7 @@ const scripts = {
         ],
       },
       reply: () =>
-        'On the slide are three familiar word pairs, each missing the second word. Have a look at each one and see if you can finish it. It is completely fine to guess.',
+        'On the slide are three familiar word pairs, each missing the second word. Say or type the missing words for each card, in any order. It is completely fine to guess.',
     },
     {
       id: 'word_associations_famous_phrases',
@@ -2148,7 +2148,7 @@ const scripts = {
         ],
       },
       reply: () =>
-        'On the slide are three well-known sayings, each missing a word. Have a look at each one and see if you can finish it. It is completely fine to guess.',
+        'On the slide are three well-known sayings, each missing a word. Say or type the missing words for each card, in any order. It is completely fine to guess.',
     },
     {
       id: 'word_associations_match_phrase',
@@ -2179,7 +2179,7 @@ const scripts = {
         ],
       },
       reply: () =>
-        'Match each saying to how it ends. Drag between them, or tap a saying then an ending. Press Check matches when you are ready.',
+        'Match each saying to how it ends. Drag between them, or tap a saying then an ending. Press Check matches when you are ready, then Continue after reviewing your matches.',
     },
     {
       id: 'word_associations_sayings',
@@ -2208,7 +2208,7 @@ const scripts = {
         ],
       },
       reply: () =>
-        'On the slide are three more familiar sayings, each missing a word. Have a look at each one and see if you can finish it. It is completely fine to guess.',
+        'On the slide are three more familiar sayings, each missing a word. Say or type the missing words for each card, in any order. It is completely fine to guess.',
     },
     {
       id: 'word_associations_category',
@@ -2379,7 +2379,7 @@ const scripts = {
         ],
       },
       reply: () =>
-        'Let us play a guessing game about prices, then and now. It is just for fun, so pick whichever option you like. First: how much did the average New Zealand family make in a year, back in 1980? And then: how much does the average family make in a year now, in 2024?',
+        'Let us play a guessing game about prices, then and now. It is just for fun. For each question, tap an answer, or say or type your choice. First: how much did the average New Zealand family make in a year, back in 1980? And then: how much does the average family make in a year now, in 2024?',
     },
     {
       id: 'money_trivia_newspaper',
@@ -2417,7 +2417,7 @@ const scripts = {
         ],
       },
       reply: () =>
-        'Next: what did a year of the New Zealand Herald newspaper cost, back in 1980? And what does it cost now, in 2024?',
+        'For each question, tap an answer, or say or type your choice. Next: what did a year of the New Zealand Herald newspaper cost, back in 1980? And what does it cost now, in 2024?',
     },
     {
       id: 'money_trivia_milk',
@@ -2455,7 +2455,7 @@ const scripts = {
         ],
       },
       reply: () =>
-        'Now, milk: what did a 1 litre bottle of Anchor milk cost back in 1980? And what does it cost now, in 2024?',
+        'For each question, tap an answer, or say or type your choice. Now, milk: what did a 1 litre bottle of Anchor milk cost back in 1980? And what does it cost now, in 2024?',
     },
     {
       id: 'money_trivia_house',
@@ -2493,7 +2493,7 @@ const scripts = {
         ],
       },
       reply: () =>
-        'Last one: what was the median house price in New Zealand back in 1980? And what is it now, in 2024?',
+        'For each question, tap an answer, or say or type your choice. Last one: what was the median house price in New Zealand back in 1980? And what is it now, in 2024?',
     },
     {
       id: 'money_world_currencies',

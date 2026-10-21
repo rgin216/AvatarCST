@@ -243,7 +243,7 @@ export function createNumberGamesScript(shared) {
         ],
       },
       reply: () =>
-        'Now for some everyday numbers. There are four questions on the cards: how many tyres are on a car, how many wheels are on a tricycle, which number is unlucky, and how many players are in a rugby team. Have a go at any of them, in any order.',
+        'Now for some everyday numbers. There are four questions on the cards: how many tyres are on a car, how many wheels are on a tricycle, which number is unlucky, and how many players are in a rugby team. Say or type the missing number for each card, in any order.',
     }),
     memoryQuestion(
       'rugby',
@@ -298,7 +298,7 @@ export function createNumberGamesScript(shared) {
         ],
       },
       reply: () =>
-        'Next, three things that come in fours. Pick whichever answer you like, or say it. Which good-luck plant has four leaves? What does the New Zealand flag have four of? And which famous foursome made its American debut on The Ed Sullivan Show in 1964?',
+        'Next, three things that come in fours. For each question, tap an answer, or say or type your choice. Which good-luck plant has four leaves? What does the New Zealand flag have four of? And which famous foursome made its American debut on The Ed Sullivan Show in 1964?',
     }),
     memoryQuestion(
       'beatles',
