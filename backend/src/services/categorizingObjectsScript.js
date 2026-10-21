@@ -69,7 +69,7 @@ export function createCategorizingObjectsScript(shared) {
     activity('odd_one_out', 17, "What doesn't belong?", 'Look at all these pictures. Which items do you think do not belong with the others? Tap or click to circle them, then press Check selections. You can change your choices before checking.', {
       interaction: { type: 'objectSelection', mode: 'odd', items: oddItems }, activityKind: 'odd',
     }),
-    activity('pairs', 18, 'What goes together?', 'Choose two objects you think go together. Each pair will have its own colour and number. There are many possible connections: how we use them, a room they belong in, their material, or their colour. You can reuse an object in a different pair. Choose two to begin, and press Done whenever you have had enough.', {
+    activity('pairs', 18, 'What goes together?', 'Choose two objects you think go together. Each pair will have its own colour and number. There are many possible connections: how we use them, a room they belong in, their material, or their colour. You can reuse an object in a different pair. Tap two objects to make a pair, then say or type what connects them. Press Done whenever you have had enough.', {
       interaction: { type: 'objectSelection', mode: 'pairs', items: pairItems }, activityKind: 'pairs',
     }),
     activity('category', 19, 'Choose a category', 'Now we will try Categories from A to Z. First choose a category, such as animals, foods, places, or names. Then we will choose a letter and think of words in that category beginning with it. What category would you like?', { activityKind: 'category' }),

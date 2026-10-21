@@ -36,7 +36,7 @@ export function createOrientationScript(shared) {
         inactivityTimeoutMs: 180000,
         trivia: { choices: options, answer, aliases: [answer, ...aliases] },
         interaction: { type: 'choiceQuestion', question, progress: `Question ${number} of 5`, options },
-        reply: () => `${number === 1 ? (slide === 17 ? 'Let us move on to some general geography trivia. These are just for fun, so take your time. ' : 'Now, let us move on to some general landmark trivia. ') : ''}${question} ${options.map((option, index) => `${'ABCD'[index]}, ${option}`).join('; ')}. You can choose from the list, say the letter or place, or say I am not sure.`,
+        reply: () => `${number === 1 ? (slide === 17 ? 'Let us move on to some general geography trivia. These are just for fun, so take your time. ' : 'Now, let us move on to some general landmark trivia. ') : ''}${question} ${options.map((option, index) => `${'ABCD'[index]}, ${option}`).join('; ')}. Choose from the list and press Confirm answer, or say or type the letter or place. You can also choose I’m not sure.`,
       });
   };
   const focused = (suffix, slide, title, question, progress) => discussion(suffix, slide, title, question,

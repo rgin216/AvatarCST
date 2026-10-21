@@ -22,7 +22,7 @@ export function createFacesScenesScript(shared) {
   });
   const matching = (suffix, deckSlide, title, descriptions, names, answers) => ({
     ...discussion(suffix, deckSlide, title,
-      'Match each clue to a name. Drag between them, or tap a clue then a name. Press Check matches when you are ready.',
+      'Match each clue to a name. Drag between them, or tap a clue then a name. Press Check matches when you are ready, then Continue after reviewing your matches.',
       descriptions.map((description, index) => `${description}: ${names[answers[index]]}`),
       'Use these associations to respond gently to matches. Never demand a perfect score. The original NZ slide omitted Michael Jones; he is included in this activity.'),
     adaptiveFollowUp: undefined,

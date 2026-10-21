@@ -6,7 +6,6 @@ import {
   buildTopicSessionSummary,
   buildSafetyInactivityReminderText,
   buildNewsElaboration,
-  buildInteractiveGameGuidance,
   buildThemeSongLookupFeedback,
   canRequestAdaptiveFollowUp,
   collapseRepeatedAdjacentSpeech,
@@ -1027,7 +1026,7 @@ test('asks which Celebration recording to use and resolves the chosen track', ()
   assert.equal(resolveThemeSongSelectedTrack('Celebration', pendingSong), null);
 });
 
-test('every interactive game has first-entry guidance without repeating it on the next matching slide', () => {
+test('activity entry speaks only the authored instructions on start and slide transitions', () => {
   const scriptIds = [
     'cst_childhood', 'cst_physical_games', 'cst_sounds', 'cst_food', 'cst_current_affairs',
     'cst_faces_scenes', 'cst_word_associations', 'cst_categorizing_objects',
@@ -1036,37 +1035,44 @@ test('every interactive game has first-entry guidance without repeating it on th
   const gameTypes = new Set([
     'questionWheel', 'activityReveal', 'triviaChoice', 'phraseCards', 'matching',
     'realOrAi', 'mealBuilder', 'objectSelection', 'pronunciation', 'wordGuess',
-    'audioClips', 'choiceQuestion',
+    'audioClips', 'choiceQuestion', 'focusedQuestion', 'offscreenTask',
   ]);
   for (const scriptId of scriptIds) {
     const steps = getScript(scriptId);
     for (const [index, step] of steps.entries()) {
-      const type = step.interaction?.type;
-      if (!gameTypes.has(type)) continue;
-      assert.ok(buildInteractiveGameGuidance(step), `${scriptId}: ${step.id}`);
-      if (steps[index - 1]?.interaction?.type === type && steps[index - 1]?.interaction?.mode === step.interaction?.mode) {
-        assert.equal(buildInteractiveGameGuidance(step, steps[index - 1]), '', `${scriptId}: ${step.id}`);
+      if (!gameTypes.has(step.interaction?.type)) continue;
+      const expected = renderScriptReply(step, {});
+      assert.ok(expected, `${scriptId}: ${step.id} has an authored introduction`);
+      // Check the actual way to answer/finish, not just that some narration exists.
+      const requiredControls = {
+        questionWheel: [/press spin/i],
+        activityReveal: [/tap.*card/i, /I have finished this action/i],
+        triviaChoice: [/tap an answer/i, /say or type/i],
+        phraseCards: [/say or type/i, /each card/i],
+        matching: [/drag/i, /tap/i, /Check matches/i, /Continue/i],
+        realOrAi: [/choose Real person or AI generated/i, /tell me your guess/i],
+        mealBuilder: [/drag/i, /tap/i, /That.s my plate/i],
+        objectSelection: step.interaction.mode === 'pairs'
+          ? [/tap two objects/i, /say or type/i, /Done/i]
+          : [/tap or click/i, /Check selections/i],
+        pronunciation: [/click each/i, /all six/i, /Continue/i],
+        wordGuess: [/keyboard/i, /Enter/i, /Give me a hint/i, /Finish this game/i, /Continue/i],
+        audioClips: [/press Play/i, /say or type/i],
+        choiceQuestion: [/Confirm answer/i, /say or type/i],
+        offscreenTask: [/pen and paper/i, /press the button, or tell me/i],
+      };
+      for (const control of requiredControls[step.interaction.type] || []) {
+        assert.match(expected, control, `${scriptId}: ${step.id} explains ${control}`);
+      }
+
+      assert.equal(getProgressScriptLine({ step, currentTurnIndex: 0, context: {} }), expected, step.id);
+      if (index > 0) {
+        assert.equal(getProgressScriptLine({
+          step: steps[index - 1], nextStep: step, currentTurnIndex: 1, stepTurns: 1, context: {},
+        }), expected, `${step.id} transition`);
       }
     }
   }
-});
-
-test('object selection explains pairs after odd-one-out even though the interaction type matches', () => {
-  const odd = { interaction: { type: 'objectSelection', mode: 'odd' } };
-  const pairs = { interaction: { type: 'objectSelection', mode: 'pairs' } };
-  assert.match(buildInteractiveGameGuidance(pairs, odd), /Check pair/i);
-  assert.equal(buildInteractiveGameGuidance(pairs, pairs), '');
-});
-
-test('spoken game guidance appears on entry and is omitted on the next matching slide', () => {
-  const first = getScriptStep('cst_sounds', getScriptStepIndex('cst_sounds', 'sounds_trivia_1')).step;
-  const second = getScriptStep('cst_sounds', getScriptStepIndex('cst_sounds', 'sounds_trivia_2')).step;
-  const prior = getScriptStep('cst_sounds', getScriptStepIndex('cst_sounds', 'sounds_trivia_1') - 1).step;
-  const firstLine = getProgressScriptLine({ step: prior, nextStep: first, currentTurnIndex: 1, stepTurns: 1, context: {} });
-  const secondLine = getProgressScriptLine({ step: first, nextStep: second, currentTurnIndex: 1, stepTurns: 1, context: {} });
-  assert.match(firstLine, /tap one answer on the slide/i);
-  assert.doesNotMatch(secondLine, /tap one answer on the slide/i);
-  assert.match(secondLine, /sound bounces/i);
 });
 
 test('spoken media instructions explain automatic continuation and early Done', () => {

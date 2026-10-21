@@ -2343,30 +2343,8 @@ export const generateSessionSummary = async ({
   }
 };
 
-export const buildInteractiveGameGuidance = (step, previousStep = null) => {
-  const interaction = step?.interaction;
-  const type = interaction?.type;
-  if (!type || (previousStep?.interaction?.type === type && previousStep?.interaction?.mode === interaction.mode)) return '';
-  const guidance = {
-    questionWheel: 'Press Spin on the wheel. When it stops, I will ask its question; you can answer by speaking or typing.',
-    activityReveal: 'Tap a black card, try the action while seated, then press “I have finished this action” before choosing another card.',
-    triviaChoice: 'For each question, tap one answer on the slide, or say or type your choice. We can take them one at a time.',
-    phraseCards: 'Look at each card, then say or type what belongs in its blank. You can answer in any order.',
-    matching: 'Drag to connect each pair, or tap one item on each side. Press Check matches when you are finished.',
-    realOrAi: 'Use the Real person, AI generated, or Not sure buttons, or tell me your guess.',
-    mealBuilder: 'Drag foods onto the plate or tap their cards, then press “That’s my plate” when you are ready.',
-    pronunciation: 'Tap each word to hear it. After all six have played, press Continue.',
-    wordGuess: 'Type a five-letter word into the boxes and press Enter. You can use “Give me a hint” or “Finish this game” whenever you like.',
-    audioClips: 'Press Play on the sound clip, then tell me what you think by speaking or typing. You can replay it.',
-    choiceQuestion: 'Choose an answer from the list and press Confirm answer, or say or type its letter or name.',
-  };
-  if (type === 'objectSelection') return interaction.mode === 'pairs'
-    ? 'Tap two objects and press Check pair. You can make more pairs, then press Done when you are finished.'
-    : 'Tap the objects you think do not belong, then press Check selections.';
-  return guidance[type] || '';
-};
-
-const renderContextualScriptReply = (step, context, previousStep = null, includeGuide = false) => {
+// Activity instructions belong to the authored script, so they are spoken once.
+const renderContextualScriptReply = (step, context) => {
   let reply = step?.interaction?.type === 'positiveNews' &&
     context?.currentAffairs?.reason === 'no-new-headline'
     ? `There are no new positive New Zealand stories available right now. ${PLEASANT_NEWS_PROMPT}`
@@ -2379,7 +2357,7 @@ const renderContextualScriptReply = (step, context, previousStep = null, include
     reply = reply.replace(/When you are finished, press Done, or say or type done\./i,
       'I will continue when the video ends. Press Done if you want to continue sooner.');
   }
-  return includeGuide ? joinSpeechParts(reply, buildInteractiveGameGuidance(step, previousStep)) : reply;
+  return reply;
 };
 
 const getAskedScriptLine = (step, currentTurnIndex, context) =>
@@ -2388,8 +2366,8 @@ const getAskedScriptLine = (step, currentTurnIndex, context) =>
     : renderScriptFollowUp(step, currentTurnIndex - 2, context);
 
 export const getProgressScriptLine = ({ step, nextStep, currentTurnIndex, stepTurns, context }) => {
-  if (currentTurnIndex <= 0) return renderContextualScriptReply(step, context, null, true);
-  if (currentTurnIndex >= stepTurns) return renderContextualScriptReply(nextStep, context, step, true);
+  if (currentTurnIndex <= 0) return renderContextualScriptReply(step, context);
+  if (currentTurnIndex >= stepTurns) return renderContextualScriptReply(nextStep, context);
   return renderScriptFollowUp(step, currentTurnIndex - 1, context);
 };
 
