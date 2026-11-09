@@ -10,13 +10,13 @@ export default function OrientationActivity({ interaction, title, disabled, onAc
     <h1>{title}</h1>
     <p className="orientation-question" id={`${inputId}-question`}>{interaction.question}</p>
     {isChoice ? <form onSubmit={(event) => { event.preventDefault(); if (answer && !disabled) onComplete(answer); }}>
-      <label htmlFor={inputId}>Choose a place</label>
+      <label htmlFor={inputId}>{interaction.answerLabel || 'Choose a place'}</label>
       <select id={inputId} aria-describedby={`${inputId}-question`} value={answer} disabled={disabled}
         onChange={(event) => { setAnswer(event.target.value); onActivity?.(); }}>
         <option value="">Select an answer…</option>
         {interaction.options.map((option, index) => <option key={option} value={option}>{'ABCD'[index]}. {option}</option>)}
       </select>
-      <p>You can also say or type the letter or place name.</p>
+      <p>{interaction.answerHint || 'You can also say or type the letter or place name.'}</p>
       <div className="orientation-actions">
         <button type="submit" disabled={disabled || !answer}>Confirm answer</button>
         <button type="button" disabled={disabled} onClick={() => onComplete('I am not sure')}>I’m not sure</button>

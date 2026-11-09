@@ -1,3 +1,4 @@
+import { createTeamQuizScript } from './teamQuizScript.js';
 import { BEING_CREATIVE_PREPARATION, createBeingCreativeScript } from './beingCreativeScript.js';
 import { createCategorizingObjectsScript } from './categorizingObjectsScript.js';
 import { createFacesScenesScript } from './facesScenesScript.js';
@@ -27,6 +28,7 @@ const scriptSlideFolders = {
   cst_using_money: 'session12',
   cst_number_games: 'session13',
   cst_word_games: 'session14',
+  cst_team_quiz: 'session15',
 };
 
 const physicalGamesWheelOptions = [
@@ -2685,6 +2687,7 @@ scripts.cst_orientation = createOrientationScript(scripts.cst_faces_scenes);
 scripts.cst_word_games = createWordGamesScript(scripts.cst_faces_scenes);
 scripts.cst_categorizing_objects = createCategorizingObjectsScript(scripts.cst_current_affairs);
 scripts.cst_number_games = createNumberGamesScript(scripts.cst_current_affairs);
+scripts.cst_team_quiz = createTeamQuizScript(scripts.cst_number_games, scripts.cst_faces_scenes);
 scripts.cst_being_creative = createBeingCreativeScript(scripts.cst_current_affairs);
 
 // Things to have ready before a session starts, shown before the first slide.

@@ -1,3 +1,4 @@
+import { teamQuizQuestions, evaluateTeamQuizAnswer } from './teamQuizService.js';
 import { evaluateCategorizingTurn } from './categorizingObjectsService.js';
 import { hasCompletedPronunciation, matchesWordGameAnswer, wordGameTriviaFeedback } from './wordGamesService.js';
 import { personalizeCategorizingReply } from './categorizingAcknowledgementService.js';
@@ -757,6 +758,9 @@ const expandTriviaChoices = (content, choices) => {
 };
 
 export const evaluateTriviaAnswer = ({ step, content, answers = [] }) => {
+  if (step?.id?.startsWith('team_quiz_question_')) {
+    return evaluateTeamQuizAnswer(teamQuizQuestions.find(q => q.id === step.id), content);
+  }
   const rule = getTriviaRule(step);
   if (!rule || !content) return null;
   if (step.id.startsWith('word_games_teaser_')) Object.assign(rule, wordGameTriviaFeedback(step, answers));
@@ -1769,6 +1773,7 @@ const toSessionAnswer = ({ step, content }) => ({
   title: step.title,
   prompt: step.prompt,
   answer: content.trim(),
+  ...(step.id.startsWith('team_quiz_question_') ? { quizOutcome: evaluateTriviaAnswer({ step, content })?.outcome } : {}),
 });
 
 const attachAdaptiveFollowUpAnswer = ({ answers, step, question, content }) => {
@@ -3323,6 +3328,7 @@ const respondToSessionTurnWrite = async ({ sessionId, content, activitySession, 
     orientationPractice,
     rememberedChildhoodPlace: orientationPractice.rememberedChildhoodPlace,
     categorizing: categorizingTurn?.state || session.interactionState?.categorizing || {},
+    sessionAnswers: session.interactionState?.sessionAnswers || [],
     previousAnswer: userContent,
     recentMessages,
     name: getDisplayName(user),
@@ -3766,6 +3772,7 @@ const respondToSessionTurnWrite = async ({ sessionId, content, activitySession, 
 
       if (themeSong.status === 'available') {
         sessionAnswers = recordedAnswers;
+        scriptContext.sessionAnswers = sessionAnswers;
         scriptContext.sessionSummary = buildTopicSessionSummary(sessionAnswers, { themeSong });
         const savedThemeSong = buildSavedThemeSong(themeSong, {
           sourceSessionId: session._id,
@@ -3784,6 +3791,7 @@ const respondToSessionTurnWrite = async ({ sessionId, content, activitySession, 
       }
     } else {
       sessionAnswers = recordedAnswers;
+      scriptContext.sessionAnswers = sessionAnswers;
       scriptContext.sessionSummary = buildTopicSessionSummary(sessionAnswers, { themeSong });
     }
   }
@@ -4144,6 +4152,8 @@ const respondToSessionTurnWrite = async ({ sessionId, content, activitySession, 
   }
   if (
     step.interaction?.summarizeOnComplete &&
+    // Session 15 retains scored answers after the recap for the session record.
+    session.scriptId !== 'cst_team_quiz' &&
     displaySlide.id !== step.id
   ) {
     delete nextInteractionState.sessionAnswers;
