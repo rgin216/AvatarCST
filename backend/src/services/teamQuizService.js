@@ -1,3 +1,4 @@
+/** Normalize answer text and aliases for case-, accent-, and punctuation-insensitive matching. */
 const normalize = (value = '') => String(value).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
 
 // Source: NZ15 Team Quiz, slides 16–23. Options support less familiar facts;
@@ -28,6 +29,13 @@ export const teamQuizQuestions = [
   aliases: [answer, ...aliases], options, deckSlide: 16 + Math.floor(index / 5),
 }));
 
+/**
+ * Check a typed or spoken answer, expanding option letters and accepting bounded aliases.
+ * Uncertainty and explicit negation do not earn credit.
+ * @param {object} question Quiz question with aliases and optional answer choices.
+ * @param {string} content Participant's answer.
+ * @returns {boolean} Whether the answer earns credit.
+ */
 export function matchesTeamQuizAnswer(question, content) {
   let text = normalize(content);
   if (/\b(?:don t know|dont know|not sure|unsure|can t remember|cannot remember|no idea)\b/.test(text)) return false;
@@ -41,6 +49,11 @@ export function matchesTeamQuizAnswer(question, content) {
   return question.aliases.some(alias => (` ${text} `).includes(` ${normalize(alias)} `));
 }
 
+/**
+ * Count each quiz question once, preferring its recorded outcome over re-evaluation.
+ * @param {object[]} [answers=[]] Session answers, including any recorded quiz outcomes.
+ * @returns {{correct: number, total: number, attempted: number}} Quiz score and attempt count.
+ */
 export function tallyTeamQuiz(answers = []) {
   const recorded = new Map();
   for (const entry of answers) if (!recorded.has(entry.stepId)) recorded.set(entry.stepId, entry);
@@ -49,6 +62,11 @@ export function tallyTeamQuiz(answers = []) {
   return { correct, total: teamQuizQuestions.length, attempted: attempted.length };
 }
 
+/**
+ * Announce the quiz total with encouragement appropriate to every score.
+ * @param {object[]} [answers=[]] Recorded session answers.
+ * @returns {string} Score announcement and encouragement.
+ */
 export function teamQuizScoreReply(answers = []) {
   const { correct, total } = tallyTeamQuiz(answers);
   const cheer = correct >= 16 ? 'Wonderful work! You recalled so much today.' : correct >= 8
@@ -78,6 +96,12 @@ const alternativeFeedback = {
   ],
 };
 
+/**
+ * Classify one quiz answer and provide varied feedback naming accepted alternatives.
+ * @param {object} question Question from the Team Quiz question bank.
+ * @param {string} content Participant's typed or spoken answer.
+ * @returns {{answered: boolean, outcome: string, response: string}|null} Feedback, or null for missing input.
+ */
 export function evaluateTeamQuizAnswer(question, content) {
   if (!question || !content) return null;
   const text = normalize(content);
@@ -87,7 +111,7 @@ export function evaluateTeamQuizAnswer(question, content) {
   const index = teamQuizQuestions.indexOf(question);
   const answer = question.answer;
   const detail = alternativeFeedback[question.id]?.find(([aliases]) =>
-    aliases.some(alias => (` ${text} `).includes(` ${alias} `)))?.[1] || `${answer}.`;
+    aliases.some(alias => (` ${text} `).includes(` ${normalize(alias)} `)))?.[1] || `${answer}.`;
   const praise = ['Well done!', 'You have got it!', 'Lovely work!', 'Exactly!', 'That is a good answer!', 'Nicely recalled!'];
   const incorrect = [
     `Good effort. This one is ${answer}.`,

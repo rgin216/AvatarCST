@@ -1,5 +1,12 @@
 import { teamQuizQuestions, teamQuizScoreReply } from './teamQuizService.js';
 
+/**
+ * Build Session 15 with shared opening and closing activities, quiz rounds, and feedback.
+ * Cloning preserves live getters and remaps navigation to this session's step IDs.
+ * @param {object[]} numberGames Session 13 steps supplying the standard opening.
+ * @param {object[]} facesScenes Session 7 steps supplying the wheel, recap, and closing.
+ * @returns {object[]} Ordered Team Quiz session steps.
+ */
 export function createTeamQuizScript(numberGames, facesScenes) {
   const clone = (source, overrides = {}) => {
     const step = Object.defineProperties({}, Object.getOwnPropertyDescriptors(source));
