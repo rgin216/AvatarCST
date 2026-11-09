@@ -29,24 +29,32 @@ export const teamQuizQuestions = [
   aliases: [answer, ...aliases], options, deckSlide: 16 + Math.floor(index / 5),
 }));
 
+/** Return separately affirmed clauses while keeping negated lists together. */
+const affirmedAnswerClauses = (content) => String(content)
+  .split(/[,;.!?\n]+(?!\s*(?:and|or)\b)|\b(?:but|rather|instead)\b/i)
+  .map(normalize)
+  .filter(text => !/\b(?:not|no|never|isnt|isn t|dont|don t)\b/.test(text));
+
 /**
  * Check a typed or spoken answer, expanding option letters and accepting bounded aliases.
- * Uncertainty and explicit negation do not earn credit.
+ * Uncertainty and negated clauses do not earn credit; affirmed alternatives can.
  * @param {object} question Quiz question with aliases and optional answer choices.
  * @param {string} content Participant's answer.
  * @returns {boolean} Whether the answer earns credit.
  */
 export function matchesTeamQuizAnswer(question, content) {
-  let text = normalize(content);
+  const text = normalize(content);
   if (/\b(?:don t know|dont know|not sure|unsure|can t remember|cannot remember|no idea)\b/.test(text)) return false;
-  const selection = text.match(/^(?:(?:i think|i choose|i pick|i will go with|i ll go with|it is|it s|the answer is)\s+)?(?:(?:option|letter|answer)\s+)?([abc]|ay|bee|be|see|sea)(?:\s+please)?$/);
-  if (selection && question.options) {
-    const letters = { ay: 'a', bee: 'b', be: 'b', see: 'c', sea: 'c' };
-    text = normalize(question.options[(letters[selection[1]] || selection[1]).charCodeAt(0) - 97]);
-  }
-  if (/\b(?:not|no|never|isnt|isn t|dont|don t)\b/.test(text)) return false;
-  // Word boundaries accept conversational phrasing without accepting substrings.
-  return question.aliases.some(alias => (` ${text} `).includes(` ${normalize(alias)} `));
+  return affirmedAnswerClauses(content).some(clause => {
+    let text = clause;
+    const selection = text.match(/^(?:(?:i think|i choose|i pick|i will go with|i ll go with|it is|it s|the answer is)\s+)?(?:(?:option|letter|answer)\s+)?([abc]|ay|bee|be|see|sea)(?:\s+please)?$/);
+    if (selection && question.options) {
+      const letters = { ay: 'a', bee: 'b', be: 'b', see: 'c', sea: 'c' };
+      text = normalize(question.options[(letters[selection[1]] || selection[1]).charCodeAt(0) - 97]);
+    }
+    // Word boundaries accept conversational phrasing without accepting substrings.
+    return question.aliases.some(alias => (` ${text} `).includes(` ${normalize(alias)} `));
+  });
 }
 
 /**
@@ -111,7 +119,8 @@ export function evaluateTeamQuizAnswer(question, content) {
   const index = teamQuizQuestions.indexOf(question);
   const answer = question.answer;
   const detail = alternativeFeedback[question.id]?.find(([aliases]) =>
-    aliases.some(alias => (` ${text} `).includes(` ${normalize(alias)} `)))?.[1] || `${answer}.`;
+    aliases.some(alias => affirmedAnswerClauses(content).some(clause =>
+      (` ${clause} `).includes(` ${normalize(alias)} `))))?.[1] || `${answer}.`;
   const praise = ['Well done!', 'You have got it!', 'Lovely work!', 'Exactly!', 'That is a good answer!', 'Nicely recalled!'];
   const incorrect = [
     `Good effort. This one is ${answer}.`,

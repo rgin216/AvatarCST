@@ -151,3 +151,18 @@ test('correct, incorrect and unsure acknowledgements vary between questions', ()
     for (let i = 1; i < openings.length; i += 1) assert.notEqual(openings[i], openings[i - 1], kind);
   }
 });
+
+test('negation applies to its clause while affirmed alternatives earn credit', () => {
+  const step = questions[18];
+  for (const content of ['not gold, platinum', 'not gold but platinum', 'platinum, not gold', 'not gold; silver', 'not platinum, gold']) {
+    assert.equal(evaluateTriviaAnswer({ step, content }).outcome, 'correct', content);
+    assert.equal(tallyTeamQuiz([{ stepId: step.id, answer: content }]).correct, 1, content);
+  }
+  for (const content of ['not gold', 'not platinum', 'it is not gold', 'gold is not right', 'not gold or platinum', 'not gold, or platinum', 'not gold, not platinum', 'not gold, copper']) {
+    assert.equal(evaluateTriviaAnswer({ step, content }).outcome, 'incorrect', content);
+    assert.equal(tallyTeamQuiz([{ stepId: step.id, answer: content }]).correct, 0, content);
+  }
+  assert.match(evaluateTriviaAnswer({ step, content: 'not gold, platinum' }).response, /Platinum/);
+  assert.doesNotMatch(evaluateTriviaAnswer({ step, content: 'not platinum, gold' }).response, /Platinum/);
+  assert.equal(evaluateTriviaAnswer({ step: questions[0], content: 'not China, option A' }).outcome, 'correct');
+});
