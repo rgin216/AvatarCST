@@ -170,6 +170,10 @@ ${JSON.stringify(slide.imageGuidance)}
     : '';
 
 const getCurrentStepScript = (scriptId, slide) => {
+  if (scriptId === 'cst_team_quiz') {
+    const { step } = getScriptStep(scriptId, slide.index);
+    return `Session 15: Team Quiz. Current activity: ${step.title}. ${step.prompt}. Ask only this question. Use the scripted answer feedback and score; never invent a score. Accept uncertainty or a pass warmly. Personal feedback and memories are not graded. Do not reveal the answer before the participant tries.`;
+  }
   if (scriptId === 'cst_word_games') {
     const { step } = getScriptStep(scriptId, slide.index);
     const guidance = step.wordAssociation

@@ -80,7 +80,7 @@ test('welcome slides after Session 1 advance after narration without asking for 
     'cst_childhood', 'cst_physical_games', 'cst_sounds', 'cst_food',
     'cst_current_affairs', 'cst_faces_scenes', 'cst_word_associations',
     'cst_categorizing_objects', 'cst_orientation', 'cst_using_money',
-    'cst_number_games', 'cst_word_games', 'cst_being_creative',
+    'cst_number_games', 'cst_word_games', 'cst_team_quiz', 'cst_being_creative',
   ]) {
     const welcome = getScriptStep(scriptId, 0).step;
     assert.equal(welcome.interaction?.type, 'autoAdvance', scriptId);
@@ -1030,7 +1030,7 @@ test('activity entry speaks only the authored instructions on start and slide tr
   const scriptIds = [
     'cst_childhood', 'cst_physical_games', 'cst_sounds', 'cst_food', 'cst_current_affairs',
     'cst_faces_scenes', 'cst_word_associations', 'cst_categorizing_objects',
-    'cst_orientation', 'cst_using_money', 'cst_number_games', 'cst_word_games', 'cst_being_creative',
+    'cst_orientation', 'cst_using_money', 'cst_number_games', 'cst_word_games', 'cst_team_quiz', 'cst_being_creative',
   ];
   const gameTypes = new Set([
     'questionWheel', 'activityReveal', 'triviaChoice', 'phraseCards', 'matching',
@@ -1296,7 +1296,7 @@ test('recognises requests for more news and elaborates only from vetted details'
     'cst_childhood', 'cst_physical_games', 'cst_sounds', 'cst_food',
     'cst_current_affairs', 'cst_faces_scenes', 'cst_word_associations',
     'cst_categorizing_objects', 'cst_orientation', 'cst_using_money',
-    'cst_number_games', 'cst_word_games', 'cst_being_creative',
+    'cst_number_games', 'cst_word_games', 'cst_team_quiz', 'cst_being_creative',
   ]) {
     const step = getScript(scriptId).find(({ interaction }) => interaction?.type === 'positiveNews');
     assert.ok(step, `${scriptId} has a positive-news step`);
