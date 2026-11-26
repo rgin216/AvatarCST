@@ -54,3 +54,63 @@ tail -n 100 ~/avatarcst-deploy/deploy.log
 The quick-tunnel URL remains stable while the tunnel process runs but changes
 if Cloudflared is recreated. For a permanent hostname, replace the tunnel PM2
 entry with a named Cloudflare Tunnel token tied to a domain.
+
+## Keep the Vercel frontend in sync with the Quick Tunnel
+
+The sync job reads the latest tunnel hostname from PM2's logs. When it changes,
+the job checks the new public `/api/health`, updates the production
+`VITE_API_URL`, and queues a deployment. Vite embeds this value at build time,
+so the old frontend may fail until the new build is live.
+
+1. In the Vercel frontend project, make sure `VITE_API_URL` has its own entry
+   scoped only to **Production**. If the existing entry covers multiple
+   environments, split it and retain the existing values for the other
+   environments. Use the current working tunnel URL plus `/api` as its value.
+2. In Vercel **Settings → Git → Deploy Hooks**, create a hook for the project's
+   production branch (usually `main`). From **Settings → General**, copy the
+   project ID. Create a Vercel access token scoped to the account or team that
+   owns the project. For a team project, also copy the team ID from team settings.
+3. After this script is on GitHub `main` and the server has deployed that
+   revision, sign into the university server as the deployment account. Create
+   the private configuration file:
+
+   ```bash
+   umask 077
+   touch ~/avatarcst-deploy/shared/vercel-sync.env
+   chmod 600 ~/avatarcst-deploy/shared/vercel-sync.env
+   nano ~/avatarcst-deploy/shared/vercel-sync.env
+   ```
+
+   Paste the following, replacing the placeholders. Omit the team ID line for
+   a personal project. Keep both the token and deploy hook URL in this file.
+
+   ```dotenv
+   AVATARCST_VERCEL_TOKEN=your-token
+   AVATARCST_VERCEL_PROJECT_ID=prj_your_project_id
+   AVATARCST_VERCEL_TEAM_ID=team_your_team_id
+   AVATARCST_VERCEL_DEPLOY_HOOK=https://api.vercel.com/v1/integrations/deploy/your-project/your-hook
+   ```
+
+4. Run the job once on the server and confirm Vercel shows a new production
+   deployment. Once it is Ready, start a session from the frontend.
+
+   ```bash
+   flock -n "$HOME/avatarcst-deploy/shared/vercel-sync.lock" \
+     "$HOME/.local/node-current/bin/node" \
+     --env-file="$HOME/avatarcst-deploy/shared/vercel-sync.env" \
+     "$HOME/avatarcst-deploy/current/deployment/uoa-server/sync-vercel-api.mjs" \
+     "$HOME/avatarcst-deploy/shared"
+   ```
+
+5. Run `crontab -e` and add the line below alongside the existing deployment
+   entries. It checks every minute and exits without calling Vercel when it has
+   already queued a build for that URL.
+
+   ```cron
+   * * * * * flock -n "$HOME/avatarcst-deploy/shared/vercel-sync.lock" "$HOME/.local/node-current/bin/node" --env-file="$HOME/avatarcst-deploy/shared/vercel-sync.env" "$HOME/avatarcst-deploy/current/deployment/uoa-server/sync-vercel-api.mjs" "$HOME/avatarcst-deploy/shared" >> "$HOME/avatarcst-deploy/shared/vercel-sync.log" 2>&1
+   ```
+
+The next run retries health checks and Vercel requests that fail before a build
+is queued. Check `~/avatarcst-deploy/shared/vercel-sync.log` for those failures.
+If Vercel accepts a build and the build later fails, check the build logs in
+Vercel, fix the error, and retry the deployment there.
