@@ -59,10 +59,12 @@ async function sync() {
   };
   const listing = await request(envUrl, { headers }, 'Vercel environment lookup');
   const { envs } = await listing.json();
-  const production = envs.filter(({ key, target }) =>
-    key === 'VITE_API_URL' && target?.includes('production'));
-  if (production.length !== 1 || production[0].target.length !== 1) {
-    throw new Error('Create exactly one VITE_API_URL entry scoped only to Production in Vercel');
+  const production = envs
+    .filter(({ key }) => key === 'VITE_API_URL')
+    .map(({ id, target }) => ({ id, targets: Array.isArray(target) ? target : [target] }))
+    .filter(({ targets }) => targets.includes('production'));
+  if (production.length !== 1 || production[0].targets.length !== 1) {
+    throw new Error('Vercel must have exactly one VITE_API_URL entry targeting Production, and that entry must target only Production');
   }
 
   envUrl.pathname += `/${encodeURIComponent(production[0].id)}`;
